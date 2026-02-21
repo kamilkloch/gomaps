@@ -1,0 +1,5 @@
+node_modules
+dist
+data
+playwright-report
+.DS_Store
