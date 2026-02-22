@@ -1,0 +1,428 @@
+{
+  "project": "GoMaps",
+  "branchName": "ralph/gomaps-v1",
+  "description": "Google Maps accommodation scraper with interactive Explorer UI — see SPEC.md for full specification, DEVELOPMENT.md for implementation guide",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Project restructure — monorepo setup",
+      "description": "Set up monorepo with server/ and client/ packages. Move existing MVP to legacy/. Server: Express + TypeScript. Client: Vite + React + TypeScript. Root npm workspaces. .env.example with GOOGLE_MAPS_API_KEY.",
+      "acceptanceCriteria": [
+        "npm install from root succeeds",
+        "server/ and client/ each have package.json and tsconfig.json",
+        "legacy/src/index.ts contains the original MVP code",
+        "npm run typecheck passes in both server/ and client/",
+        "npm run build succeeds in both packages",
+        "server starts and responds to GET /health with 200",
+        "client dev server starts and renders a placeholder page",
+        ".env.example exists with GOOGLE_MAPS_API_KEY placeholder"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "SQLite database schema and data access layer",
+      "description": "Create SQLite schema covering all entities from SPEC.md §6: Project, ScrapeRun, Tile, Place, Review, PlaceScrapeRun, Shortlist, ShortlistEntry. Use better-sqlite3. Typed query functions for CRUD. Tests for schema creation and basic CRUD.",
+      "acceptanceCriteria": [
+        "better-sqlite3 installed in server/",
+        "Schema creates all tables: projects, scrape_runs, tiles, places, reviews, place_scrape_runs, shortlists, shortlist_entries",
+        "Typed CRUD functions exist for each entity",
+        "Tests pass: create DB, insert/read/update/delete for Project and Place entities",
+        "npm run typecheck passes in server/",
+        "Database file is created in a configurable location (default: data/gomaps.db)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Express API skeleton with project CRUD",
+      "description": "Express server with route modules for projects, scrapes, places, shortlists. Full CRUD for Projects endpoint. Other routes export placeholder routers. Integrate with SQLite DB layer from US-002.",
+      "acceptanceCriteria": [
+        "GET /api/projects returns list of projects",
+        "POST /api/projects creates a project (name, bounds)",
+        "GET /api/projects/:id returns single project",
+        "PUT /api/projects/:id updates project",
+        "DELETE /api/projects/:id deletes project",
+        "Placeholder routers mounted at /api/scrape, /api/places, /api/shortlists",
+        "npm run typecheck passes",
+        "Integration tests pass for project CRUD"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "React app shell with Google Maps",
+      "description": "Bootstrap React app with Vite. React Router with pages: Setup, Explorer, Shortlists. Embed Google Maps on Setup page using @vis.gl/react-google-maps. Map renders, is interactive. Proxy API requests to Express server.",
+      "acceptanceCriteria": [
+        "npm run dev starts the React dev server",
+        "React Router navigates between Setup, Explorer, Shortlists pages",
+        "Google Maps renders on Setup page (interactive — pan, zoom)",
+        "API key loaded from VITE_GOOGLE_MAPS_API_KEY env var",
+        "Vite proxy forwards /api/* requests to Express server",
+        "npm run typecheck passes in client/",
+        "npm run build succeeds in client/"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Extract scraper into modular engine",
+      "description": "Refactor MVP scraper logic from legacy/src/index.ts into server/src/scraper/engine.ts. Importable module (not standalone script). Accepts config via parameters. Writes results to SQLite instead of JSON/CSV. Preserves: URL collection, detail extraction, CAPTCHA pause, checkpoint/resume.",
+      "acceptanceCriteria": [
+        "server/src/scraper/engine.ts exports a startScrape() function",
+        "Function accepts typed config: query, bounds, browser options",
+        "Scraped places are inserted into SQLite Place table",
+        "Reviews are inserted into SQLite Review table",
+        "CAPTCHA detection and pause mechanism preserved",
+        "URL normalization and lat/lng parsing extracted as testable functions",
+        "Unit tests pass for URL normalization, lat/lng parsing",
+        "npm run typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Adaptive tiling algorithm",
+      "description": "Implement server/src/scraper/tiling.ts. Given bounding box, generate coarse grid (~0.1°). Process tiles one at a time. If result count >= threshold (~120), subdivide into 4 sub-tiles. Track tile status in DB. Enforce minimum tile size floor. See SPEC.md §5.",
+      "acceptanceCriteria": [
+        "generateTiles(bounds) returns initial grid of tile objects",
+        "subdivideTile(tile) returns 4 child tiles",
+        "shouldSubdivide(resultCount, threshold) returns boolean",
+        "Minimum tile size floor (0.01°) prevents infinite recursion",
+        "Tile status tracked in SQLite: pending, running, completed, subdivided",
+        "Progress can be queried: tiles total/completed/subdivided, places found",
+        "Unit tests pass for tile generation, subdivision, bounds math",
+        "npm run typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Enhanced detail extraction",
+      "description": "Extend scraper to extract: priceLevel, photoUrls (first N), openingHours (text), amenities (best-effort from About tab). Store reviews in Review table with individual rating + text. See SPEC.md §7 extraction table.",
+      "acceptanceCriteria": [
+        "Place records include priceLevel (nullable string)",
+        "Place records include photoUrls (array of URLs)",
+        "Place records include openingHours (nullable string)",
+        "Place records include amenities (array of strings)",
+        "Reviews stored in reviews table with placeId, rating, text, relativeDate",
+        "Extraction handles missing fields gracefully (nulls, empty arrays)",
+        "npm run typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Website classification",
+      "description": "Implement server/src/scraper/classifier.ts. Classify place website domain as direct/ota/social/unknown. Hardcoded allowlist of ~30 OTA and social domains. See SPEC.md §7 classification table.",
+      "acceptanceCriteria": [
+        "classifyWebsite(url) returns 'direct' | 'ota' | 'social' | 'unknown'",
+        "Correctly classifies: booking.com, airbnb.com, expedia.com, hotels.com, vrbo.com, agoda.com, tripadvisor.com → ota",
+        "Correctly classifies: facebook.com, instagram.com → social",
+        "Correctly classifies: www.hotel-example.it → direct",
+        "Handles subdomains: www.booking.com → ota",
+        "Handles null/undefined input → unknown",
+        "Place records include websiteType field populated by classifier",
+        "Comprehensive tests pass (15+ test cases)",
+        "npm run typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Scrape API — start, monitor, pause with SSE progress",
+      "description": "Wire scraper into Express API. POST to start scrape (projectId + query). GET scrape run status. POST to pause/resume. SSE endpoint for live progress. Scraper runs as background async task in server process.",
+      "acceptanceCriteria": [
+        "POST /api/scrape/start accepts { projectId, query } and returns scrapeRunId",
+        "GET /api/scrape/:runId returns run status, tile progress, place counts",
+        "POST /api/scrape/:runId/pause pauses the running scrape",
+        "POST /api/scrape/:runId/resume resumes a paused scrape",
+        "GET /api/scrape/:runId/progress is an SSE endpoint streaming progress events",
+        "Progress events include: { tilesCompleted, tilesTotal, tilesSubdivided, placesFound, placesUnique, elapsedMs }",
+        "Scrape runs in background — API remains responsive during scrape",
+        "npm run typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Project management UI",
+      "description": "React Projects page. List projects (name, date, place count). New Project button → form. Clicking project navigates to its Setup page. Fetch from /api/projects.",
+      "acceptanceCriteria": [
+        "Projects page lists all projects from API",
+        "Each project shows name, creation date, place count",
+        "'New Project' button opens a creation form (name input)",
+        "Creating a project calls POST /api/projects and refreshes list",
+        "Clicking a project navigates to /projects/:id/setup",
+        "Delete button removes project (with confirmation)",
+        "npm run typecheck passes",
+        "npm run build succeeds"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Google Maps area selection with drawable rectangle",
+      "description": "On project Setup page, Google Maps with 'Select Area' button. Current viewport becomes a draggable/resizable rectangle. Bounding box coords displayed and saved to project via API. Existing bounds shown on load.",
+      "acceptanceCriteria": [
+        "Setup page shows full Google Maps view for the project",
+        "'Select Area' button creates a rectangle matching current viewport",
+        "Rectangle is draggable and resizable with handles",
+        "Bounding box coordinates (SW lat/lng, NE lat/lng) displayed below map",
+        "'Save Area' persists bounds to project via PUT /api/projects/:id",
+        "On page load, existing project bounds are shown as rectangle on map",
+        "npm run typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Scrape launch and live progress display",
+      "description": "Query input + Start Scrape button on Setup page. Start calls API. Progress panel subscribes to SSE. Shows live stats: tiles, places, elapsed, ETA. Tile status overlay on map (green/yellow/gray rectangles).",
+      "acceptanceCriteria": [
+        "Query text input field on Setup page",
+        "'Start Scrape' button calls POST /api/scrape/start",
+        "Progress panel appears showing live stats from SSE",
+        "Stats shown: tiles completed/total, places found (unique), elapsed time, estimated remaining",
+        "Tile rectangles overlaid on Google Maps: green=completed, yellow=running, gray=pending",
+        "Pause/Resume button toggles scrape state",
+        "User can navigate away and return to see current progress",
+        "npm run typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Map view with place markers and clustering",
+      "description": "Explorer page. Fetch places for current project. Render as custom markers on Google Maps. Color by rating (red/yellow/green). Marker clustering when zoomed out. Click marker to select.",
+      "acceptanceCriteria": [
+        "Explorer page at /projects/:id/explorer",
+        "GET /api/places?projectId=X returns all places for project",
+        "Places rendered as colored markers on Google Maps",
+        "Marker color by rating: red (< 3.5), yellow (3.5–4.2), green (> 4.2)",
+        "Marker clustering via @googlemaps/markerclusterer when zoomed out",
+        "Clicking a marker selects it (visually distinct — larger or highlighted)",
+        "npm run typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Place table with sorting and virtual scrolling",
+      "description": "Table below map on Explorer page. Columns: Name, Category, Rating, Reviews, Price, Website (linked), Address. Sortable columns. Virtual scrolling for 5000+ rows. Inline text filter.",
+      "acceptanceCriteria": [
+        "Table displays all places for the current project",
+        "Columns: Name, Category, Rating, Review Count, Price Level, Website, Address",
+        "Clicking column header sorts ascending/descending",
+        "Website column renders as clickable link",
+        "Virtual scrolling handles 5000+ rows without lag",
+        "Inline text filter above table filters rows across all text columns",
+        "npm run typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-015",
+      "title": "Detail panel with reviews",
+      "description": "Right-side panel showing selected place details. All fields from SPEC.md §8.4: name, rating, price, address, phone, website with Direct/OTA badge, amenities, photos, hours, reviews. Action link: Open in Google Maps.",
+      "acceptanceCriteria": [
+        "Panel opens on right side when a place is selected",
+        "Displays all place fields: name, category, rating, reviewCount, priceLevel, address, phone, website, amenities, photoUrls, openingHours, scrapedAt",
+        "Phone rendered as clickable tel: link",
+        "Website shows badge: green 'Book Direct' for direct, orange 'OTA' for ota, gray for none",
+        "Photo URLs rendered as clickable thumbnail strip",
+        "Reviews section shows all reviews (rating + text)",
+        "Reviews searchable via text input within panel",
+        "'Open in Google Maps' link opens googleUrl in new tab",
+        "npm run typecheck passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-016",
+      "title": "Map ↔ Table bidirectional selection sync",
+      "description": "Clicking map marker highlights table row + opens detail panel. Clicking table row centers map on marker + opens detail panel. Selected marker has distinct visual style.",
+      "acceptanceCriteria": [
+        "Clicking a map marker: scrolls table to corresponding row, highlights it, opens detail panel",
+        "Clicking a table row: centers map on corresponding marker, opens detail panel",
+        "Selected marker has distinct visual style (larger/different color/bouncing)",
+        "Only one place selected at a time",
+        "Deselecting (clicking empty area) closes detail panel",
+        "npm run typecheck passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-017",
+      "title": "Fuzzy text search",
+      "description": "Search bar at top of Explorer. Fuzzy search across place name, address, category, amenities, review text. Updates map (only matching markers) and table. Use Fuse.js or SQLite FTS5. Debounce 300ms.",
+      "acceptanceCriteria": [
+        "Search input at top of Explorer page",
+        "Typing filters places by fuzzy match across: name, address, category, amenities, review text",
+        "Map shows only matching markers",
+        "Table shows only matching rows",
+        "Search is debounced (300ms)",
+        "Clearing search restores all results",
+        "npm run typecheck passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-018",
+      "title": "Filter panel",
+      "description": "Collapsible filter panel on Explorer. Filters: rating range slider, min review count, category multi-select, has website toggle, website type (direct/OTA), price level multi-select. AND logic. Updates map + table live. Persists in URL params.",
+      "acceptanceCriteria": [
+        "Collapsible/expandable filter panel on Explorer page",
+        "Rating: range slider (1.0–5.0)",
+        "Min reviews: number input",
+        "Category: multi-select checkboxes (populated from data)",
+        "Has website: toggle (Yes/No/Any)",
+        "Website type: checkboxes (Direct/OTA/Social)",
+        "Price level: multi-select ($, $$, $$$, $$$$)",
+        "All filters combine with AND logic",
+        "Map markers and table update live as filters change",
+        "Filter state persisted in URL query parameters",
+        "npm run typecheck passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-019",
+      "title": "Review keyword search and distance filter",
+      "description": "Two advanced filters: (1) Review keyword text input — filter to places with matching reviews, highlight keyword in detail panel. (2) Distance from point — click map to set center point, radius slider (1–50km), filter places within radius.",
+      "acceptanceCriteria": [
+        "Review keyword filter: text input that filters to places where >= 1 review contains the keyword",
+        "Matching keywords highlighted in detail panel review section",
+        "Distance filter: click map to set center point (shown as marker)",
+        "Radius slider (1–50km) appears after point is set",
+        "Only places within radius are shown on map and table",
+        "Circle overlay drawn on map showing the radius",
+        "Both filters integrate with existing filter system (AND logic)",
+        "npm run typecheck passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-020",
+      "title": "Star/bookmark places and shortlist management",
+      "description": "Star toggle in table, map popups, detail panel. Stars saved to default shortlist via API. Shortlists page: list/create/rename/delete shortlists. Move places between shortlists. Per-entry notes. Full shortlist CRUD API.",
+      "acceptanceCriteria": [
+        "⭐ toggle button in table rows, detail panel",
+        "Starring a place saves it to default shortlist via API",
+        "POST/GET/PUT/DELETE /api/shortlists endpoints work",
+        "POST/DELETE /api/shortlists/:id/entries endpoints work",
+        "Shortlists page lists all shortlists for a project",
+        "Can create, rename, delete shortlists",
+        "Can add free-text notes to each shortlist entry",
+        "Can move entries between shortlists",
+        "npm run typecheck passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-021",
+      "title": "Comparison view and CSV export",
+      "description": "On Shortlists page, select 2–3 places for side-by-side comparison. Comparison table shows key fields in columns. Export CSV button downloads shortlist as CSV with all place fields + user notes.",
+      "acceptanceCriteria": [
+        "Checkbox selection on shortlist entries (max 3)",
+        "'Compare' button opens side-by-side comparison view",
+        "Comparison shows: name, rating, reviews, price, website, amenities, address",
+        "'Export CSV' button downloads shortlist as CSV",
+        "CSV includes all place fields plus user notes",
+        "npm run typecheck passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-022",
+      "title": "Re-scrape support",
+      "description": "Refresh Data button on project page. Re-visits detail pages of all existing places to update data. Skips tiling/discovery. Special ScrapeRun type. Progress shown in UI.",
+      "acceptanceCriteria": [
+        "'Refresh Data' button on project Setup page",
+        "POST /api/scrape/rescrape accepts { projectId } and creates a re-scrape run",
+        "Re-scrape iterates existing place URLs, not tiles",
+        "Updated place data (rating, reviews, price, etc.) overwrites old data",
+        "scrapedAt timestamp updated for each re-scraped place",
+        "Progress shown via SSE (places refreshed / total)",
+        "npm run typecheck passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-023",
+      "title": "External search links (Booking.com, Airbnb)",
+      "description": "In detail panel, add auto-generated 'Search on Booking.com' and 'Search on Airbnb' links. Encode place name + location into OTA search URLs. Open in new tab.",
+      "acceptanceCriteria": [
+        "'Search on Booking.com' link in detail panel",
+        "'Search on Airbnb' link in detail panel",
+        "Links encode place name and location into OTA search URL format",
+        "Links open in new tab (target=_blank)",
+        "Links only shown when place has a name and location",
+        "npm run typecheck passes"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-024",
+      "title": "Stale data indicators",
+      "description": "Visual indicator in table and detail panel for places with scrapedAt > 7 days old. Configurable threshold. 'Show stale only' toggle in filter panel.",
+      "acceptanceCriteria": [
+        "Places with scrapedAt older than threshold show stale indicator (icon + tooltip) in table",
+        "Stale indicator also shown in detail panel",
+        "Threshold configurable (default: 7 days)",
+        "'Show stale only' toggle added to filter panel",
+        "Stale filter integrates with existing filter system",
+        "npm run typecheck passes"
+      ],
+      "priority": 24,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
