@@ -12,6 +12,8 @@
 - **API integration tests:** Use `supertest` with `process.env.DB_PATH` set before importing app; cleanup with `closeDatabase()` + `unlinkSync`
 - **Client routing:** React Router v7 with `BrowserRouter`; pages in `client/src/pages/`; named exports
 - **Google Maps:** `@vis.gl/react-google-maps` with `<APIProvider apiKey={...}>` + `<Map>` pattern; key from `VITE_GOOGLE_MAPS_API_KEY`
+- **Scraper modules:** `server/src/scraper/` — `engine.ts` (main engine), `utils.ts` (pure utility functions)
+- **Place IDs:** Generated via SHA-256 hash of canonical Google Maps URL (first 16 hex chars) using `generatePlaceId()`
 
 ---
 
@@ -71,4 +73,22 @@ Thread: https://ampcode.com/threads/T-019c8cb2-c300-74eb-acd0-66e4d3352f21
   - NavLink from react-router-dom provides `isActive` for styling active nav links
   - Use `gestureHandling="greedy"` on Map for full pan/zoom without modifier keys
   - Pages live in `client/src/pages/` with named exports (e.g., `SetupPage`)
+---
+
+## 2026-02-24 - US-005
+Thread: https://ampcode.com/threads/T-019c8cbc-7385-742a-8306-65e4909e615f
+- Extracted MVP scraper logic into modular `server/src/scraper/engine.ts`
+- Created `server/src/scraper/utils.ts` with pure utility functions (normalizePlaceUrl, parseLatLngFromUrl, generatePlaceId)
+- `startScrape(config)` accepts typed ScrapeConfig and writes to SQLite via DB layer
+- Places inserted via `createPlace()`, reviews via `createReview()`, junction via `linkPlaceToScrapeRun()`
+- CAPTCHA detection preserved as polling mechanism (checks every 3s, 5min timeout)
+- Checkpoint/resume: existing places detected via `getPlace()` and skipped
+- Cookie consent handling preserved from legacy
+- Files changed: server/src/scraper/engine.ts, server/src/scraper/utils.ts, server/tests/scraper-utils.test.ts, server/package.json
+- **Learnings for future iterations:**
+  - Playwright installed as dependency (browsers installed separately via `npx playwright install`)
+  - CAPTCHA handling changed from readline (interactive) to polling (non-interactive) since engine runs as background task
+  - Place ID is SHA-256 hash of canonical URL (first 16 hex chars) — deterministic dedup
+  - `createReview()` takes `relativeDate?: string` (optional), but scraper data has `string | null` — use `?? undefined`
+  - Legacy code had `topReviews: string[]` (just text); new engine extracts individual rating + relativeDate per review
 ---
