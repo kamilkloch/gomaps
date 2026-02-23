@@ -1,19 +1,15 @@
 {
-  "name": "gomaps-mvp",
-  "version": "0.1.0",
+  "name": "gomaps",
+  "version": "1.0.0",
   "private": true,
-  "description": "Manual human-in-the-loop Google Maps accommodation scraper MVP",
+  "description": "Google Maps accommodation scraper with interactive Explorer UI",
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "scripts": {
-    "dev": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "playwright": "^1.54.2",
-    "zod": "^3.24.1"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.5",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typecheck": "npm run typecheck --workspace=server && npm run typecheck --workspace=client",
+    "build": "npm run build --workspace=server && npm run build --workspace=client",
+    "test": "npm test --workspace=server"
   }
 }

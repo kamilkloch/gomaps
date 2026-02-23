@@ -3,3 +3,4 @@ dist
 data
 playwright-report
 .DS_Store
+.env

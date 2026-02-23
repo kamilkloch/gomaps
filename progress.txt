@@ -1,0 +1,26 @@
+## Codebase Patterns
+
+- **Server entry:** `server/src/index.ts` exports `app` (Express instance) for testability
+- **Test framework:** Vitest in server/, tests in `server/tests/`
+- **Client build:** `tsc -b && vite build` (project references)
+- **Server build:** `tsc` (standard compilation)
+- **Monorepo:** npm workspaces with `server` and `client` packages
+- **Express version:** Express v5 (no need for @types/express body parsing)
+
+---
+
+## 2026-02-23 - US-001
+Thread: https://ampcode.com/threads/T-019c8c87-3bac-7712-94cc-7f06fe88cd13
+- Set up npm workspaces monorepo with server/ and client/ packages
+- Moved MVP code to legacy/src/index.ts
+- Server: Express v5 + TypeScript with /health endpoint
+- Client: Vite + React + TypeScript with placeholder page
+- Created .env.example with GOOGLE_MAPS_API_KEY placeholders
+- Vite proxy forwards /api/* to Express server
+- Files changed: package.json, tsconfig.json, .gitignore, .env.example, server/*, client/*, legacy/src/index.ts
+- **Learnings for future iterations:**
+  - Express v5 is latest stable; use `express` directly (not express@4)
+  - Client uses project references tsconfig (tsconfig.json → tsconfig.app.json)
+  - Server test imports use `.js` extension for ESM compatibility
+  - `npx --workspace=server tsx src/index.ts` runs server from root (paths relative to workspace)
+---

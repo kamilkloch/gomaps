@@ -18,7 +18,7 @@
         ".env.example exists with GOOGLE_MAPS_API_KEY placeholder"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
