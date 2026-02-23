@@ -34,7 +34,7 @@
         "Database file is created in a configurable location (default: data/gomaps.db)"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

@@ -6,6 +6,8 @@
 - **Server build:** `tsc` (standard compilation)
 - **Monorepo:** npm workspaces with `server` and `client` packages
 - **Express version:** Express v5 (no need for @types/express body parsing)
+- **DB layer:** `server/src/db/` — one file per entity, `schema.ts` for init, `types.ts` for interfaces, `index.ts` re-exports all
+- **DB tests:** Use `createDatabase(tempPath)` for isolated test DBs; snake_case columns mapped to camelCase interfaces
 
 ---
 
@@ -23,4 +25,19 @@ Thread: https://ampcode.com/threads/T-019c8c87-3bac-7712-94cc-7f06fe88cd13
   - Client uses project references tsconfig (tsconfig.json → tsconfig.app.json)
   - Server test imports use `.js` extension for ESM compatibility
   - `npx --workspace=server tsx src/index.ts` runs server from root (paths relative to workspace)
+---
+
+## 2026-02-23 - US-002
+Thread: https://ampcode.com/threads/T-019c8c8b-feed-721a-a9c8-8689742c3686
+- Created SQLite schema with all 8 tables: projects, scrape_runs, tiles, places, reviews, place_scrape_runs, shortlists, shortlist_entries
+- Typed CRUD functions for each entity in server/src/db/
+- Tests verify schema creation, CRUD for projects and places, cascade deletes, unique constraints
+- Files changed: server/src/db/ (10 files), server/tests/db.test.ts, server/package.json
+- **Learnings for future iterations:**
+  - better-sqlite3 is synchronous — no async needed for DB calls
+  - Use `Record<string, unknown>` for raw row typing, then map to typed interfaces
+  - SQLite column names use snake_case, TypeScript interfaces use camelCase — map in dedicated functions
+  - DB path is configurable via DB_PATH env var (default: data/gomaps.db)
+  - `createDatabase()` can be used directly in tests with temp paths for isolation
+  - Foreign keys must be enabled per-connection with `db.pragma('foreign_keys = ON')`
 ---
