@@ -8,6 +8,8 @@
 - **Express version:** Express v5 (no need for @types/express body parsing)
 - **DB layer:** `server/src/db/` — one file per entity, `schema.ts` for init, `types.ts` for interfaces, `index.ts` re-exports all
 - **DB tests:** Use `createDatabase(tempPath)` for isolated test DBs; snake_case columns mapped to camelCase interfaces
+- **Route files:** `server/src/routes/` — one file per resource, named export of Router (e.g., `projectsRouter`)
+- **API integration tests:** Use `supertest` with `process.env.DB_PATH` set before importing app; cleanup with `closeDatabase()` + `unlinkSync`
 
 ---
 
@@ -40,4 +42,17 @@ Thread: https://ampcode.com/threads/T-019c8c8b-feed-721a-a9c8-8689742c3686
   - DB path is configurable via DB_PATH env var (default: data/gomaps.db)
   - `createDatabase()` can be used directly in tests with temp paths for isolation
   - Foreign keys must be enabled per-connection with `db.pragma('foreign_keys = ON')`
+---
+
+## 2026-02-23 - US-003
+Thread: https://ampcode.com/threads/T-019c8c8f-b08c-7348-997c-e18b89c71974
+- Created Express route modules: projects (full CRUD), scrape, places, shortlists (placeholders)
+- Mounted routes at /api/projects, /api/scrape, /api/places, /api/shortlists
+- 14 integration tests using supertest covering all CRUD operations + error cases + placeholder routes
+- Files changed: server/src/index.ts, server/src/routes/{projects,scrape,places,shortlists}.ts, server/tests/projects.test.ts, server/package.json
+- **Learnings for future iterations:**
+  - supertest works well with Express v5 — pass the app directly, no need to start/stop server
+  - Set `process.env.DB_PATH` before importing app to redirect the DB singleton to a temp file for tests
+  - Express v5 route params accessed via `req.params.id` (same as v4)
+  - Placeholder routers just need a single GET / returning empty array
 ---

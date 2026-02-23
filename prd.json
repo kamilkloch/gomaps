@@ -52,7 +52,7 @@
         "Integration tests pass for project CRUD"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
