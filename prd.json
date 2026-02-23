@@ -65,8 +65,8 @@
         "Google Maps renders on Setup page (interactive — pan, zoom)",
         "API key loaded from VITE_GOOGLE_MAPS_API_KEY env var",
         "Vite proxy forwards /api/* requests to Express server",
-        "npm run typecheck passes in client/",
-        "npm run build succeeds in client/"
+        "npm run build succeeds in client/",
+        "Typecheck passes"
       ],
       "priority": 4,
       "passes": false,
@@ -177,8 +177,8 @@
         "Clicking a project navigates to /projects/:id/setup",
         "Delete button removes project (with confirmation)",
         "Dark theme styling matching mockup color palette (deep navy background, dark slate cards)",
-        "npm run typecheck passes",
-        "npm run build succeeds"
+        "npm run build succeeds",
+        "Typecheck passes"
       ],
       "priority": 10,
       "passes": false,
