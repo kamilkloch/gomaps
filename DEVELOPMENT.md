@@ -20,7 +20,7 @@ The project is built incrementally via a Ralph loop: an AI coding agent picks on
 ./ralph.sh [max_iterations]
 
 # Option 2: Manual Ralph loop with Amp
-while :; do amp --prompt prompt.md; done
+while :; do amp -x < prompt.md; done
 ```
 
 ## Project structure (target)
