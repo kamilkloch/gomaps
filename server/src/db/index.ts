@@ -1,4 +1,5 @@
-export { createDatabase, getDatabase, closeDatabase } from './schema.js'
+export { createDatabase } from './schema.js'
+export { Db, DbLive } from './Db.js'
 export type {
   Project,
   ScrapeRun,

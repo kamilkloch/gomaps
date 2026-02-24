@@ -9,6 +9,7 @@ import {
   type CreatePlaceInput,
 } from '../db/index.js'
 import { ScrapeError } from '../errors.js'
+import { appRuntime } from '../runtime.js'
 import {
   normalizePlaceUrl,
   parseLatLngFromUrl,
@@ -58,7 +59,7 @@ async function startScrapeImpl(config: ScrapeConfig): Promise<void> {
     onProgress,
   } = config
 
-  Effect.runSync(
+  appRuntime.runSync(
     updateScrapeRun(scrapeRunId, {
       status: 'running',
       startedAt: new Date().toISOString(),
@@ -83,13 +84,13 @@ async function startScrapeImpl(config: ScrapeConfig): Promise<void> {
       const url = discoveredUrls[i]
       const placeId = generatePlaceId(url)
 
-      const existing = Effect.runSync(
+      const existing = appRuntime.runSync(
         getPlace(placeId).pipe(
           Effect.catchTag('NotFoundError', () => Effect.succeed(undefined as undefined))
         )
       )
       if (existing) {
-        Effect.runSync(linkPlaceToScrapeRun(placeId, scrapeRunId))
+        appRuntime.runSync(linkPlaceToScrapeRun(placeId, scrapeRunId))
         placesFound += 1
         emitProgress(onProgress, {
           placesFound,
@@ -117,17 +118,17 @@ async function startScrapeImpl(config: ScrapeConfig): Promise<void> {
         lng: record.lng ?? 0,
       }
 
-      Effect.runSync(createPlace(placeInput))
-      Effect.runSync(linkPlaceToScrapeRun(placeId, scrapeRunId))
+      appRuntime.runSync(createPlace(placeInput))
+      appRuntime.runSync(linkPlaceToScrapeRun(placeId, scrapeRunId))
 
       for (const review of record.reviews) {
-        Effect.runSync(createReview(placeId, review.rating, review.text, review.relativeDate ?? undefined))
+        appRuntime.runSync(createReview(placeId, review.rating, review.text, review.relativeDate ?? undefined))
       }
 
       placesFound += 1
       placesUnique += 1
 
-      Effect.runSync(updateScrapeRun(scrapeRunId, { placesFound, placesUnique }))
+      appRuntime.runSync(updateScrapeRun(scrapeRunId, { placesFound, placesUnique }))
 
       emitProgress(onProgress, {
         placesFound,
@@ -140,7 +141,7 @@ async function startScrapeImpl(config: ScrapeConfig): Promise<void> {
       await sleep(delayMs + randomInt(200, 600))
     }
 
-    Effect.runSync(
+    appRuntime.runSync(
       updateScrapeRun(scrapeRunId, {
         status: 'completed',
         placesFound,
@@ -157,7 +158,7 @@ async function startScrapeImpl(config: ScrapeConfig): Promise<void> {
       status: 'completed',
     })
   } catch (error) {
-    Effect.runSync(
+    appRuntime.runSync(
       updateScrapeRun(scrapeRunId, {
         status: 'failed',
         completedAt: new Date().toISOString(),

@@ -8,6 +8,7 @@ import {
   deleteProject,
 } from '../db/index.js'
 import { ValidationError } from '../errors.js'
+import { appRuntime } from '../runtime.js'
 
 export const projectsRouter = Router()
 
@@ -22,7 +23,7 @@ const UpdateProjectBody = Schema.Struct({
 })
 
 projectsRouter.get('/', async (_req, res) => {
-  await Effect.runPromise(
+  await appRuntime.runPromise(
     listProjects().pipe(
       Effect.andThen((projects) => Effect.sync(() => res.json(projects))),
       Effect.catchTag('DbError', (e) =>
@@ -33,7 +34,7 @@ projectsRouter.get('/', async (_req, res) => {
 })
 
 projectsRouter.post('/', async (req, res) => {
-  await Effect.runPromise(
+  await appRuntime.runPromise(
     Effect.gen(function* () {
       const body = yield* Schema.decodeUnknown(CreateProjectBody)(req.body).pipe(
         Effect.mapError(() => new ValidationError({ message: 'name is required' }))
@@ -52,7 +53,7 @@ projectsRouter.post('/', async (req, res) => {
 })
 
 projectsRouter.get('/:id', async (req, res) => {
-  await Effect.runPromise(
+  await appRuntime.runPromise(
     getProject(req.params.id).pipe(
       Effect.andThen((project) => Effect.sync(() => res.json(project))),
       Effect.catchTag('NotFoundError', () =>
@@ -66,7 +67,7 @@ projectsRouter.get('/:id', async (req, res) => {
 })
 
 projectsRouter.put('/:id', async (req, res) => {
-  await Effect.runPromise(
+  await appRuntime.runPromise(
     Effect.gen(function* () {
       const body = yield* Schema.decodeUnknown(UpdateProjectBody)(req.body).pipe(
         Effect.mapError(() => new ValidationError({ message: 'Invalid request body' }))
@@ -88,7 +89,7 @@ projectsRouter.put('/:id', async (req, res) => {
 })
 
 projectsRouter.delete('/:id', async (req, res) => {
-  await Effect.runPromise(
+  await appRuntime.runPromise(
     deleteProject(req.params.id).pipe(
       Effect.andThen(() => Effect.sync(() => res.status(204).end())),
       Effect.catchTag('NotFoundError', () =>

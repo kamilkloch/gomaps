@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
-import { getDatabase } from './schema.js'
+import { Db } from './Db.js'
 import type { Tile } from './types.js'
 import { DbError, NotFoundError } from '../errors.js'
 
@@ -9,29 +9,29 @@ export const createTile = (
   bounds: string,
   zoomLevel: number,
   parentTileId?: string
-): Effect.Effect<Tile, DbError> =>
-  Effect.try({
-    try: () => {
-      const db = getDatabase()
-      const id = randomUUID()
-      db.prepare(
-        'INSERT INTO tiles (id, scrape_run_id, bounds, zoom_level, parent_tile_id) VALUES (?, ?, ?, ?, ?)'
-      ).run(id, scrapeRunId, bounds, zoomLevel, parentTileId ?? null)
-      const row = db.prepare('SELECT * FROM tiles WHERE id = ?').get(id) as Record<string, unknown>
-      return mapTile(row)
-    },
-    catch: (e) => new DbError({ message: `Failed to create tile: ${String(e)}`, cause: e }),
-  })
-
-export const getTile = (id: string): Effect.Effect<Tile, DbError | NotFoundError> =>
-  Effect.gen(function* () {
-    const row = yield* Effect.try({
+): Effect.Effect<Tile, DbError, Db> =>
+  Effect.flatMap(Db, ({ db }) =>
+    Effect.try({
       try: () => {
-        const db = getDatabase()
-        return db.prepare('SELECT * FROM tiles WHERE id = ?').get(id) as
-          | Record<string, unknown>
-          | undefined
+        const id = randomUUID()
+        db.prepare(
+          'INSERT INTO tiles (id, scrape_run_id, bounds, zoom_level, parent_tile_id) VALUES (?, ?, ?, ?, ?)'
+        ).run(id, scrapeRunId, bounds, zoomLevel, parentTileId ?? null)
+        const row = db.prepare('SELECT * FROM tiles WHERE id = ?').get(id) as Record<string, unknown>
+        return mapTile(row)
       },
+      catch: (e) => new DbError({ message: `Failed to create tile: ${String(e)}`, cause: e }),
+    })
+  )
+
+export const getTile = (id: string): Effect.Effect<Tile, DbError | NotFoundError, Db> =>
+  Effect.gen(function* () {
+    const { db } = yield* Db
+    const row = yield* Effect.try({
+      try: () =>
+        db.prepare('SELECT * FROM tiles WHERE id = ?').get(id) as
+          | Record<string, unknown>
+          | undefined,
       catch: (e) => new DbError({ message: `Failed to get tile: ${String(e)}`, cause: e }),
     })
     if (!row) {
@@ -40,23 +40,25 @@ export const getTile = (id: string): Effect.Effect<Tile, DbError | NotFoundError
     return mapTile(row)
   })
 
-export const listTiles = (scrapeRunId: string): Effect.Effect<Tile[], DbError> =>
-  Effect.try({
-    try: () => {
-      const db = getDatabase()
-      const rows = db
-        .prepare('SELECT * FROM tiles WHERE scrape_run_id = ?')
-        .all(scrapeRunId) as Record<string, unknown>[]
-      return rows.map(mapTile)
-    },
-    catch: (e) => new DbError({ message: `Failed to list tiles: ${String(e)}`, cause: e }),
-  })
+export const listTiles = (scrapeRunId: string): Effect.Effect<Tile[], DbError, Db> =>
+  Effect.flatMap(Db, ({ db }) =>
+    Effect.try({
+      try: () => {
+        const rows = db
+          .prepare('SELECT * FROM tiles WHERE scrape_run_id = ?')
+          .all(scrapeRunId) as Record<string, unknown>[]
+        return rows.map(mapTile)
+      },
+      catch: (e) => new DbError({ message: `Failed to list tiles: ${String(e)}`, cause: e }),
+    })
+  )
 
 export const updateTile = (
   id: string,
   updates: Partial<Pick<Tile, 'status' | 'resultCount'>>
-): Effect.Effect<Tile, DbError | NotFoundError> =>
+): Effect.Effect<Tile, DbError | NotFoundError, Db> =>
   Effect.gen(function* () {
+    const { db } = yield* Db
     const sets: string[] = []
     const values: unknown[] = []
 
@@ -73,7 +75,6 @@ export const updateTile = (
     values.push(id)
     yield* Effect.try({
       try: () => {
-        const db = getDatabase()
         db.prepare(`UPDATE tiles SET ${sets.join(', ')} WHERE id = ?`).run(...values)
       },
       catch: (e) => new DbError({ message: `Failed to update tile: ${String(e)}`, cause: e }),
@@ -81,15 +82,16 @@ export const updateTile = (
     return yield* getTile(id)
   })
 
-export const deleteTile = (id: string): Effect.Effect<boolean, DbError> =>
-  Effect.try({
-    try: () => {
-      const db = getDatabase()
-      const result = db.prepare('DELETE FROM tiles WHERE id = ?').run(id)
-      return result.changes > 0
-    },
-    catch: (e) => new DbError({ message: `Failed to delete tile: ${String(e)}`, cause: e }),
-  })
+export const deleteTile = (id: string): Effect.Effect<boolean, DbError, Db> =>
+  Effect.flatMap(Db, ({ db }) =>
+    Effect.try({
+      try: () => {
+        const result = db.prepare('DELETE FROM tiles WHERE id = ?').run(id)
+        return result.changes > 0
+      },
+      catch: (e) => new DbError({ message: `Failed to delete tile: ${String(e)}`, cause: e }),
+    })
+  )
 
 function mapTile(row: Record<string, unknown>): Tile {
   return {

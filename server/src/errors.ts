@@ -18,3 +18,8 @@ export class ScrapeError extends Data.TaggedError('ScrapeError')<{
   readonly message: string
   readonly cause?: unknown
 }> {}
+
+export class DecodeError extends Data.TaggedError('DecodeError')<{
+  readonly message: string
+  readonly cause?: unknown
+}> {}
