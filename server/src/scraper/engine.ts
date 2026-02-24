@@ -1,4 +1,5 @@
 import { chromium, type BrowserContext, type Page } from 'playwright'
+import { Effect } from 'effect'
 import {
   createPlace,
   getPlace,
@@ -7,6 +8,7 @@ import {
   updateScrapeRun,
   type CreatePlaceInput,
 } from '../db/index.js'
+import { ScrapeError } from '../errors.js'
 import {
   normalizePlaceUrl,
   parseLatLngFromUrl,
@@ -36,7 +38,14 @@ export interface ScrapeProgress {
   status: 'collecting' | 'scraping' | 'paused' | 'completed' | 'failed'
 }
 
-export async function startScrape(config: ScrapeConfig): Promise<void> {
+export function startScrape(config: ScrapeConfig): Effect.Effect<void, ScrapeError> {
+  return Effect.tryPromise({
+    try: () => startScrapeImpl(config),
+    catch: (e) => new ScrapeError({ message: `Scrape failed: ${String(e)}`, cause: e }),
+  })
+}
+
+async function startScrapeImpl(config: ScrapeConfig): Promise<void> {
   const {
     scrapeRunId,
     query,
@@ -49,10 +58,12 @@ export async function startScrape(config: ScrapeConfig): Promise<void> {
     onProgress,
   } = config
 
-  updateScrapeRun(scrapeRunId, {
-    status: 'running',
-    startedAt: new Date().toISOString(),
-  })
+  Effect.runSync(
+    updateScrapeRun(scrapeRunId, {
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    })
+  )
 
   let context: BrowserContext | undefined
   try {
@@ -72,9 +83,13 @@ export async function startScrape(config: ScrapeConfig): Promise<void> {
       const url = discoveredUrls[i]
       const placeId = generatePlaceId(url)
 
-      const existing = getPlace(placeId)
+      const existing = Effect.runSync(
+        getPlace(placeId).pipe(
+          Effect.catchTag('NotFoundError', () => Effect.succeed(undefined as undefined))
+        )
+      )
       if (existing) {
-        linkPlaceToScrapeRun(placeId, scrapeRunId)
+        Effect.runSync(linkPlaceToScrapeRun(placeId, scrapeRunId))
         placesFound += 1
         emitProgress(onProgress, {
           placesFound,
@@ -102,17 +117,17 @@ export async function startScrape(config: ScrapeConfig): Promise<void> {
         lng: record.lng ?? 0,
       }
 
-      createPlace(placeInput)
-      linkPlaceToScrapeRun(placeId, scrapeRunId)
+      Effect.runSync(createPlace(placeInput))
+      Effect.runSync(linkPlaceToScrapeRun(placeId, scrapeRunId))
 
       for (const review of record.reviews) {
-        createReview(placeId, review.rating, review.text, review.relativeDate ?? undefined)
+        Effect.runSync(createReview(placeId, review.rating, review.text, review.relativeDate ?? undefined))
       }
 
       placesFound += 1
       placesUnique += 1
 
-      updateScrapeRun(scrapeRunId, { placesFound, placesUnique })
+      Effect.runSync(updateScrapeRun(scrapeRunId, { placesFound, placesUnique }))
 
       emitProgress(onProgress, {
         placesFound,
@@ -125,12 +140,14 @@ export async function startScrape(config: ScrapeConfig): Promise<void> {
       await sleep(delayMs + randomInt(200, 600))
     }
 
-    updateScrapeRun(scrapeRunId, {
-      status: 'completed',
-      placesFound,
-      placesUnique,
-      completedAt: new Date().toISOString(),
-    })
+    Effect.runSync(
+      updateScrapeRun(scrapeRunId, {
+        status: 'completed',
+        placesFound,
+        placesUnique,
+        completedAt: new Date().toISOString(),
+      })
+    )
 
     emitProgress(onProgress, {
       placesFound,
@@ -140,10 +157,12 @@ export async function startScrape(config: ScrapeConfig): Promise<void> {
       status: 'completed',
     })
   } catch (error) {
-    updateScrapeRun(scrapeRunId, {
-      status: 'failed',
-      completedAt: new Date().toISOString(),
-    })
+    Effect.runSync(
+      updateScrapeRun(scrapeRunId, {
+        status: 'failed',
+        completedAt: new Date().toISOString(),
+      })
+    )
     throw error
   } finally {
     if (context) {

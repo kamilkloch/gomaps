@@ -9,6 +9,7 @@ export type {
   Shortlist,
   ShortlistEntry,
 } from './types.js'
+export { DbError, NotFoundError, ValidationError, ScrapeError } from '../errors.js'
 
 export * from './projects.js'
 export * from './places.js'

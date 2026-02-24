@@ -1,5 +1,7 @@
+import { Effect } from 'effect'
 import { getDatabase } from './schema.js'
 import type { Place } from './types.js'
+import { DbError, NotFoundError } from '../errors.js'
 
 export interface CreatePlaceInput {
   id: string
@@ -20,111 +22,137 @@ export interface CreatePlaceInput {
   amenities?: string[]
 }
 
-export function createPlace(input: CreatePlaceInput): Place {
-  const db = getDatabase()
-  const stmt = db.prepare(`
-    INSERT INTO places (id, google_url, name, category, rating, review_count, price_level, phone, website, website_type, address, lat, lng, photo_urls, opening_hours, amenities)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-  stmt.run(
-    input.id,
-    input.googleUrl,
-    input.name,
-    input.category ?? null,
-    input.rating ?? null,
-    input.reviewCount ?? null,
-    input.priceLevel ?? null,
-    input.phone ?? null,
-    input.website ?? null,
-    input.websiteType ?? 'unknown',
-    input.address ?? null,
-    input.lat,
-    input.lng,
-    JSON.stringify(input.photoUrls ?? []),
-    input.openingHours ?? null,
-    JSON.stringify(input.amenities ?? [])
-  )
-  return getPlace(input.id)!
-}
-
-export function getPlace(id: string): Place | undefined {
-  const db = getDatabase()
-  const row = db.prepare('SELECT * FROM places WHERE id = ?').get(id) as
-    | Record<string, unknown>
-    | undefined
-  if (!row) return undefined
-  return mapPlace(row)
-}
-
-export function listPlaces(projectId?: string): Place[] {
-  const db = getDatabase()
-  if (projectId) {
-    const rows = db
-      .prepare(
-        `SELECT DISTINCT p.* FROM places p
-         INNER JOIN place_scrape_runs psr ON psr.place_id = p.id
-         INNER JOIN scrape_runs sr ON sr.id = psr.scrape_run_id
-         WHERE sr.project_id = ?
-         ORDER BY p.name`
+export const createPlace = (input: CreatePlaceInput): Effect.Effect<Place, DbError> =>
+  Effect.try({
+    try: () => {
+      const db = getDatabase()
+      db.prepare(`
+        INSERT INTO places (id, google_url, name, category, rating, review_count, price_level, phone, website, website_type, address, lat, lng, photo_urls, opening_hours, amenities)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        input.id,
+        input.googleUrl,
+        input.name,
+        input.category ?? null,
+        input.rating ?? null,
+        input.reviewCount ?? null,
+        input.priceLevel ?? null,
+        input.phone ?? null,
+        input.website ?? null,
+        input.websiteType ?? 'unknown',
+        input.address ?? null,
+        input.lat,
+        input.lng,
+        JSON.stringify(input.photoUrls ?? []),
+        input.openingHours ?? null,
+        JSON.stringify(input.amenities ?? [])
       )
-      .all(projectId) as Record<string, unknown>[]
-    return rows.map(mapPlace)
-  }
-  const rows = db.prepare('SELECT * FROM places ORDER BY name').all() as Record<string, unknown>[]
-  return rows.map(mapPlace)
-}
+      const row = db.prepare('SELECT * FROM places WHERE id = ?').get(input.id) as Record<string, unknown>
+      return mapPlace(row)
+    },
+    catch: (e) => new DbError({ message: `Failed to create place: ${String(e)}`, cause: e }),
+  })
 
-export function updatePlace(
+export const getPlace = (id: string): Effect.Effect<Place, DbError | NotFoundError> =>
+  Effect.gen(function* () {
+    const row = yield* Effect.try({
+      try: () => {
+        const db = getDatabase()
+        return db.prepare('SELECT * FROM places WHERE id = ?').get(id) as
+          | Record<string, unknown>
+          | undefined
+      },
+      catch: (e) => new DbError({ message: `Failed to get place: ${String(e)}`, cause: e }),
+    })
+    if (!row) {
+      return yield* Effect.fail(new NotFoundError({ entity: 'Place', id }))
+    }
+    return mapPlace(row)
+  })
+
+export const listPlaces = (projectId?: string): Effect.Effect<Place[], DbError> =>
+  Effect.try({
+    try: () => {
+      const db = getDatabase()
+      if (projectId) {
+        const rows = db
+          .prepare(
+            `SELECT DISTINCT p.* FROM places p
+             INNER JOIN place_scrape_runs psr ON psr.place_id = p.id
+             INNER JOIN scrape_runs sr ON sr.id = psr.scrape_run_id
+             WHERE sr.project_id = ?
+             ORDER BY p.name`
+          )
+          .all(projectId) as Record<string, unknown>[]
+        return rows.map(mapPlace)
+      }
+      const rows = db.prepare('SELECT * FROM places ORDER BY name').all() as Record<string, unknown>[]
+      return rows.map(mapPlace)
+    },
+    catch: (e) => new DbError({ message: `Failed to list places: ${String(e)}`, cause: e }),
+  })
+
+export const updatePlace = (
   id: string,
   updates: Partial<Omit<CreatePlaceInput, 'id'>>
-): Place | undefined {
-  const db = getDatabase()
-  const sets: string[] = []
-  const values: unknown[] = []
+): Effect.Effect<Place, DbError | NotFoundError> =>
+  Effect.gen(function* () {
+    const sets: string[] = []
+    const values: unknown[] = []
 
-  const fieldMap: Record<string, string> = {
-    googleUrl: 'google_url',
-    name: 'name',
-    category: 'category',
-    rating: 'rating',
-    reviewCount: 'review_count',
-    priceLevel: 'price_level',
-    phone: 'phone',
-    website: 'website',
-    websiteType: 'website_type',
-    address: 'address',
-    lat: 'lat',
-    lng: 'lng',
-    openingHours: 'opening_hours',
-  }
-
-  for (const [key, col] of Object.entries(fieldMap)) {
-    if (key in updates) {
-      sets.push(`${col} = ?`)
-      values.push((updates as Record<string, unknown>)[key] ?? null)
+    const fieldMap: Record<string, string> = {
+      googleUrl: 'google_url',
+      name: 'name',
+      category: 'category',
+      rating: 'rating',
+      reviewCount: 'review_count',
+      priceLevel: 'price_level',
+      phone: 'phone',
+      website: 'website',
+      websiteType: 'website_type',
+      address: 'address',
+      lat: 'lat',
+      lng: 'lng',
+      openingHours: 'opening_hours',
     }
-  }
 
-  if ('photoUrls' in updates) {
-    sets.push('photo_urls = ?')
-    values.push(JSON.stringify(updates.photoUrls ?? []))
-  }
-  if ('amenities' in updates) {
-    sets.push('amenities = ?')
-    values.push(JSON.stringify(updates.amenities ?? []))
-  }
+    for (const [key, col] of Object.entries(fieldMap)) {
+      if (key in updates) {
+        sets.push(`${col} = ?`)
+        values.push((updates as Record<string, unknown>)[key] ?? null)
+      }
+    }
 
-  if (sets.length === 0) return getPlace(id)
-  values.push(id)
-  db.prepare(`UPDATE places SET ${sets.join(', ')} WHERE id = ?`).run(...values)
-  return getPlace(id)
-}
+    if ('photoUrls' in updates) {
+      sets.push('photo_urls = ?')
+      values.push(JSON.stringify(updates.photoUrls ?? []))
+    }
+    if ('amenities' in updates) {
+      sets.push('amenities = ?')
+      values.push(JSON.stringify(updates.amenities ?? []))
+    }
 
-export function deletePlace(id: string): boolean {
-  const db = getDatabase()
-  const result = db.prepare('DELETE FROM places WHERE id = ?').run(id)
-  return result.changes > 0
-}
+    if (sets.length === 0) return yield* getPlace(id)
+    values.push(id)
+    yield* Effect.try({
+      try: () => {
+        const db = getDatabase()
+        db.prepare(`UPDATE places SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+      },
+      catch: (e) => new DbError({ message: `Failed to update place: ${String(e)}`, cause: e }),
+    })
+    return yield* getPlace(id)
+  })
+
+export const deletePlace = (id: string): Effect.Effect<boolean, DbError> =>
+  Effect.try({
+    try: () => {
+      const db = getDatabase()
+      const result = db.prepare('DELETE FROM places WHERE id = ?').run(id)
+      return result.changes > 0
+    },
+    catch: (e) => new DbError({ message: `Failed to delete place: ${String(e)}`, cause: e }),
+  })
 
 function mapPlace(row: Record<string, unknown>): Place {
   return {

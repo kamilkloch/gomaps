@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { Effect, Schema } from 'effect'
 import {
   createProject,
   getProject,
@@ -6,48 +7,96 @@ import {
   updateProject,
   deleteProject,
 } from '../db/index.js'
+import { ValidationError } from '../errors.js'
 
 export const projectsRouter = Router()
 
-projectsRouter.get('/', (_req, res) => {
-  const projects = listProjects()
-  res.json(projects)
+const CreateProjectBody = Schema.Struct({
+  name: Schema.String,
+  bounds: Schema.optional(Schema.String),
 })
 
-projectsRouter.post('/', (req, res) => {
-  const { name, bounds } = req.body as { name?: string; bounds?: string }
-  if (!name) {
-    res.status(400).json({ error: 'name is required' })
-    return
-  }
-  const project = createProject(name, bounds)
-  res.status(201).json(project)
+const UpdateProjectBody = Schema.Struct({
+  name: Schema.optional(Schema.String),
+  bounds: Schema.optional(Schema.String),
 })
 
-projectsRouter.get('/:id', (req, res) => {
-  const project = getProject(req.params.id)
-  if (!project) {
-    res.status(404).json({ error: 'Project not found' })
-    return
-  }
-  res.json(project)
+projectsRouter.get('/', async (_req, res) => {
+  await Effect.runPromise(
+    listProjects().pipe(
+      Effect.andThen((projects) => Effect.sync(() => res.json(projects))),
+      Effect.catchTag('DbError', (e) =>
+        Effect.sync(() => res.status(500).json({ error: e.message }))
+      ),
+    )
+  )
 })
 
-projectsRouter.put('/:id', (req, res) => {
-  const { name, bounds } = req.body as { name?: string; bounds?: string }
-  const project = updateProject(req.params.id, { name, bounds })
-  if (!project) {
-    res.status(404).json({ error: 'Project not found' })
-    return
-  }
-  res.json(project)
+projectsRouter.post('/', async (req, res) => {
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const body = yield* Schema.decodeUnknown(CreateProjectBody)(req.body).pipe(
+        Effect.mapError(() => new ValidationError({ message: 'name is required' }))
+      )
+      const project = yield* createProject(body.name, body.bounds)
+      res.status(201).json(project)
+    }).pipe(
+      Effect.catchTag('ValidationError', (e) =>
+        Effect.sync(() => res.status(400).json({ error: e.message }))
+      ),
+      Effect.catchTag('DbError', (e) =>
+        Effect.sync(() => res.status(500).json({ error: e.message }))
+      ),
+    )
+  )
 })
 
-projectsRouter.delete('/:id', (req, res) => {
-  const deleted = deleteProject(req.params.id)
-  if (!deleted) {
-    res.status(404).json({ error: 'Project not found' })
-    return
-  }
-  res.status(204).end()
+projectsRouter.get('/:id', async (req, res) => {
+  await Effect.runPromise(
+    getProject(req.params.id).pipe(
+      Effect.andThen((project) => Effect.sync(() => res.json(project))),
+      Effect.catchTag('NotFoundError', () =>
+        Effect.sync(() => res.status(404).json({ error: 'Project not found' }))
+      ),
+      Effect.catchTag('DbError', (e) =>
+        Effect.sync(() => res.status(500).json({ error: e.message }))
+      ),
+    )
+  )
+})
+
+projectsRouter.put('/:id', async (req, res) => {
+  await Effect.runPromise(
+    Effect.gen(function* () {
+      const body = yield* Schema.decodeUnknown(UpdateProjectBody)(req.body).pipe(
+        Effect.mapError(() => new ValidationError({ message: 'Invalid request body' }))
+      )
+      const project = yield* updateProject(req.params.id, { name: body.name, bounds: body.bounds })
+      res.json(project)
+    }).pipe(
+      Effect.catchTag('NotFoundError', () =>
+        Effect.sync(() => res.status(404).json({ error: 'Project not found' }))
+      ),
+      Effect.catchTag('ValidationError', (e) =>
+        Effect.sync(() => res.status(400).json({ error: e.message }))
+      ),
+      Effect.catchTag('DbError', (e) =>
+        Effect.sync(() => res.status(500).json({ error: e.message }))
+      ),
+    )
+  )
+})
+
+projectsRouter.delete('/:id', async (req, res) => {
+  await Effect.runPromise(
+    deleteProject(req.params.id).pipe(
+      Effect.andThen(() => Effect.sync(() => res.status(204).end())),
+      Effect.catchTag('NotFoundError', () =>
+        Effect.sync(() => res.status(404).json({ error: 'Project not found' }))
+      ),
+      Effect.catchTag('DbError', (e) =>
+        Effect.sync(() => res.status(500).json({ error: e.message }))
+      ),
+    )
+  )
 })

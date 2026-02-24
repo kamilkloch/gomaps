@@ -1,49 +1,76 @@
 import { randomUUID } from 'node:crypto'
+import { Effect } from 'effect'
 import { getDatabase } from './schema.js'
 import type { Review } from './types.js'
+import { DbError, NotFoundError } from '../errors.js'
 
-export function createReview(
+export const createReview = (
   placeId: string,
   rating: number,
   text: string,
   relativeDate?: string
-): Review {
-  const db = getDatabase()
-  const id = randomUUID()
-  db.prepare(
-    'INSERT INTO reviews (id, place_id, rating, text, relative_date) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, placeId, rating, text, relativeDate ?? null)
-  return getReview(id)!
-}
+): Effect.Effect<Review, DbError> =>
+  Effect.try({
+    try: () => {
+      const db = getDatabase()
+      const id = randomUUID()
+      db.prepare(
+        'INSERT INTO reviews (id, place_id, rating, text, relative_date) VALUES (?, ?, ?, ?, ?)'
+      ).run(id, placeId, rating, text, relativeDate ?? null)
+      const row = db.prepare('SELECT * FROM reviews WHERE id = ?').get(id) as Record<string, unknown>
+      return mapReview(row)
+    },
+    catch: (e) => new DbError({ message: `Failed to create review: ${String(e)}`, cause: e }),
+  })
 
-export function getReview(id: string): Review | undefined {
-  const db = getDatabase()
-  const row = db.prepare('SELECT * FROM reviews WHERE id = ?').get(id) as
-    | Record<string, unknown>
-    | undefined
-  if (!row) return undefined
-  return mapReview(row)
-}
+export const getReview = (id: string): Effect.Effect<Review, DbError | NotFoundError> =>
+  Effect.gen(function* () {
+    const row = yield* Effect.try({
+      try: () => {
+        const db = getDatabase()
+        return db.prepare('SELECT * FROM reviews WHERE id = ?').get(id) as
+          | Record<string, unknown>
+          | undefined
+      },
+      catch: (e) => new DbError({ message: `Failed to get review: ${String(e)}`, cause: e }),
+    })
+    if (!row) {
+      return yield* Effect.fail(new NotFoundError({ entity: 'Review', id }))
+    }
+    return mapReview(row)
+  })
 
-export function listReviews(placeId: string): Review[] {
-  const db = getDatabase()
-  const rows = db
-    .prepare('SELECT * FROM reviews WHERE place_id = ?')
-    .all(placeId) as Record<string, unknown>[]
-  return rows.map(mapReview)
-}
+export const listReviews = (placeId: string): Effect.Effect<Review[], DbError> =>
+  Effect.try({
+    try: () => {
+      const db = getDatabase()
+      const rows = db
+        .prepare('SELECT * FROM reviews WHERE place_id = ?')
+        .all(placeId) as Record<string, unknown>[]
+      return rows.map(mapReview)
+    },
+    catch: (e) => new DbError({ message: `Failed to list reviews: ${String(e)}`, cause: e }),
+  })
 
-export function deleteReview(id: string): boolean {
-  const db = getDatabase()
-  const result = db.prepare('DELETE FROM reviews WHERE id = ?').run(id)
-  return result.changes > 0
-}
+export const deleteReview = (id: string): Effect.Effect<boolean, DbError> =>
+  Effect.try({
+    try: () => {
+      const db = getDatabase()
+      const result = db.prepare('DELETE FROM reviews WHERE id = ?').run(id)
+      return result.changes > 0
+    },
+    catch: (e) => new DbError({ message: `Failed to delete review: ${String(e)}`, cause: e }),
+  })
 
-export function deleteReviewsByPlace(placeId: string): number {
-  const db = getDatabase()
-  const result = db.prepare('DELETE FROM reviews WHERE place_id = ?').run(placeId)
-  return result.changes
-}
+export const deleteReviewsByPlace = (placeId: string): Effect.Effect<number, DbError> =>
+  Effect.try({
+    try: () => {
+      const db = getDatabase()
+      const result = db.prepare('DELETE FROM reviews WHERE place_id = ?').run(placeId)
+      return result.changes
+    },
+    catch: (e) => new DbError({ message: `Failed to delete reviews: ${String(e)}`, cause: e }),
+  })
 
 function mapReview(row: Record<string, unknown>): Review {
   return {
