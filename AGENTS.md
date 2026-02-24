@@ -44,6 +44,16 @@ npm run dev --workspace=client
 - Use async/await (no raw promises or callbacks)
 - No classes unless necessary — prefer functions and plain objects
 
+## Effect best practices (server only, v3.19.19)
+
+- **Sync I/O that may throw** (e.g., better-sqlite3): use `Effect.try({ try: () => ..., catch: (e) => new MyError(...) })` — NOT `Effect.tryBlocking` (does not exist) or `Effect.sync` (swallows errors as defects)
+- **Services**: define with `Context.Tag`, access via `yield* MyService` in gen blocks or `Effect.flatMap(MyService, ...)`
+- **Resource lifecycle**: `Layer.scoped` + `Effect.acquireRelease` (see `Db.ts` for the DB connection pattern)
+- **Running effects**: use `ManagedRuntime.make(layer)` → `appRuntime.runPromise()` / `appRuntime.runSync()` — never bare `Effect.runPromise` when the effect requires services
+- **Typed errors**: extend `Data.TaggedError('Tag')<{ ... }>`, catch with `Effect.catchTag('Tag', ...)`
+- **Schema**: import from `effect` (`import { Schema } from 'effect'`), not `@effect/schema`
+- **Do not invent Effect APIs** — if you're unsure whether a function exists, check the installed types in `node_modules/effect/dist/dts/`
+
 ## File organization
 
 - Server routes in `server/src/routes/` — one file per resource
