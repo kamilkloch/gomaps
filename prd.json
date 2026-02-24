@@ -91,6 +91,24 @@
       "notes": ""
     },
     {
+      "id": "US-025",
+      "title": "Migrate server TypeScript to Effect-TS",
+      "description": "Migrate the server/ package from plain TypeScript to Effect (https://github.com/Effect-TS/effect). Replace try/catch with typed Effect errors, wrap DB access and scraper in Effect services with Layer-based dependency injection, use Effect.gen for async flows, and adopt Effect Schema for API request/response validation. Express route handlers use Effect.runPromise at the boundary. Preserve all existing functionality.",
+      "acceptanceCriteria": [
+        "effect and @effect/schema installed in server/",
+        "DB access layer (server/src/db/) wrapped as Effect services with typed errors (DbError, NotFoundError)",
+        "Scraper engine (server/src/scraper/) returns Effect instead of raw Promises",
+        "Express route handlers use Effect.runPromise at the API boundary",
+        "API request validation uses Effect Schema instead of manual checks",
+        "All existing API endpoints and scraper functionality preserved (no regressions)",
+        "npm run typecheck --workspace=server passes",
+        "npm test --workspace=server passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Reference: https://github.com/Effect-TS/effect — focus on server/ package only, client/ remains unchanged"
+    },
+    {
       "id": "US-006",
       "title": "Adaptive tiling algorithm",
       "description": "Implement server/src/scraper/tiling.ts. Given bounding box, generate coarse grid (~0.1°). Process tiles one at a time. If result count >= threshold (~120), subdivide into 4 sub-tiles. Track tile status in DB. Enforce minimum tile size floor. See SPEC.md §5.",
@@ -104,7 +122,7 @@
         "Unit tests pass for tile generation, subdivision, bounds math",
         "npm run typecheck passes"
       ],
-      "priority": 6,
+      "priority": 7,
       "passes": false,
       "notes": ""
     },
@@ -121,7 +139,7 @@
         "Extraction handles missing fields gracefully (nulls, empty arrays)",
         "npm run typecheck passes"
       ],
-      "priority": 7,
+      "priority": 8,
       "passes": false,
       "notes": ""
     },
@@ -140,7 +158,7 @@
         "Comprehensive tests pass (15+ test cases)",
         "npm run typecheck passes"
       ],
-      "priority": 8,
+      "priority": 9,
       "passes": false,
       "notes": ""
     },
@@ -158,7 +176,7 @@
         "Scrape runs in background — API remains responsive during scrape",
         "npm run typecheck passes"
       ],
-      "priority": 9,
+      "priority": 10,
       "passes": false,
       "notes": ""
     },
@@ -180,7 +198,7 @@
         "npm run build succeeds",
         "Typecheck passes"
       ],
-      "priority": 10,
+      "priority": 11,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/01-projects-page.png"
     },
@@ -200,7 +218,7 @@
         "On page load, existing project bounds shown as rectangle on map",
         "npm run typecheck passes"
       ],
-      "priority": 11,
+      "priority": 12,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/02-scrape-setup-page.png"
     },
@@ -220,7 +238,7 @@
         "Progress subscribes to SSE for live updates",
         "npm run typecheck passes"
       ],
-      "priority": 12,
+      "priority": 13,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/02-scrape-setup-page.png"
     },
@@ -237,7 +255,7 @@
         "Selected marker has pulse effect with green translucent radius highlight",
         "npm run typecheck passes"
       ],
-      "priority": 13,
+      "priority": 14,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/03-explorer-page.png"
     },
@@ -256,7 +274,7 @@
         "Horizontal scrollbar at bottom",
         "npm run typecheck passes"
       ],
-      "priority": 14,
+      "priority": 15,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/03-explorer-page.png"
     },
@@ -277,7 +295,7 @@
         "Three full-width blue action buttons: 'Open in Google Maps', 'Search on Booking.com', 'Search on Airbnb'",
         "npm run typecheck passes"
       ],
-      "priority": 15,
+      "priority": 16,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/03-explorer-page.png"
     },
@@ -293,7 +311,7 @@
         "Deselecting (clicking empty area) closes detail panel",
         "npm run typecheck passes"
       ],
-      "priority": 16,
+      "priority": 17,
       "passes": false,
       "notes": ""
     },
@@ -310,7 +328,7 @@
         "Clearing search restores all results",
         "npm run typecheck passes"
       ],
-      "priority": 17,
+      "priority": 18,
       "passes": false,
       "notes": ""
     },
@@ -329,7 +347,7 @@
         "Filter state persisted in URL query parameters",
         "npm run typecheck passes"
       ],
-      "priority": 18,
+      "priority": 19,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/03-explorer-page.png"
     },
@@ -347,7 +365,7 @@
         "Both filters integrate with existing filter system (AND logic)",
         "npm run typecheck passes"
       ],
-      "priority": 19,
+      "priority": 20,
       "passes": false,
       "notes": ""
     },
@@ -368,7 +386,7 @@
         "Can create, rename, delete shortlists",
         "npm run typecheck passes"
       ],
-      "priority": 20,
+      "priority": 21,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/04-shortlists-page.png"
     },
@@ -386,7 +404,7 @@
         "'Export CSV' downloads shortlist as CSV with all place fields plus user notes",
         "npm run typecheck passes"
       ],
-      "priority": 21,
+      "priority": 22,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/04-shortlists-page.png"
     },
@@ -403,7 +421,7 @@
         "Progress shown via SSE (places refreshed / total)",
         "npm run typecheck passes"
       ],
-      "priority": 22,
+      "priority": 23,
       "passes": false,
       "notes": ""
     },
@@ -420,7 +438,7 @@
         "Buttons only shown when place has a name and location",
         "npm run typecheck passes"
       ],
-      "priority": 23,
+      "priority": 24,
       "passes": false,
       "notes": "Reference mockup: docs/mockups/03-explorer-page.png"
     },
@@ -436,7 +454,7 @@
         "Stale filter integrates with existing filter system",
         "npm run typecheck passes"
       ],
-      "priority": 24,
+      "priority": 25,
       "passes": false,
       "notes": ""
     }
