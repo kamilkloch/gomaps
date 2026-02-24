@@ -14,6 +14,7 @@
 - **Google Maps:** `@vis.gl/react-google-maps` with `<APIProvider apiKey={...}>` + `<Map>` pattern; key from `VITE_GOOGLE_MAPS_API_KEY`
 - **Scraper modules:** `server/src/scraper/` — `engine.ts` (main engine), `utils.ts` (pure utility functions)
 - **Place IDs:** Generated via SHA-256 hash of canonical Google Maps URL (first 16 hex chars) using `generatePlaceId()`
+- **Effect-TS:** All DB functions return `Effect<A, DbError | NotFoundError>`. Routes use `Effect.runPromise` at boundary. Scraper uses `Effect.runSync` for DB calls since better-sqlite3 is synchronous. Typed errors in `server/src/errors.ts`: `DbError`, `NotFoundError`, `ValidationError`, `ScrapeError`. Schema validation via `Schema.decodeUnknown` from `effect` package.
 
 ---
 
@@ -91,4 +92,26 @@ Thread: https://ampcode.com/threads/T-019c8cbc-7385-742a-8306-65e4909e615f
   - Place ID is SHA-256 hash of canonical URL (first 16 hex chars) — deterministic dedup
   - `createReview()` takes `relativeDate?: string` (optional), but scraper data has `string | null` — use `?? undefined`
   - Legacy code had `topReviews: string[]` (just text); new engine extracts individual rating + relativeDate per review
+---
+
+## 2026-02-24 - US-025
+Thread: https://ampcode.com/threads/T-019c91b1-6714-730b-a164-c586f5713c65
+- Migrated entire server/ package from plain TypeScript to Effect-TS
+- Installed `effect` and `@effect/schema` (deprecated, merged into `effect` 3.x)
+- Created `server/src/errors.ts` with typed errors: DbError, NotFoundError, ValidationError, ScrapeError (using `Data.TaggedError`)
+- All DB functions (projects, places, reviews, scrape-runs, tiles, place-scrape-runs, shortlists) now return `Effect<A, DbError | NotFoundError>`
+- Express route handlers in `routes/projects.ts` use `Effect.runPromise` at the API boundary with `Effect.catchTag` for error handling
+- API request validation uses `Schema.Struct` + `Schema.decodeUnknown` from `effect` package (replaced manual `if (!name)` checks)
+- Scraper `startScrape()` returns `Effect<void, ScrapeError>` wrapping async implementation
+- Scraper internally uses `Effect.runSync()` for DB calls (safe since better-sqlite3 is synchronous)
+- Files changed: server/src/errors.ts (new), server/src/db/*.ts (all 8 modules), server/src/routes/projects.ts, server/src/scraper/engine.ts, server/package.json
+- **Learnings for future iterations:**
+  - `@effect/schema` is deprecated in Effect 3.x — use `import { Schema } from "effect"` directly
+  - `Data.TaggedError("Tag")<{ ... }>` creates errors with `_tag` property for pattern matching via `Effect.catchTag`
+  - `Effect.try({ try, catch })` wraps synchronous operations that may throw
+  - `Effect.tryPromise({ try, catch })` wraps async operations
+  - `Effect.gen(function* () { ... })` composes multiple effects with `yield*`
+  - `Effect.runSync()` executes sync effects; throws on failure (same behavior as original sync DB calls)
+  - `Effect.runPromise()` executes effects (sync or async) returning a Promise
+  - For "find or undefined" patterns: `getX(id).pipe(Effect.catchTag("NotFoundError", () => Effect.succeed(undefined as undefined)))`
 ---
