@@ -151,7 +151,7 @@
         "npm test --workspace=server passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "This replaces the old Playwright-based engine. Uses Effect patterns. Depends on US-005 (places-api.ts) and US-006 (tiling.ts)."
     },
     {

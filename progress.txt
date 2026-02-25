@@ -14,6 +14,7 @@
 - **Google Maps:** `@vis.gl/react-google-maps` with `<APIProvider apiKey={...}>` + `<Map>` pattern; key from `VITE_GOOGLE_MAPS_API_KEY`
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
+- **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
 - **Places API requests:** Use `X-Goog-Api-Key` + `X-Goog-FieldMask` headers and wrap network calls in `Effect.tryPromise` with typed `ScrapeError`
 - **Place IDs:** Use Google Place IDs from Places API (`place.id` or resource name `places/{id}`), and persist canonical map links in `google_maps_uri`
 - **Effect-TS:** All DB functions return `Effect<A, DbError | NotFoundError>`. Routes use `Effect.runPromise` at boundary. Scraper uses `Effect.runSync` for DB calls since better-sqlite3 is synchronous. Typed errors in `server/src/errors.ts`: `DbError`, `NotFoundError`, `ValidationError`, `ScrapeError`. Schema validation via `Schema.decodeUnknown` from `effect` package.
@@ -142,4 +143,16 @@ Thread: https://ampcode.com/threads/T-019c96f1-762b-775a-abea-cc7bfcf3863f
   - Keep tiling computations pure and side-effect free, then layer persistence as separate Effect helpers for easier testing
   - Use `ManagedRuntime.make(DbLive(tempDbPath))` in tests to validate Effect-based DB modules against isolated SQLite files
   - When subdividing, update parent tile status and scrape-run aggregate counters in the same effect flow to avoid drift in progress metrics
+---
+
+## 2026-02-25 23:42:53 CET - US-007
+Thread: https://ampcode.com/threads/T-019c96f4-c54b-7769-8ccf-432720f1de9a
+- Implemented the Places API scrape orchestrator in `server/src/scraper/engine.ts` with tile-queue processing, up-to-3-page pagination, subdivision at 60+ hits, dedup/linking by Google Place ID, detail enrichment, and run lifecycle updates (`running` → `completed` / `failed`)
+- Added engine tests in `server/tests/engine.test.ts` covering subdivision + pagination flow, checkpoint/resume from existing tile states, and existing-place dedup behavior (link without re-fetching details)
+- Updated reusable guidance in `AGENTS.md`, set `US-007` to passing in `prd.json`, and validated required checks
+- Files changed: `server/src/scraper/engine.ts`, `server/tests/engine.test.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - In this codebase, `placesFound` tracks raw processed hits from completed tiles (including duplicates across pages), while `placesUnique` tracks newly inserted place IDs
+  - `startScrape()` should treat both `pending` and `running` tiles as runnable to support interruption-safe resume semantics
+  - Direct `createTile()` calls do not update `scrape_runs.tiles_total`; use tiling helpers when aggregate counters matter
 ---
