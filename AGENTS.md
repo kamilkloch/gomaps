@@ -59,6 +59,7 @@ npm run dev --workspace=client
 - Server routes in `server/src/routes/` — one file per resource
 - Database access functions in `server/src/db/` — no raw SQL in route handlers
 - Scraper modules in `server/src/scraper/`
+- Tiling logic should live in `server/src/scraper/tiling.ts` as pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) plus thin DB progress helpers
 - React components in `client/src/components/`
 - API client functions in `client/src/lib/api.ts`
 - React hooks in `client/src/hooks/`

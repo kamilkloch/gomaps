@@ -128,7 +128,7 @@
         "npm test --workspace=server passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Threshold is 60 (API pagination limit of 3 pages × 20 results), not 120 (old browser scraping limit)."
     },
     {

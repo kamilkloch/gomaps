@@ -13,6 +13,7 @@
 - **Client routing:** React Router v7 with `BrowserRouter`; pages in `client/src/pages/`; named exports
 - **Google Maps:** `@vis.gl/react-google-maps` with `<APIProvider apiKey={...}>` + `<Map>` pattern; key from `VITE_GOOGLE_MAPS_API_KEY`
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
+- **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Places API requests:** Use `X-Goog-Api-Key` + `X-Goog-FieldMask` headers and wrap network calls in `Effect.tryPromise` with typed `ScrapeError`
 - **Place IDs:** Use Google Place IDs from Places API (`place.id` or resource name `places/{id}`), and persist canonical map links in `google_maps_uri`
 - **Effect-TS:** All DB functions return `Effect<A, DbError | NotFoundError>`. Routes use `Effect.runPromise` at boundary. Scraper uses `Effect.runSync` for DB calls since better-sqlite3 is synchronous. Typed errors in `server/src/errors.ts`: `DbError`, `NotFoundError`, `ValidationError`, `ScrapeError`. Schema validation via `Schema.decodeUnknown` from `effect` package.
@@ -129,4 +130,16 @@ Thread: https://ampcode.com/threads/T-019c96ec-8860-70cf-a1f1-cb65da4ea78f
   - Keep Places field masks explicit and test for required fields to avoid accidental SKU creep
   - Parse Place ID from both `id` and `name=places/{id}` because API payloads vary between endpoints
   - Canonical map links should be persisted as `google_maps_uri` to match Places API naming and downstream UI expectations
+---
+
+## 2026-02-25 23:37:52 CET - US-006
+Thread: https://ampcode.com/threads/T-019c96f1-762b-775a-abea-cc7bfcf3863f
+- Implemented adaptive tiling module in `server/src/scraper/tiling.ts` with coarse grid generation, 4-way subdivision, minimum tile floor handling (0.01°), and threshold helper defaulting to 60 results
+- Added DB-backed tile progress helpers to initialize run tiles, mark tile state transitions (running/completed/subdivided), persist subdivision children, and query run progress (`tilesTotal`, `tilesCompleted`, `tilesSubdivided`, `placesFound`)
+- Added unit/integration coverage in `server/tests/tiling.test.ts` for bounds math, subdivision behavior, threshold logic, and SQLite-backed progress/status tracking
+- Files changed: `server/src/scraper/tiling.ts`, `server/tests/tiling.test.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Keep tiling computations pure and side-effect free, then layer persistence as separate Effect helpers for easier testing
+  - Use `ManagedRuntime.make(DbLive(tempDbPath))` in tests to validate Effect-based DB modules against isolated SQLite files
+  - When subdividing, update parent tile status and scrape-run aggregate counters in the same effect flow to avoid drift in progress metrics
 ---
