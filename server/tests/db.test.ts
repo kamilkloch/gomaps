@@ -129,7 +129,7 @@ describe('place CRUD', () => {
   it('inserts and reads a place', () => {
     const id = 'place-001'
     db.prepare(`
-      INSERT INTO places (id, google_url, name, lat, lng)
+      INSERT INTO places (id, google_maps_uri, name, lat, lng)
       VALUES (?, ?, ?, ?, ?)
     `).run(id, 'https://maps.google.com/place/test', 'Hotel Sardinia', 39.2, 9.1)
 
@@ -138,7 +138,7 @@ describe('place CRUD', () => {
     expect(row.name).toBe('Hotel Sardinia')
     expect(row.lat).toBe(39.2)
     expect(row.lng).toBe(9.1)
-    expect(row.google_url).toBe('https://maps.google.com/place/test')
+    expect(row.google_maps_uri).toBe('https://maps.google.com/place/test')
     expect(row.website_type).toBe('unknown')
     expect(row.photo_urls).toBe('[]')
     expect(row.amenities).toBe('[]')
@@ -150,7 +150,7 @@ describe('place CRUD', () => {
     const amenities = JSON.stringify(['pool', 'wifi', 'parking'])
 
     db.prepare(`
-      INSERT INTO places (id, google_url, name, category, rating, review_count, price_level, phone, website, website_type, address, lat, lng, photo_urls, opening_hours, amenities)
+      INSERT INTO places (id, google_maps_uri, name, category, rating, review_count, price_level, phone, website, website_type, address, lat, lng, photo_urls, opening_hours, amenities)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, 'https://maps.google.com/place/full', 'Grand Hotel',
@@ -170,13 +170,13 @@ describe('place CRUD', () => {
     expect(row.amenities).toBe(amenities)
   })
 
-  it('enforces unique google_url', () => {
+  it('enforces unique google_maps_uri', () => {
     const url = 'https://maps.google.com/place/unique'
-    db.prepare('INSERT INTO places (id, google_url, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO places (id, google_maps_uri, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
       'p1', url, 'Place 1', 39.0, 9.0
     )
     expect(() => {
-      db.prepare('INSERT INTO places (id, google_url, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
+      db.prepare('INSERT INTO places (id, google_maps_uri, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
         'p2', url, 'Place 2', 39.1, 9.1
       )
     }).toThrow()
@@ -184,7 +184,7 @@ describe('place CRUD', () => {
 
   it('updates a place', () => {
     const id = 'place-upd'
-    db.prepare('INSERT INTO places (id, google_url, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO places (id, google_maps_uri, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
       id, 'https://maps.google.com/place/upd', 'Old Name', 39.0, 9.0
     )
 
@@ -197,7 +197,7 @@ describe('place CRUD', () => {
 
   it('deletes a place', () => {
     const id = 'place-del'
-    db.prepare('INSERT INTO places (id, google_url, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO places (id, google_maps_uri, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
       id, 'https://maps.google.com/place/del', 'To Delete', 39.0, 9.0
     )
 
@@ -210,7 +210,7 @@ describe('place CRUD', () => {
 
   it('cascades review delete when place is deleted', () => {
     const placeId = 'place-cascade'
-    db.prepare('INSERT INTO places (id, google_url, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO places (id, google_maps_uri, name, lat, lng) VALUES (?, ?, ?, ?, ?)').run(
       placeId, 'https://maps.google.com/place/cascade', 'Cascade Test', 39.0, 9.0
     )
     db.prepare('INSERT INTO reviews (id, place_id, rating, text) VALUES (?, ?, ?, ?)').run(

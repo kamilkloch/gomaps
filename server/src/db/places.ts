@@ -5,7 +5,7 @@ import { DbError, NotFoundError } from '../errors.js'
 
 export interface CreatePlaceInput {
   id: string
-  googleUrl: string
+  googleMapsUri: string
   name: string
   category?: string | null
   rating?: number | null
@@ -27,11 +27,11 @@ export const createPlace = (input: CreatePlaceInput): Effect.Effect<Place, DbErr
     Effect.try({
       try: () => {
         db.prepare(`
-          INSERT INTO places (id, google_url, name, category, rating, review_count, price_level, phone, website, website_type, address, lat, lng, photo_urls, opening_hours, amenities)
+          INSERT INTO places (id, google_maps_uri, name, category, rating, review_count, price_level, phone, website, website_type, address, lat, lng, photo_urls, opening_hours, amenities)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           input.id,
-          input.googleUrl,
+          input.googleMapsUri,
           input.name,
           input.category ?? null,
           input.rating ?? null,
@@ -103,7 +103,7 @@ export const updatePlace = (
     const values: unknown[] = []
 
     const fieldMap: Record<string, string> = {
-      googleUrl: 'google_url',
+      googleMapsUri: 'google_maps_uri',
       name: 'name',
       category: 'category',
       rating: 'rating',
@@ -159,7 +159,7 @@ export const deletePlace = (id: string): Effect.Effect<boolean, DbError, Db> =>
 function mapPlace(row: Record<string, unknown>): Place {
   return {
     id: row.id as string,
-    googleUrl: row.google_url as string,
+    googleMapsUri: row.google_maps_uri as string,
     name: row.name as string,
     category: row.category as string | null,
     rating: row.rating as number | null,

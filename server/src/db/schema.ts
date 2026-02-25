@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS tiles (
 
 CREATE TABLE IF NOT EXISTS places (
   id TEXT PRIMARY KEY,
-  google_url TEXT NOT NULL UNIQUE,
+  google_maps_uri TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   category TEXT,
   rating REAL,

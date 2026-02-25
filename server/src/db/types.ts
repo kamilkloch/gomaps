@@ -31,7 +31,7 @@ export interface Tile {
 
 export interface Place {
   id: string
-  googleUrl: string
+  googleMapsUri: string
   name: string
   category: string | null
   rating: number | null

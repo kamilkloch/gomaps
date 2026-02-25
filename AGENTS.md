@@ -30,7 +30,7 @@ npm run dev --workspace=client
 
 ## Tech stack
 
-- **Server:** Express + TypeScript + better-sqlite3 + Playwright
+- **Server:** Express + TypeScript + better-sqlite3 + Effect + Google Places API (New)
 - **Client:** Vite + React + TypeScript + @vis.gl/react-google-maps
 - **Monorepo:** npm workspaces (server/ and client/)
 - **Database:** SQLite (file-based, stored in data/gomaps.db)
@@ -66,7 +66,8 @@ npm run dev --workspace=client
 ## Important notes
 
 - The Google Maps API key is provided by the user in `.env` as `GOOGLE_MAPS_API_KEY` (server) and `VITE_GOOGLE_MAPS_API_KEY` (client)
-- The Playwright scraper does NOT use any Google API — it drives a real browser
+- Scraping/discovery now uses Google Places API (New) over server-side HTTP (`places:searchText`, `places/{placeId}`)
+- Keep Places field masks explicit with `X-Goog-FieldMask` headers to control SKU/cost and avoid over-fetching
 - The Google Maps JavaScript API (embedded maps in the React UI) is a separate concern from scraping
 - The legacy MVP code is preserved in `legacy/` for reference — do not modify it
 - SQLite database file goes in `data/gomaps.db` — ensure `data/` is in `.gitignore`

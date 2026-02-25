@@ -1,4 +1,4 @@
-export { createDatabase } from './schema.js'
+export { createDatabase, closeDatabase } from './schema.js'
 export { Db, DbLive } from './Db.js'
 export type {
   Project,

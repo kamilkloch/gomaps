@@ -109,7 +109,7 @@
         "npm test --workspace=server passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Use native fetch() for HTTP calls. API key from process.env.GOOGLE_MAPS_API_KEY. Wrap in Effect.tryPromise for error handling. See SPEC.md §7 for field mapping table."
     },
     {
