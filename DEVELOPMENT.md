@@ -48,9 +48,9 @@ gomaps/
 │   │   │   ├── places.ts
 │   │   │   └── shortlists.ts
 │   │   └── scraper/
-│   │       ├── engine.ts      # Playwright scraper
+│   │       ├── engine.ts      # Scrape orchestrator (tiling + API)
+│   │       ├── places-api.ts  # Google Places API (New) client
 │   │       ├── tiling.ts      # Adaptive tiling algorithm
-│   │       ├── extractor.ts   # Place detail extraction
 │   │       └── classifier.ts  # Website classification
 │   └── tests/
 │
@@ -82,7 +82,7 @@ gomaps/
 | Phase | Stories | What you get when done |
 |-------|---------|----------------------|
 | 1. Foundation | US-001 → US-004 | Monorepo, SQLite DB, Express API, React shell with Google Maps |
-| 2. Scraper Core | US-005 → US-009 | Adaptive tiling scraper triggered via API with live progress |
+| 2. Places API Data Fetching | US-005 → US-009 | Places API client, tiling, engine, classifier, API endpoints with live progress |
 | 3. Scrape Setup UI | US-010 → US-012 | Full scrape setup flow: create project, draw area, launch scrape |
 | 4. Explorer | US-013 → US-016 | Map + table + detail panel with linked selection |
 | 5. Search & Filters | US-017 → US-019 | Fuzzy search, filter panel, review keyword search |
@@ -111,22 +111,22 @@ Bootstrap the React app using Vite. Set up React Router with placeholder pages: 
 
 ---
 
-### Phase 2: Scraper Core
+### Phase 2: Places API Data Fetching
 
-**US-005: Extract scraper into modular engine**
-Refactor the existing MVP scraper logic (`legacy/src/index.ts`) into `server/src/scraper/engine.ts`. The engine should be importable (not a standalone script) and accept configuration via function parameters. It should write results to SQLite (not JSON/CSV). Preserve the core scraping logic: URL collection via scrolling, detail page extraction, CAPTCHA pause, checkpoint/resume. Add tests for the non-browser-dependent parts (URL normalization, lat/lng parsing, CSV escape).
+**US-005: Places API client module**
+Replace the Playwright-based scraper with a Places API client in `server/src/scraper/`. Create `server/src/scraper/places-api.ts` that wraps the Google Places API (New) HTTP endpoints: Text Search (`POST /v1/places:searchText`) and Place Details (`GET /v1/places/{placeId}`). Use field masks to control cost. Parse API responses into the existing Place/Review DB schema. Write tests with mocked HTTP responses.
 
 **US-006: Adaptive tiling algorithm**
-Implement `server/src/scraper/tiling.ts`. Given a bounding box, generate an initial coarse grid (~0.1°). The scraper processes one tile at a time: searches Google Maps at the tile center, scrolls results to exhaustion, counts results. If result count ≥ threshold (~120), subdivide into 4 sub-tiles and queue them. Track tile status (pending/running/completed/subdivided) in the Tile table. Enforce a minimum tile size floor. Write unit tests for the tiling math (subdivision, bounds calculation, progress tracking).
+Implement `server/src/scraper/tiling.ts`. Given a bounding box, generate an initial coarse grid (~0.1°). For each tile, call Text Search API with `locationBias` set to the tile center. If result count hits 60 (API pagination limit), subdivide into 4 sub-tiles. Track tile status (pending/running/completed/subdivided) in the Tile table. Enforce a minimum tile size floor. Write unit tests for the tiling math (subdivision, bounds calculation, progress tracking).
 
-**US-007: Enhanced detail extraction**
-Extend `server/src/scraper/extractor.ts` to extract additional fields beyond the MVP: priceLevel, photoUrls (first N image URLs from the carousel), openingHours (text), and amenities (best-effort from the About/amenities tab). Store reviews in the Review table (text + rating per review). Write tests for the extraction parsing logic where possible (mock HTML snippets).
+**US-007: Scrape engine using Places API**
+Implement `server/src/scraper/engine.ts` as the orchestrator that ties tiling + Places API together. For each tile: call Text Search, paginate results, check subdivision threshold, insert places into DB. Then fetch Place Details for enriched data (reviews, photos). Handle de-duplication by Google Place ID. Checkpoint/resume via tile status in DB.
 
 **US-008: Website classification**
 Implement `server/src/scraper/classifier.ts`. Given a URL, classify the domain as `direct`, `ota`, `social`, or `unknown` using a hardcoded allowlist of ~30 OTA/social domains. Write comprehensive tests covering known OTA domains (booking.com, airbnb.com, expedia.com, etc.), social media, direct hotel sites, and edge cases (subdomains, URL variations).
 
 **US-009: Scrape API — start, monitor, pause**
-Wire the scraper engine into the Express API. Implement endpoints: POST to start a scrape run (project ID + query), GET scrape run status/progress, POST to pause/resume. The scraper runs in the background (spawned as an async task in the server process). Implement Server-Sent Events (SSE) endpoint for live progress updates (tiles completed, places found, estimated time). Write an integration test that starts a mock scrape and verifies progress events.
+Wire the scrape engine into the Express API. Implement endpoints: POST to start a scrape run (project ID + query), GET scrape run status/progress, POST to pause/resume. The engine runs in the background (spawned as an async task in the server process). Implement Server-Sent Events (SSE) endpoint for live progress updates (tiles completed, places found, estimated time). Write an integration test that starts a mock scrape and verifies progress events.
 
 ---
 

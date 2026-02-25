@@ -29,9 +29,9 @@ A personal accommodation discovery tool that scrapes Google Maps comprehensively
          ┌──────────────┼──────────────┐
          │              │              │
     ┌────▼─────┐  ┌─────▼────┐  ┌─────▼─────┐
-    │  Scrape  │  │  SQLite  │  │  Scraper  │
-    │  Planner │  │    DB    │  │  Engine   │
-    │ (tiling) │  │          │  │(Playwright)│
+    │  Area    │  │  SQLite  │  │  Places   │
+    │  Tiling  │  │    DB    │  │  API      │
+    │          │  │          │  │  Client   │
     └──────────┘  └──────────┘  └───────────┘
 ```
 
@@ -39,9 +39,9 @@ A personal accommodation discovery tool that scrapes Google Maps comprehensively
 
 - **Frontend:** React + TypeScript, Google Maps JavaScript API (embedded)
 - **Backend:** Node.js server (Express), serves REST API + static frontend build
-- **Scraper:** Playwright (Chromium), single browser tab, runs as background process triggered via API
+- **Data Fetching:** Google Places API (New) — Text Search and Place Details endpoints, called server-side via HTTP
 - **Storage:** SQLite
-- **Google Maps API key:** Required. User provides their own key via `.env`. The free tier ($200/month credit) is more than sufficient for personal use.
+- **Google Maps API key:** Required. User provides their own key via `.env`. The Places API (New) has generous free usage thresholds per SKU (e.g., 5,000 free Text Search Pro requests/month, 10,000 free Place Details Essentials/month). For personal vacation planning, usage stays well within free tiers.
 
 ---
 
@@ -110,33 +110,35 @@ The tile overlay on the map updates in real time as tiles complete.
 
 ---
 
-## 5. Adaptive Tiling Algorithm
+## 5. Area Coverage via Tiled API Queries
 
-The tool decides tile size automatically. The user never configures tile dimensions.
+The tool tiles the user-defined bounding box to ensure comprehensive coverage via the Google Places API (New).
 
 ### Strategy
 
 ```
 1. Start with a coarse grid (tiles ≈ 0.1° — roughly 10km).
-2. For each tile (processed sequentially, one browser tab):
-   a. Navigate Google Maps to the tile's center at an appropriate zoom level.
-   b. Execute the search query.
-   c. Scroll the results panel to exhaustion (no new results appearing).
-   d. Collect all place URLs.
-   e. IF result count hits Google's display cap (~120 places):
+2. For each tile:
+   a. Call Text Search API with the query, using locationBias set to
+      the tile's center + radius covering the tile area.
+   b. Paginate via nextPageToken (up to 60 results per tile, 20 per page).
+   c. IF result count hits the API page limit (60 places):
       → This tile likely has undiscovered places.
       → Subdivide into 4 smaller sub-tiles.
       → Queue sub-tiles for processing.
-   f. IF result count < cap:
+   d. IF result count < 60:
       → Tile is complete — all places in this area captured.
-3. De-duplicate places across all tiles by canonical Google Maps URL.
+3. De-duplicate places across all tiles by Google Place ID.
 4. Enforce a minimum tile size floor (e.g., 0.01° ≈ 1km) to prevent
    infinite recursion in extremely dense areas.
+5. For each discovered place, call Place Details API to fetch
+   enriched data (reviews, photos, amenities, etc.) if not already
+   returned by Text Search.
 ```
 
 ### Why this works
 
-Google Maps search caps visible results at approximately 120 places per viewport. If a tile returns that many, there are likely more places not shown — so we zoom in (subdivide). If it returns fewer, we've captured everything in that area.
+The Text Search API returns up to 20 results per request (60 with pagination). By tiling the area and using locationBias, we ensure comprehensive spatial coverage. Subdivision handles dense areas the same way the browser-based approach did, but via reliable API calls instead of fragile browser scraping.
 
 ---
 
@@ -146,8 +148,8 @@ Google Maps search caps visible results at approximately 120 places per viewport
 
 ```
 Place {
-  id                      (hash of canonical Google Maps URL)
-  googleUrl               (canonical URL)
+  id                      (Google Place ID, e.g., "ChIJ...")
+  googleMapsUri           (canonical Google Maps URL)
   name
   category                ("Hotel", "Vacation rental", "Guest house", ...)
   rating                  (1.0–5.0, nullable)
@@ -240,27 +242,34 @@ ShortlistEntry {
 
 ---
 
-## 7. Scraper Engine
+## 7. Places API Data Fetching
 
-### Per-place data extraction
+### Data retrieval strategy
 
-For each discovered place URL, the scraper opens the detail page and extracts:
+Data is fetched using the Google Places API (New), which provides structured JSON responses. Two main endpoints are used:
 
-| Field | Source | Notes |
+1. **Text Search (New):** Discovers places matching a query within a geographic area. Called server-side via HTTP POST to `https://places.googleapis.com/v1/places:searchText`. Returns up to 20 results per page (60 with pagination). Fields requested via the `X-Goog-FieldMask` header determine the SKU tier and cost.
+
+2. **Place Details (New):** Fetches enriched data for individual places. Called server-side via HTTP GET to `https://places.googleapis.com/v1/places/{placeId}`. Used for fields not returned by Text Search (e.g., full reviews, photos).
+
+### Fields and mapping
+
+| Field | API Source | Places API field |
 |---|---|---|
-| name | `h1` heading | |
-| category | Category button/link | "Hotel", "Vacation rental", etc. |
-| rating | Rating display element | Numeric, 1.0–5.0 |
-| reviewCount | Reviews button aria-label | Parsed from "X reviews" |
-| priceLevel | Price level indicator | "$"–"$$$$", if displayed |
-| phone | Phone button | |
-| website | Website/authority link | |
-| address | Address button | |
-| lat, lng | Parsed from page URL | `/@lat,lng,...` pattern |
-| photoUrls | Photo carousel | First N image URLs |
-| openingHours | Hours section | Text representation |
-| amenities | Amenities/About section | Best-effort list extraction |
-| reviews | Reviews tab | Text + individual rating, capped by `reviewLimit` |
+| name | Text Search | `displayName.text` |
+| category | Text Search | `primaryTypeDisplayName.text` or `types[]` |
+| rating | Text Search | `rating` |
+| reviewCount | Text Search | `userRatingCount` |
+| priceLevel | Text Search | `priceLevel` (PRICE_LEVEL_INEXPENSIVE → "$", etc.) |
+| phone | Text Search / Details | `internationalPhoneNumber` |
+| website | Text Search / Details | `websiteUri` |
+| address | Text Search | `formattedAddress` |
+| lat, lng | Text Search | `location.latitude`, `location.longitude` |
+| photoUrls | Details | `photos[].name` → Photo API URL |
+| openingHours | Text Search / Details | `regularOpeningHours.weekdayDescriptions[]` |
+| amenities | Details | Not directly available — best-effort from `types[]` and `editorialSummary` |
+| reviews | Details | `reviews[]` with `rating`, `text.text`, `relativePublishTimeDescription` |
+| googleMapsUri | Text Search | `googleMapsUri` — canonical Google Maps URL |
 
 ### Website classification (Direct Booking Detection)
 
@@ -279,12 +288,11 @@ In the Explorer UI, places with `websiteType: "direct"` display a prominent **"B
 
 ### Operational behavior
 
-- **Sequential processing:** One browser tab at a time. One tile, then one place detail page at a time.
-- **Randomized delays:** Configurable base delay (default: 1500ms) plus random jitter (200–600ms) between page loads.
-- **Persistent browser profile:** Chromium profile stored per project. Cookies and session persist across runs.
-- **CAPTCHA handling:** If a challenge page is detected, the scrape pauses and the UI notifies the user to solve it manually in the browser window, then continue.
-- **Checkpoint/resume:** Progress is saved after every tile and every place detail scrape. If interrupted, resume picks up at the next unfinished tile/place.
-- **Language:** Whatever Google serves based on the browser's locale. No forced language override.
+- **Server-side HTTP calls:** All Places API requests are made from the Express server using the Google Maps API key. No browser required.
+- **Rate limiting:** Respect API quotas. Add configurable delay between requests (default: 200ms) to avoid hitting rate limits.
+- **Checkpoint/resume:** Progress is saved after every tile and every place detail fetch. If interrupted, resume picks up at the next unfinished tile/place.
+- **De-duplication:** Places are de-duplicated by Google Place ID (`places/{placeId}`). The same place discovered in overlapping tiles is stored once.
+- **Cost awareness:** Use field masks to request only needed fields, minimizing SKU tier charges. Text Search with basic+pro fields handles most data; Place Details only for reviews and photos.
 
 ---
 
@@ -424,20 +432,20 @@ User can:
 
 ## 10. Non-Functional Requirements
 
-- **Google Maps API key:** Required for the embedded map UI. User provides via `.env`. Free tier ($200/month) sufficient for personal use.
-- **No Google login required** for scraping. The scraper operates as an anonymous browser session.
+- **Google Maps API key:** Required for both the embedded map UI and Places API data fetching. User provides via `.env`. The Places API (New) uses per-SKU free thresholds: Text Search Pro has 5,000 free/month, Place Details Essentials has 10,000 free/month, Place Details Pro has 5,000 free/month. Personal vacation planning stays well within free tiers.
+- **No browser/scraper required:** All data is fetched via Google Places API HTTP endpoints. No Playwright, no CAPTCHA risk.
 - **Performance:** SQLite with proper indexes. UI handles 5,000+ places without lag via virtual scrolling and marker clustering.
 - **Resilience:** Checkpoint after every tile and every place. Graceful pause/resume. No data loss on crash.
-- **Privacy:** All data stored locally. No external services beyond Google Maps (scraping + API).
+- **Privacy:** All data stored locally. Google Places API is the only external service.
 - **Single user:** This is a personal tool, not multi-tenant. No auth needed.
 
 ---
 
 ## 11. Future Considerations (Out of Scope for v1)
 
-- Parallel scraping (multiple browser tabs)
+- Parallel API requests (concurrent tile fetching)
 - Automatic price comparison with OTA APIs
 - Email/notification when scrape completes
 - Cloud deployment / shared access
 - Mobile-responsive UI
-- Automatic CAPTCHA solving
+- Nearby Search API as alternative to Text Search for area-based queries

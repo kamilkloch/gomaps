@@ -1,7 +1,7 @@
 {
   "project": "GoMaps",
   "branchName": "ralph/gomaps-v1",
-  "description": "Google Maps accommodation scraper with interactive Explorer UI — see SPEC.md for full specification, DEVELOPMENT.md for implementation guide",
+  "description": "Google Maps accommodation discovery tool using Google Places API (New) for data fetching, with interactive Explorer UI — see SPEC.md for full specification, DEVELOPMENT.md for implementation guide",
   "userStories": [
     {
       "id": "US-001",
@@ -73,75 +73,86 @@
       "notes": ""
     },
     {
-      "id": "US-005",
-      "title": "Extract scraper into modular engine",
-      "description": "Refactor MVP scraper logic from legacy/src/index.ts into server/src/scraper/engine.ts. Importable module (not standalone script). Accepts config via parameters. Writes results to SQLite instead of JSON/CSV. Preserves: URL collection, detail extraction, CAPTCHA pause, checkpoint/resume.",
+      "id": "US-025",
+      "title": "Migrate server TypeScript to Effect-TS",
+      "description": "Migrate the server/ package from plain TypeScript to Effect. Replace try/catch with typed Effect errors, wrap DB access in Effect services with Layer-based dependency injection, use Effect.gen for async flows, and adopt Effect Schema for API request/response validation.",
       "acceptanceCriteria": [
-        "server/src/scraper/engine.ts exports a startScrape() function",
-        "Function accepts typed config: query, bounds, browser options",
-        "Scraped places are inserted into SQLite Place table",
-        "Reviews are inserted into SQLite Review table",
-        "CAPTCHA detection and pause mechanism preserved",
-        "URL normalization and lat/lng parsing extracted as testable functions",
-        "Unit tests pass for URL normalization, lat/lng parsing",
-        "npm run typecheck passes"
+        "effect installed in server/",
+        "DB access layer (server/src/db/) wrapped as Effect services with typed errors (DbError, NotFoundError)",
+        "Express route handlers use Effect.runPromise at the API boundary",
+        "API request validation uses Effect Schema instead of manual checks",
+        "All existing API endpoints preserved (no regressions)",
+        "npm run typecheck --workspace=server passes",
+        "npm test --workspace=server passes"
       ],
       "priority": 5,
       "passes": true,
-      "notes": ""
+      "notes": "Effect-TS v3.19.19 installed. All DB functions return Effect<A, DbError | NotFoundError, Db>. Typed errors in server/src/errors.ts."
     },
     {
-      "id": "US-025",
-      "title": "Migrate server TypeScript to Effect-TS",
-      "description": "Migrate the server/ package from plain TypeScript to Effect (https://github.com/Effect-TS/effect). Replace try/catch with typed Effect errors, wrap DB access and scraper in Effect services with Layer-based dependency injection, use Effect.gen for async flows, and adopt Effect Schema for API request/response validation. Express route handlers use Effect.runPromise at the boundary. Preserve all existing functionality.",
+      "id": "US-005",
+      "title": "Places API client module and Playwright removal",
+      "description": "Replace the Playwright-based scraper with a Google Places API (New) HTTP client. Create server/src/scraper/places-api.ts wrapping Text Search (POST /v1/places:searchText) and Place Details (GET /v1/places/{placeId}). Use field masks to control SKU costs. Parse API responses into DB types. Remove Playwright dependency. Rename Place.googleUrl to Place.googleMapsUri throughout codebase (types, DB mapper, schema column, routes, tests). Place IDs now use Google Place ID (e.g., 'ChIJ...'). Remove old engine.ts and utils.ts. Use Effect patterns consistent with existing codebase.",
       "acceptanceCriteria": [
-        "effect and @effect/schema installed in server/",
-        "DB access layer (server/src/db/) wrapped as Effect services with typed errors (DbError, NotFoundError)",
-        "Scraper engine (server/src/scraper/) returns Effect instead of raw Promises",
-        "Express route handlers use Effect.runPromise at the API boundary",
-        "API request validation uses Effect Schema instead of manual checks",
-        "All existing API endpoints and scraper functionality preserved (no regressions)",
+        "server/src/scraper/places-api.ts exports textSearch() and getPlaceDetails() functions returning Effect types",
+        "textSearch() calls POST https://places.googleapis.com/v1/places:searchText with API key, query, locationBias, and field mask",
+        "getPlaceDetails() calls GET https://places.googleapis.com/v1/places/{placeId} with API key and field mask",
+        "API responses parsed into CreatePlaceInput shape for DB insertion",
+        "Field masks configured to request: displayName, location, rating, userRatingCount, formattedAddress, internationalPhoneNumber, websiteUri, primaryTypeDisplayName, priceLevel, googleMapsUri, reviews, photos, regularOpeningHours",
+        "Old server/src/scraper/engine.ts (Playwright) removed",
+        "Old server/src/scraper/utils.ts removed",
+        "playwright removed from server/package.json dependencies",
+        "Place.googleUrl renamed to Place.googleMapsUri in types.ts, places.ts DB functions, schema.ts (column rename: google_url → google_maps_uri), route files, and tests",
+        "Place ID uses Google Place ID format instead of SHA-256 hash",
+        "Unit tests pass with mocked HTTP responses for both textSearch and getPlaceDetails",
         "npm run typecheck --workspace=server passes",
         "npm test --workspace=server passes"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "Reference: https://github.com/Effect-TS/effect — focus on server/ package only, client/ remains unchanged"
+      "passes": false,
+      "notes": "Use native fetch() for HTTP calls. API key from process.env.GOOGLE_MAPS_API_KEY. Wrap in Effect.tryPromise for error handling. See SPEC.md §7 for field mapping table."
     },
     {
       "id": "US-006",
       "title": "Adaptive tiling algorithm",
-      "description": "Implement server/src/scraper/tiling.ts. Given bounding box, generate coarse grid (~0.1°). Process tiles one at a time. If result count >= threshold (~120), subdivide into 4 sub-tiles. Track tile status in DB. Enforce minimum tile size floor. See SPEC.md §5.",
+      "description": "Implement server/src/scraper/tiling.ts. Given bounding box, generate coarse grid (~0.1°). Process tiles sequentially. If Text Search result count >= 60 (API pagination limit), subdivide into 4 sub-tiles. Track tile status in DB. Enforce minimum tile size floor. See SPEC.md §5.",
       "acceptanceCriteria": [
         "generateTiles(bounds) returns initial grid of tile objects",
         "subdivideTile(tile) returns 4 child tiles",
-        "shouldSubdivide(resultCount, threshold) returns boolean",
+        "shouldSubdivide(resultCount, threshold) returns boolean with default threshold of 60",
         "Minimum tile size floor (0.01°) prevents infinite recursion",
         "Tile status tracked in SQLite: pending, running, completed, subdivided",
         "Progress can be queried: tiles total/completed/subdivided, places found",
         "Unit tests pass for tile generation, subdivision, bounds math",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=server passes",
+        "npm test --workspace=server passes"
       ],
       "priority": 7,
       "passes": false,
-      "notes": ""
+      "notes": "Threshold is 60 (API pagination limit of 3 pages × 20 results), not 120 (old browser scraping limit)."
     },
     {
       "id": "US-007",
-      "title": "Enhanced detail extraction",
-      "description": "Extend scraper to extract: priceLevel, photoUrls (first N), openingHours (text), amenities (best-effort from About tab). Store reviews in Review table with individual rating + text. See SPEC.md §7 extraction table.",
+      "title": "Scrape engine orchestrator using Places API",
+      "description": "Implement server/src/scraper/engine.ts as the orchestrator that combines tiling + Places API client + DB layer. For each tile: call Text Search with locationBias, paginate results (up to 3 pages), check subdivision threshold, insert/update places in DB. Then optionally fetch Place Details for enriched data (reviews, photos). De-duplicate by Google Place ID. Checkpoint/resume via tile status. Rate limiting between requests.",
       "acceptanceCriteria": [
-        "Place records include priceLevel (nullable string)",
-        "Place records include photoUrls (array of URLs)",
-        "Place records include openingHours (nullable string)",
-        "Place records include amenities (array of strings)",
-        "Reviews stored in reviews table with placeId, rating, text, relativeDate",
-        "Extraction handles missing fields gracefully (nulls, empty arrays)",
-        "npm run typecheck passes"
+        "server/src/scraper/engine.ts exports a startScrape(config) function returning Effect",
+        "Config accepts: scrapeRunId, query, bounds, optional delayMs (default 200ms)",
+        "Engine generates tiles for bounds, iterates tiles sequentially",
+        "For each tile: calls textSearch with locationBias, paginates via nextPageToken",
+        "Places inserted into DB via createPlace(), reviews via createReview()",
+        "De-duplication: existing places (by Google Place ID) are linked but not re-scraped",
+        "Subdivision: tiles with 60+ results are subdivided into 4 sub-tiles",
+        "Tile status updated in DB after each tile (checkpoint/resume)",
+        "ScrapeRun progress updated: placesFound, placesUnique, tilesCompleted",
+        "Configurable delay between API requests for rate limiting",
+        "Website classification applied to each place via classifier (US-008 dependency — skip if not yet implemented)",
+        "npm run typecheck --workspace=server passes",
+        "npm test --workspace=server passes"
       ],
       "priority": 8,
       "passes": false,
-      "notes": ""
+      "notes": "This replaces the old Playwright-based engine. Uses Effect patterns. Depends on US-005 (places-api.ts) and US-006 (tiling.ts)."
     },
     {
       "id": "US-008",
@@ -156,7 +167,8 @@
         "Handles null/undefined input → unknown",
         "Place records include websiteType field populated by classifier",
         "Comprehensive tests pass (15+ test cases)",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=server passes",
+        "npm test --workspace=server passes"
       ],
       "priority": 9,
       "passes": false,
@@ -165,7 +177,7 @@
     {
       "id": "US-009",
       "title": "Scrape API — start, monitor, pause with SSE progress",
-      "description": "Wire scraper into Express API. POST to start scrape (projectId + query). GET scrape run status. POST to pause/resume. SSE endpoint for live progress. Scraper runs as background async task in server process.",
+      "description": "Wire scrape engine into Express API. POST to start scrape (projectId + query). GET scrape run status. POST to pause/resume. SSE endpoint for live progress. Engine runs as background async task in server process.",
       "acceptanceCriteria": [
         "POST /api/scrape/start accepts { projectId, query } and returns scrapeRunId",
         "GET /api/scrape/:runId returns run status, tile progress, place counts",
@@ -174,7 +186,8 @@
         "GET /api/scrape/:runId/progress is an SSE endpoint streaming progress events",
         "Progress events include: { tilesCompleted, tilesTotal, tilesSubdivided, placesFound, placesUnique, elapsedMs }",
         "Scrape runs in background — API remains responsive during scrape",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=server passes",
+        "npm test --workspace=server passes"
       ],
       "priority": 10,
       "passes": false,
@@ -195,8 +208,8 @@
         "Clicking a project navigates to /projects/:id/setup",
         "Delete button removes project (with confirmation)",
         "Dark theme styling matching mockup color palette (deep navy background, dark slate cards)",
-        "npm run build succeeds",
-        "Typecheck passes"
+        "npm run build --workspace=client succeeds",
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 11,
       "passes": false,
@@ -216,7 +229,7 @@
         "'Clear' button (dark gray, trash icon) removes the selection",
         "Bounds saved to project via PUT /api/projects/:id",
         "On page load, existing project bounds shown as rectangle on map",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 12,
       "passes": false,
@@ -225,18 +238,18 @@
     {
       "id": "US-012",
       "title": "Scrape launch and live progress display",
-      "description": "Query input, start button, tile overlay, and progress panel on Setup page sidebar matching mockup at docs/mockups/02-scrape-setup-page.png. Sidebar has: query input with magnifying glass icon, estimate badge ('~52 tiles · Est. 25 min'), large green 'Start Scrape' button with play icon, 'Previous Runs' list with status/metrics, and progress section with striped animated progress bar, percentage, and detailed stats (tiles, places with unique count, elapsed/remaining time). Map shows tile grid overlay: green=completed (white checkmark), yellow=active (pulsing dot), gray=pending.",
+      "description": "Query input, start button, tile overlay, and progress panel on Setup page sidebar matching mockup at docs/mockups/02-scrape-setup-page.png. Sidebar has: query input with magnifying glass icon, estimate badge ('~52 tiles · Est. 25 min'), large green 'Start Scrape' button with play icon, 'Previous Runs' list with status/metrics, and progress section with striped animated progress bar, percentage, and detailed stats (tiles, places with unique count, elapsed/remaining time). Map shows tile grid overlay: green=completed, yellow=active, gray=pending.",
       "acceptanceCriteria": [
         "Query text input in sidebar with magnifying glass icon and placeholder text",
         "Estimate badge below query showing estimated tile count and time",
         "'Start Scrape' button: large green with play icon and outer glow",
         "'Previous Runs' section listing past runs with query name, status badge (green checkmark + 'Complete'), places count, and time elapsed",
         "Progress section: striped animated progress bar with percentage",
-        "Detailed stats below progress bar: tiles (completed/total with grid icon), places (total + unique count with group icon), time (elapsed + estimated remaining with clock icon)",
-        "Tile grid overlay on map: green tiles with white checkmark (completed), yellow tile with pulsing dot (active), dark gray tiles (pending)",
+        "Detailed stats below progress bar: tiles (completed/total), places (total + unique count), time (elapsed + estimated remaining)",
+        "Tile grid overlay on map: green tiles (completed), yellow tile (active), dark gray tiles (pending)",
         "Pause/Resume button toggles scrape state",
         "Progress subscribes to SSE for live updates",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 13,
       "passes": false,
@@ -245,7 +258,7 @@
     {
       "id": "US-013",
       "title": "Map view with place markers and clustering",
-      "description": "Explorer page matching mockup at docs/mockups/03-explorer-page.png. Four-pane layout: header with project selector and search bar, map (top-left), detail panel (center-right), data table (bottom), filter sidebar (far-right). Dark-mode vector map with colored dot markers (green/red/yellow by rating) and blue cluster circles with white numeric counts. Selected place has pulse effect with green translucent radius. Geographic labels in white.",
+      "description": "Explorer page matching mockup at docs/mockups/03-explorer-page.png. Four-pane layout: header with project selector and search bar, map (top-left), detail panel (center-right), data table (bottom), filter sidebar (far-right). Dark-mode vector map with colored dot markers (green/red/yellow by rating) and blue cluster circles with white numeric counts. Selected place has pulse effect with green translucent radius.",
       "acceptanceCriteria": [
         "Explorer page at /projects/:id/explorer with four-pane layout per mockup",
         "Header: GoMaps logo, project selector dropdown, centered search bar, 'Filters' button with active filter count badge",
@@ -253,7 +266,7 @@
         "Places rendered as colored dot markers: green (> 4.2), yellow (3.5–4.2), red (< 3.5)",
         "Blue cluster circles with white numeric counts when zoomed out (via @googlemaps/markerclusterer)",
         "Selected marker has pulse effect with green translucent radius highlight",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 14,
       "passes": false,
@@ -272,7 +285,7 @@
         "Virtual scrolling handles 5000+ rows without lag",
         "'Filter results...' text input and 'Clear' button above table",
         "Horizontal scrollbar at bottom",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 15,
       "passes": false,
@@ -281,7 +294,7 @@
     {
       "id": "US-015",
       "title": "Detail panel with reviews",
-      "description": "Center-right detail panel on Explorer page per mockup at docs/mockups/03-explorer-page.png. Shows: title, category, star rating with review count, 'Book Direct' badge (green), contact info (website link, address with pin, phone with phone icon, price indicator $$), amenities as horizontal tags in dark blue rounded boxes (Pool, WiFi, Parking, AC, Garden), photo gallery thumbnails, 'Opening hours' accordion, scrapedAt timestamp, reviews list with user avatars and star ratings, action buttons (Open in Google Maps, Search on Booking.com, Search on Airbnb).",
+      "description": "Center-right detail panel on Explorer page per mockup at docs/mockups/03-explorer-page.png. Shows: title, category, star rating with review count, 'Book Direct' badge (green), contact info (website link, address with pin, phone with phone icon, price indicator $$), amenities as horizontal tags, photo gallery thumbnails, 'Opening hours' accordion, scrapedAt timestamp, reviews list with star ratings, action buttons (Open in Google Maps, Search on Booking.com, Search on Airbnb).",
       "acceptanceCriteria": [
         "Panel opens on right side when a place is selected",
         "Header: place title, category label, star rating (yellow), review count",
@@ -291,9 +304,9 @@
         "Photo gallery: row of rectangular thumbnail images",
         "'Opening hours' expandable accordion section",
         "scrapedAt timestamp metadata",
-        "Reviews list with user avatars, star ratings, and text snippets",
+        "Reviews list with star ratings and text snippets",
         "Three full-width blue action buttons: 'Open in Google Maps', 'Search on Booking.com', 'Search on Airbnb'",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 16,
       "passes": false,
@@ -309,7 +322,7 @@
         "Selected marker has distinct visual style (larger/different color/bouncing)",
         "Only one place selected at a time",
         "Deselecting (clicking empty area) closes detail panel",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 17,
       "passes": false,
@@ -326,7 +339,7 @@
         "Table shows only matching rows",
         "Search is debounced (300ms)",
         "Clearing search restores all results",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 18,
       "passes": false,
@@ -335,7 +348,7 @@
     {
       "id": "US-018",
       "title": "Filter panel",
-      "description": "Far-right filter sidebar on Explorer page per mockup at docs/mockups/03-explorer-page.png. Contains: Rating range slider (3.0–5.0 with blue handle and track), Category checkbox group (Hotel, Vacation Rental, B&B, Apartment), Website radio button group (Direct Booking, OTA, Unknown). AND logic. Updates map + table live.",
+      "description": "Far-right filter sidebar on Explorer page per mockup at docs/mockups/03-explorer-page.png. Contains: Rating range slider (3.0–5.0), Category checkbox group (Hotel, Vacation Rental, B&B, Apartment), Website radio button group (Direct Booking, OTA, Unknown). AND logic. Updates map + table live.",
       "acceptanceCriteria": [
         "Filter sidebar on far-right of Explorer page per mockup layout",
         "Rating: range slider (1.0–5.0) with blue handle and track, showing min/max values",
@@ -345,7 +358,7 @@
         "All filters combine with AND logic",
         "Map markers and table update live as filters change",
         "Filter state persisted in URL query parameters",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 19,
       "passes": false,
@@ -363,7 +376,7 @@
         "Only places within radius are shown on map and table",
         "Circle overlay drawn on map showing the radius",
         "Both filters integrate with existing filter system (AND logic)",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 20,
       "passes": false,
@@ -372,19 +385,20 @@
     {
       "id": "US-020",
       "title": "Star/bookmark places and shortlist management",
-      "description": "Shortlists page matching mockup at docs/mockups/04-shortlists-page.png. Left sidebar with shortlist navigation: each shortlist shows icon, name, and place count, with active state highlighted in blue. '+ Create Shortlist' button at bottom (blue outline). Main content: breadcrumbs, view title with place count badge, data table with columns (Checkbox, Name, Rating, Reviews, Price, Website, Notes input, Actions with star and trash icons). Star toggle also in Explorer table and detail panel. Full shortlist CRUD API.",
+      "description": "Shortlists page matching mockup at docs/mockups/04-shortlists-page.png. Left sidebar with shortlist navigation. Star toggle in Explorer table and detail panel. Full shortlist CRUD API.",
       "acceptanceCriteria": [
         "Shortlists page with left sidebar and main content area per mockup",
         "Sidebar lists shortlists with icon, name, place count; active shortlist highlighted in blue",
         "'+ Create Shortlist' button at sidebar bottom with blue outline",
         "Breadcrumbs: Projects > [Project Name] > Shortlists",
         "View title with shortlist name and place count badge",
-        "Data table columns: Checkbox, Name, Rating (with yellow star), Reviews, Price, Website (with OTA/Direct suffix), Notes (inline text input), Actions (yellow star icon, gray trash icon)",
+        "Data table columns: Checkbox, Name, Rating, Reviews, Price, Website, Notes (inline text input), Actions (star icon, trash icon)",
         "Notes column has inline editable text input with placeholder '[Add a note]'",
-        "⭐ toggle in Explorer table rows and detail panel saves to default shortlist",
+        "Star toggle in Explorer table rows and detail panel saves to default shortlist",
         "POST/GET/PUT/DELETE /api/shortlists and /api/shortlists/:id/entries endpoints work",
         "Can create, rename, delete shortlists",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes",
+        "npm run typecheck --workspace=server passes"
       ],
       "priority": 21,
       "passes": false,
@@ -393,16 +407,15 @@
     {
       "id": "US-021",
       "title": "Comparison view and CSV export",
-      "description": "On Shortlists page per mockup at docs/mockups/04-shortlists-page.png. Checkbox selection in table rows (max 3). 'Compare (N)' solid blue button and 'Export CSV' outlined button in header. Comparison view shows horizontal cards for selected properties: thumbnail image, 'X' close button, title, star rating (yellow), review count (green), price per night, source badge (Booking.com OTA or Direct Website), amenities chips (gray background), address with pin icon. Selected rows in table have blue checkboxes and subtle background highlight.",
+      "description": "On Shortlists page per mockup at docs/mockups/04-shortlists-page.png. Checkbox selection (max 3). 'Compare (N)' button and 'Export CSV' button. Comparison cards with place details side by side.",
       "acceptanceCriteria": [
         "Checkbox selection on shortlist table rows; selected rows show blue checkbox and highlight",
         "'Compare (N)' solid blue primary button in header showing selected count",
         "'Export CSV' outlined button with download icon in header",
-        "Comparison cards (horizontal layout): thumbnail image (left), 'X' close button (top-right), title, star rating (yellow), review count (green text), price per night, source badge, amenities as gray chips, address with pin icon",
-        "Cards have colored borders (blue standard, green for Direct properties)",
+        "Comparison cards (horizontal layout): thumbnail, title, star rating, review count, price, source badge, amenities chips, address",
         "Max 3 items in comparison",
         "'Export CSV' downloads shortlist as CSV with all place fields plus user notes",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 22,
       "passes": false,
@@ -411,32 +424,32 @@
     {
       "id": "US-022",
       "title": "Re-scrape support",
-      "description": "Refresh Data button on project page. Re-visits detail pages of all existing places to update data. Skips tiling/discovery. Special ScrapeRun type. Progress shown in UI.",
+      "description": "Refresh Data button on project page. Re-fetches Place Details for all existing places to update data. Skips tiling/discovery. Special ScrapeRun type. Progress shown in UI.",
       "acceptanceCriteria": [
         "'Refresh Data' button on project Setup page",
         "POST /api/scrape/rescrape accepts { projectId } and creates a re-scrape run",
-        "Re-scrape iterates existing place URLs, not tiles",
+        "Re-scrape iterates existing place IDs, calling Place Details API for each",
         "Updated place data (rating, reviews, price, etc.) overwrites old data",
         "scrapedAt timestamp updated for each re-scraped place",
         "Progress shown via SSE (places refreshed / total)",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=server passes"
       ],
       "priority": 23,
       "passes": false,
-      "notes": ""
+      "notes": "Uses Place Details API instead of re-visiting browser pages."
     },
     {
       "id": "US-023",
       "title": "External search links (Booking.com, Airbnb)",
-      "description": "In detail panel per mockup at docs/mockups/03-explorer-page.png, three full-width blue action buttons at bottom: 'Open in Google Maps', 'Search on Booking.com', 'Search on Airbnb'. Each with an icon. Encode place name + location into OTA search URLs. Open in new tab.",
+      "description": "In detail panel, three full-width blue action buttons: 'Open in Google Maps', 'Search on Booking.com', 'Search on Airbnb'. Encode place name + location into OTA search URLs. Open in new tab.",
       "acceptanceCriteria": [
         "Three full-width blue buttons at bottom of detail panel with icons per mockup",
-        "'Open in Google Maps' button opens googleUrl in new tab",
+        "'Open in Google Maps' button opens googleMapsUri in new tab",
         "'Search on Booking.com' button encodes place name + location into Booking.com search URL",
         "'Search on Airbnb' button encodes place name + location into Airbnb search URL",
         "All links open in new tab (target=_blank)",
         "Buttons only shown when place has a name and location",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 24,
       "passes": false,
@@ -452,7 +465,7 @@
         "Threshold configurable (default: 7 days)",
         "'Show stale only' toggle added to filter panel",
         "Stale filter integrates with existing filter system",
-        "npm run typecheck passes"
+        "npm run typecheck --workspace=client passes"
       ],
       "priority": 25,
       "passes": false,

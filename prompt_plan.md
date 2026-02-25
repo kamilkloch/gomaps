@@ -2,6 +2,20 @@
 
 You are an autonomous planning agent working on the GoMaps project.
 
+## CRITICAL CONTEXT — Architecture Pivot
+
+The project has pivoted from Playwright-based browser scraping to using the **Google Places API (New)** for all data fetching. Key changes:
+
+- **No more Playwright/browser scraping.** All place discovery and detail fetching uses Google Places API HTTP endpoints (Text Search, Place Details).
+- **US-005 needs to be rewritten** — the existing `engine.ts` uses Playwright. It must be replaced with a Places API client.
+- **US-025 (Effect-TS migration) is done** and must be preserved — new code should use Effect patterns.
+- **The existing Playwright scraper code (`server/src/scraper/engine.ts`, `server/src/scraper/utils.ts`) should be removed** and replaced with Places API client code.
+- **Playwright dependency should be removed** from `server/package.json`.
+- **Place IDs** now use the Google Place ID (e.g., `ChIJ...`) instead of SHA-256 hash of URL.
+- **SPEC.md and DEVELOPMENT.md have been updated** to reflect the new API-based approach. Use them as the source of truth.
+
+Stories US-001 through US-004 are truly complete and should remain `passes: true`. US-025 (Effect-TS migration) is also complete. US-005 (old Playwright scraper) must be marked `passes: false` and rewritten for the Places API approach. All stories from US-006 onward were never implemented and remain `passes: false`.
+
 ## Your Task — PLANNING ONLY
 
 You perform gap analysis: compare specifications against existing code, then generate or update `prd.json` with prioritized user stories. **Do NOT implement anything. Do NOT commit code changes.**
