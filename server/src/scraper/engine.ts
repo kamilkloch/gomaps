@@ -30,9 +30,23 @@ export interface StartScrapeConfig {
   query: string
   bounds: Bounds
   delayMs?: number
+  shouldPause?: () => boolean
+  onProgress?: (progress: ScrapeProgress) => void
+}
+
+export interface ScrapeProgress {
+  scrapeRunId: string
+  status: 'pending' | 'running' | 'paused' | 'completed' | 'failed'
+  tilesTotal: number
+  tilesCompleted: number
+  tilesSubdivided: number
+  placesFound: number
+  placesUnique: number
+  elapsedMs: number
 }
 
 type EngineError = DbError | NotFoundError | ScrapeError
+type RunOutcome = 'completed' | 'paused'
 
 const DEFAULT_DELAY_MS = 200
 const MAX_TEXT_SEARCH_PAGES = 3
@@ -48,23 +62,44 @@ export const startScrape = (config: StartScrapeConfig): Effect.Effect<void, Engi
 
   const scrapeEffect = Effect.gen(function* () {
     const run = yield* getScrapeRun(config.scrapeRunId)
+    const startedAt = run.startedAt ?? runStartedAt
+
     yield* updateScrapeRun(config.scrapeRunId, {
       status: 'running',
-      startedAt: run.startedAt ?? runStartedAt,
+      startedAt,
       completedAt: null,
     })
+    yield* notifyProgress(config.scrapeRunId, startedAt, config.onProgress)
 
     const existingTiles = yield* listTiles(config.scrapeRunId)
     if (existingTiles.length === 0) {
       yield* initializeTilesForRun(config.scrapeRunId, config.bounds)
+      yield* notifyProgress(config.scrapeRunId, startedAt, config.onProgress)
     }
 
-    yield* processTileQueue(config.scrapeRunId, config.query, delayMs)
+    const runOutcome = yield* processTileQueue(
+      config.scrapeRunId,
+      config.query,
+      delayMs,
+      startedAt,
+      config.shouldPause,
+      config.onProgress
+    )
+
+    if (runOutcome === 'paused') {
+      yield* updateScrapeRun(config.scrapeRunId, {
+        status: 'paused',
+        completedAt: null,
+      })
+      yield* notifyProgress(config.scrapeRunId, startedAt, config.onProgress)
+      return
+    }
 
     yield* updateScrapeRun(config.scrapeRunId, {
       status: 'completed',
       completedAt: new Date().toISOString(),
     })
+    yield* notifyProgress(config.scrapeRunId, startedAt, config.onProgress)
   })
 
   return scrapeEffect.pipe(
@@ -74,6 +109,9 @@ export const startScrape = (config: StartScrapeConfig): Effect.Effect<void, Engi
           status: 'failed',
           completedAt: new Date().toISOString(),
         }).pipe(Effect.catchAll(() => Effect.void))
+        yield* notifyProgress(config.scrapeRunId, runStartedAt, config.onProgress).pipe(
+          Effect.catchAll(() => Effect.void)
+        )
         return yield* Effect.fail(error)
       })
     )
@@ -83,13 +121,20 @@ export const startScrape = (config: StartScrapeConfig): Effect.Effect<void, Engi
 const processTileQueue = (
   scrapeRunId: string,
   query: string,
-  delayMs: number
-): Effect.Effect<void, EngineError, Db> =>
+  delayMs: number,
+  startedAt: string,
+  shouldPause?: () => boolean,
+  onProgress?: (progress: ScrapeProgress) => void
+): Effect.Effect<RunOutcome, EngineError, Db> =>
   Effect.gen(function* () {
     while (true) {
+      if (shouldPause?.()) {
+        return 'paused'
+      }
+
       const tile = yield* nextRunnableTile(scrapeRunId)
       if (!tile) {
-        return
+        return 'completed'
       }
 
       yield* markTileRunning(tile.id)
@@ -100,12 +145,42 @@ const processTileQueue = (
 
       if (shouldSubdivide(searchResult.resultCount)) {
         yield* subdivideTileInRun(tile.id)
+        yield* notifyProgress(scrapeRunId, startedAt, onProgress)
         continue
       }
 
       yield* persistTilePlaces(scrapeRunId, searchResult.places, delayMs)
       yield* markTileCompleted(tile.id, searchResult.resultCount)
+      yield* notifyProgress(scrapeRunId, startedAt, onProgress)
     }
+  })
+
+const notifyProgress = (
+  scrapeRunId: string,
+  startedAt: string,
+  onProgress?: (progress: ScrapeProgress) => void
+): Effect.Effect<void, EngineError, Db> =>
+  Effect.gen(function* () {
+    if (!onProgress) {
+      return
+    }
+
+    const scrapeRun = yield* getScrapeRun(scrapeRunId)
+    const parsedStartedAt = Date.parse(scrapeRun.startedAt ?? startedAt)
+    const elapsedMs = Number.isFinite(parsedStartedAt) ? Math.max(0, Date.now() - parsedStartedAt) : 0
+
+    yield* Effect.sync(() =>
+      onProgress({
+        scrapeRunId,
+        status: scrapeRun.status,
+        tilesTotal: scrapeRun.tilesTotal,
+        tilesCompleted: scrapeRun.tilesCompleted,
+        tilesSubdivided: scrapeRun.tilesSubdivided,
+        placesFound: scrapeRun.placesFound,
+        placesUnique: scrapeRun.placesUnique,
+        elapsedMs,
+      })
+    )
   })
 
 const nextRunnableTile = (

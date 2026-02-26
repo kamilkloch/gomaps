@@ -190,7 +190,7 @@
         "npm test --workspace=server passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

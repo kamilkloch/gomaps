@@ -61,6 +61,7 @@ npm run dev --workspace=client
 - Scraper modules in `server/src/scraper/`
 - Tiling logic should live in `server/src/scraper/tiling.ts` as pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) plus thin DB progress helpers
 - Scrape orchestration should live in `server/src/scraper/engine.ts`; when creating/subdividing tiles, use tiling helpers (`initializeTilesForRun`, `subdivideTileInRun`, `markTileCompleted`) so scrape-run counters stay consistent
+- Scrape API route orchestration (`server/src/routes/scrape.ts`) should keep ephemeral run state (pause flags/background task handles/SSE subscribers) module-scoped and expose small test hooks when async behavior needs deterministic integration tests
 - React components in `client/src/components/`
 - API client functions in `client/src/lib/api.ts`
 - React hooks in `client/src/hooks/`

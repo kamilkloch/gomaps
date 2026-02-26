@@ -15,6 +15,7 @@
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
+- **Scrape route orchestration:** keep background scrape state (`pauseRequested`, in-flight task handles, SSE subscribers) module-scoped in `server/src/routes/scrape.ts`, and expose lightweight test hooks (`set...ForTests`, `reset...ForTests`) to make async integration tests deterministic
 - **Places API requests:** Use `X-Goog-Api-Key` + `X-Goog-FieldMask` headers and wrap network calls in `Effect.tryPromise` with typed `ScrapeError`
 - **Website classification:** Normalize website hostnames with URL parsing (add `https://` fallback for protocol-less inputs), then classify via suffix matching so `www.booking.com` and other subdomains map to the base domain allowlist
 - **Place IDs:** Use Google Place IDs from Places API (`place.id` or resource name `places/{id}`), and persist canonical map links in `google_maps_uri`
@@ -169,4 +170,16 @@ Thread: https://ampcode.com/threads/T-019c9bde-9b0f-7021-8c45-4d8182a600c6
   - Keep classification centralized in one scraper helper and reuse it during API response mapping so DB writes stay consistent across Text Search and Place Details flows
   - Domain suffix matching against normalized hostnames is enough for OTA/social heuristics without needing per-path rules
   - Dedicated classifier unit tests catch subtle hostname parsing regressions early (uppercase hosts, protocol-less input, malformed URLs)
+---
+
+## 2026-02-26 22:40:54 CET - US-009
+Thread: https://ampcode.com/threads/T-019c9be1-3b37-7184-9bb5-33b69f8f8702
+- Implemented full scrape API orchestration in `server/src/routes/scrape.ts`: start run, status endpoint, pause/resume controls, and SSE progress stream using background task management
+- Extended `server/src/scraper/engine.ts` with optional `shouldPause` and `onProgress` hooks so route-level orchestration can pause gracefully between tiles and broadcast typed progress snapshots
+- Added integration coverage in `server/tests/projects.test.ts` for start/status, pause/resume lifecycle, and SSE payload streaming with deterministic mock executors
+- Files changed: `server/src/routes/scrape.ts`, `server/src/scraper/engine.ts`, `server/tests/projects.test.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Keep long-running scrape control state in-memory at the route boundary while preserving durable progress/status in `scrape_runs`
+  - Exposing small injectable executor hooks in route modules is an effective way to test background async workflows without hitting external APIs
+  - For pause semantics, return `202 pausing` immediately and let the worker mark durable `paused` state at the next safe checkpoint
 ---
