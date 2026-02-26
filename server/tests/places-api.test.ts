@@ -86,6 +86,7 @@ describe('places-api', () => {
     expect(result.places[0].placeId).toBe('ChIJ_TEXT_SEARCH_1')
     expect(result.places[0].place.googleMapsUri).toBe('https://maps.google.com/?cid=123')
     expect(result.places[0].place.priceLevel).toBe('$$')
+    expect(result.places[0].place.websiteType).toBe('direct')
     expect(result.places[0].place.photoUrls).toEqual([
       'https://places.googleapis.com/v1/places/ChIJ_TEXT_SEARCH_1/photos/photo-1/media?maxHeightPx=600&key=test-api-key',
     ])
@@ -139,6 +140,7 @@ describe('places-api', () => {
     expect(result.place.category).toBe('Vacation rental')
     expect(result.place.lat).toBe(39.21)
     expect(result.place.lng).toBe(9.11)
+    expect(result.place.websiteType).toBe('direct')
     expect(result.reviews).toEqual([
       {
         rating: 4,

@@ -1,6 +1,7 @@
 import { Effect } from 'effect'
 import type { CreatePlaceInput } from '../db/places.js'
 import { ScrapeError } from '../errors.js'
+import { classifyWebsite } from './classifier.js'
 
 const TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText'
 const PLACE_DETAILS_URL_BASE = 'https://places.googleapis.com/v1/places'
@@ -176,7 +177,7 @@ const parsePlace = (place: PlaceResult, apiKey: string): ParsedPlace => {
       priceLevel: mapPriceLevel(place.priceLevel),
       phone: place.internationalPhoneNumber ?? null,
       website: place.websiteUri ?? null,
-      websiteType: 'unknown',
+      websiteType: classifyWebsite(place.websiteUri),
       address: place.formattedAddress ?? null,
       lat: place.location.latitude,
       lng: place.location.longitude,

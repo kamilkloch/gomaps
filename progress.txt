@@ -16,6 +16,7 @@
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
 - **Places API requests:** Use `X-Goog-Api-Key` + `X-Goog-FieldMask` headers and wrap network calls in `Effect.tryPromise` with typed `ScrapeError`
+- **Website classification:** Normalize website hostnames with URL parsing (add `https://` fallback for protocol-less inputs), then classify via suffix matching so `www.booking.com` and other subdomains map to the base domain allowlist
 - **Place IDs:** Use Google Place IDs from Places API (`place.id` or resource name `places/{id}`), and persist canonical map links in `google_maps_uri`
 - **Effect-TS:** All DB functions return `Effect<A, DbError | NotFoundError>`. Routes use `Effect.runPromise` at boundary. Scraper uses `Effect.runSync` for DB calls since better-sqlite3 is synchronous. Typed errors in `server/src/errors.ts`: `DbError`, `NotFoundError`, `ValidationError`, `ScrapeError`. Schema validation via `Schema.decodeUnknown` from `effect` package.
 
@@ -155,4 +156,17 @@ Thread: https://ampcode.com/threads/T-019c96f4-c54b-7769-8ccf-432720f1de9a
   - In this codebase, `placesFound` tracks raw processed hits from completed tiles (including duplicates across pages), while `placesUnique` tracks newly inserted place IDs
   - `startScrape()` should treat both `pending` and `running` tiles as runnable to support interruption-safe resume semantics
   - Direct `createTile()` calls do not update `scrape_runs.tiles_total`; use tiling helpers when aggregate counters matter
+---
+
+## 2026-02-26 22:34:31 CET - US-008
+Thread: https://ampcode.com/threads/T-019c9bde-9b0f-7021-8c45-4d8182a600c6
+- Implemented website classification module in `server/src/scraper/classifier.ts` with hardcoded OTA/social allowlists and robust hostname normalization for protocol-less inputs and subdomains
+- Wired classifier into `server/src/scraper/places-api.ts` so parsed place payloads persist `websiteType` from `classifyWebsite()` instead of defaulting to `unknown`
+- Added comprehensive tests in `server/tests/classifier.test.ts` (15+ cases) covering OTA, social, direct, subdomain, null/undefined, and invalid URL edge cases
+- Updated existing Places API tests to assert classified `websiteType` values
+- Files changed: `server/src/scraper/classifier.ts`, `server/src/scraper/places-api.ts`, `server/tests/classifier.test.ts`, `server/tests/places-api.test.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Keep classification centralized in one scraper helper and reuse it during API response mapping so DB writes stay consistent across Text Search and Place Details flows
+  - Domain suffix matching against normalized hostnames is enough for OTA/social heuristics without needing per-path rules
+  - Dedicated classifier unit tests catch subtle hostname parsing regressions early (uppercase hosts, protocol-less input, malformed URLs)
 ---
