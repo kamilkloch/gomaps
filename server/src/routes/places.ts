@@ -1,7 +1,19 @@
 import { Router } from 'express'
+import { Effect } from 'effect'
+import { listPlaces } from '../db/index.js'
+import { appRuntime } from '../runtime.js'
 
 export const placesRouter = Router()
 
-placesRouter.get('/', (_req, res) => {
-  res.json([])
+placesRouter.get('/', async (req, res) => {
+  const projectId = typeof req.query.projectId === 'string' ? req.query.projectId : undefined
+
+  await appRuntime.runPromise(
+    listPlaces(projectId).pipe(
+      Effect.andThen((places) => Effect.sync(() => res.json(places))),
+      Effect.catchTag('DbError', (error) =>
+        Effect.sync(() => res.status(500).json({ error: error.message }))
+      ),
+    )
+  )
 })

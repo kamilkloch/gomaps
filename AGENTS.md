@@ -71,6 +71,7 @@ npm run dev --workspace=client
 - The Google Maps API key is provided by the user in `.env` as `GOOGLE_MAPS_API_KEY` (server) and `VITE_GOOGLE_MAPS_API_KEY` (client)
 - For advanced map overlays in React (`Rectangle`, listeners, imperative map APIs), keep imperative Google Maps objects in small child components that use `useMap()` (for map access) and forward state changes to parent callbacks
 - In client files importing the `Map` component from `@vis.gl/react-google-maps`, use `globalThis.Map` for JS map collections to avoid TypeScript symbol collisions
+- For Explorer marker rendering, keep marker/cluster lifecycles in a dedicated `useMap()` child controller (manage `google.maps.Marker` + `MarkerClusterer` refs there, and update via props/state) instead of creating map objects directly in page components
 - Scraping/discovery now uses Google Places API (New) over server-side HTTP (`places:searchText`, `places/{placeId}`)
 - Keep Places field masks explicit with `X-Goog-FieldMask` headers to control SKU/cost and avoid over-fetching
 - Classify place websites by normalized hostname (supporting protocol-less URLs and subdomains) in `server/src/scraper/classifier.ts`, and persist `websiteType` from that classifier instead of hardcoded defaults

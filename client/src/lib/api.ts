@@ -50,6 +50,26 @@ export interface ScrapeTile {
   parentTileId: string | null
 }
 
+export interface Place {
+  id: string
+  googleMapsUri: string
+  name: string
+  category: string | null
+  rating: number | null
+  reviewCount: number | null
+  priceLevel: string | null
+  phone: string | null
+  website: string | null
+  websiteType: 'direct' | 'ota' | 'social' | 'unknown'
+  address: string | null
+  lat: number
+  lng: number
+  photoUrls: string
+  openingHours: string | null
+  amenities: string
+  scrapedAt: string
+}
+
 const API_BASE = '/api'
 
 const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
@@ -102,6 +122,13 @@ export const getScrapeStatus = async (runId: string): Promise<ScrapeProgress> =>
 
 export const listRunTiles = async (runId: string): Promise<ScrapeTile[]> =>
   requestJson<ScrapeTile[]>(`/scrape/${runId}/tiles`)
+
+export const listPlaces = async (projectId?: string): Promise<Place[]> =>
+  requestJson<Place[]>(
+    projectId
+      ? `/places?projectId=${encodeURIComponent(projectId)}`
+      : '/places'
+  )
 
 export const startScrape = async (
   projectId: string,

@@ -14,6 +14,7 @@
 - **Google Maps:** `@vis.gl/react-google-maps` with `<APIProvider apiKey={...}>` + `<Map>` pattern; key from `VITE_GOOGLE_MAPS_API_KEY`
 - **Google Maps imperative overlays:** For `google.maps.Rectangle` and map listeners, keep imperative map objects in child components using `useMap()`, then pass updates to page state via callbacks
 - **Map naming collision:** In React files importing the `Map` component, use `globalThis.Map` for JS map collections (`new globalThis.Map(...)`) to avoid TypeScript resolving to the component symbol
+- **Explorer markers + clustering:** Manage `google.maps.Marker`, `google.maps.Circle`, and `MarkerClusterer` refs inside a dedicated `useMap()` controller; on data updates, diff markers by place id and refresh cluster membership (`clearMarkers()` + `addMarkers()`) to keep map state in sync with React state
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
@@ -220,4 +221,16 @@ Thread: https://ampcode.com/threads/T-019c9bf3-4ee5-7140-a9c8-915c7d602a38
   - Keep scrape status and tile data refresh as two channels: SSE for low-latency progress numbers and periodic snapshots for tile-state overlays.
   - Route-level optional query filtering (`/api/scrape?projectId=`) is sufficient for sidebar history without adding separate route modules.
   - In files importing `Map` from `@vis.gl/react-google-maps`, instantiate JS collections via `globalThis.Map` to avoid TypeScript constructor resolution errors.
+---
+
+## 2026-02-26 23:04:00 CET - US-013
+Thread: https://ampcode.com/threads/T-019c9bf7-5eda-711d-a89d-affd98871822
+- Implemented Explorer page layout at `/projects/:projectId/explorer` with top header controls, map panel, detail panel, bottom data table, and far-right filter sidebar shell to match the target four-pane structure.
+- Added live place loading for a project via `/api/places?projectId=...`, including project selector navigation and lightweight search filtering that updates both marker set and table rows.
+- Added dark-mode map styling, marker color encoding by rating (green/yellow/red), blue numeric clustering via `@googlemaps/markerclusterer`, and selected-place pulse highlight using an animated translucent green radius overlay.
+- Files changed: `server/src/routes/places.ts`, `client/src/lib/api.ts`, `client/src/pages/ExplorerPage.tsx`, `client/src/App.tsx`, `client/src/styles.css`, `AGENTS.md`, `prd.json`, `progress.txt`, `client/package.json`, `package-lock.json`
+- **Learnings for future iterations:**
+  - Keep marker updates idempotent by diffing marker refs against place ids before rebuilding clusters; this avoids leaked markers and stale cluster counts.
+  - A custom cluster renderer (blue circle + white count) can match product mockups closely without needing AdvancedMarker APIs.
+  - Selection pulse effects are easiest to implement with a `google.maps.Circle` plus a small interval that modulates radius/opacity.
 ---

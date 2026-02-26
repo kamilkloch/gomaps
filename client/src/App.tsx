@@ -48,6 +48,7 @@ export function App() {
         <Route path="/" element={<Navigate to="/projects" replace />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:projectId/setup" element={<SetupPage />} />
+        <Route path="/projects/:projectId/explorer" element={<ExplorerPage />} />
         <Route path="/setup" element={<Navigate to="/projects" replace />} />
         <Route path="/explorer" element={<ExplorerPage />} />
         <Route path="/shortlists" element={<ShortlistsPage />} />
