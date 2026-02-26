@@ -1,11 +1,14 @@
 import { APIProvider, Map } from '@vis.gl/react-google-maps'
+import { useParams } from 'react-router-dom'
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string
 
 export function SetupPage() {
+  const { projectId } = useParams()
+
   return (
     <div style={{ padding: '1rem' }}>
-      <h2>Scrape Setup</h2>
+      <h2>Scrape Setup {projectId ? `· ${projectId}` : ''}</h2>
       <div style={{ width: '100%', height: '600px' }}>
         <APIProvider apiKey={API_KEY}>
           <Map

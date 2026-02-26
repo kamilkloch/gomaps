@@ -183,3 +183,14 @@ Thread: https://ampcode.com/threads/T-019c9be1-3b37-7184-9bb5-33b69f8f8702
   - Exposing small injectable executor hooks in route modules is an effective way to test background async workflows without hitting external APIs
   - For pause semantics, return `202 pausing` immediately and let the worker mark durable `paused` state at the next safe checkpoint
 ---
+## 2026-02-26 22:47:43 CET - US-010
+Thread: https://ampcode.com/threads/T-019c9be9-89ea-719e-b4bd-faabaa2f1da5
+- Implemented a dedicated Projects management UI page with a dark themed nav/header, responsive project card grid, selection glow state, empty-state card, and map preview blocks with bounds overlays.
+- Added client-side project API helpers and wired create/delete flows: `+ New Project` toggles a creation form that POSTs to `/api/projects`, delete uses confirmation + refresh, and cards navigate to `/projects/:id/setup`.
+- Updated app routing so Projects is the default landing page and setup now supports project-specific paths.
+- Files changed: `client/src/App.tsx`, `client/src/main.tsx`, `client/src/pages/ProjectsPage.tsx`, `client/src/pages/SetupPage.tsx`, `client/src/lib/api.ts`, `client/src/styles.css`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For pre-mockup UI stories, it helps to centralize API calls in `client/src/lib/api.ts` first so page components stay focused on state/rendering and later stories can reuse the same CRUD helpers.
+  - Project cards can render lightweight map previews with a CSS bounds overlay even before full drawing/edit flows are implemented in Setup.
+  - Keep `Projects` as the router default once project selection becomes the primary entry point for downstream pages.
+---

@@ -212,7 +212,7 @@
         "npm run typecheck --workspace=client passes"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "Reference mockup: docs/mockups/01-projects-page.png"
     },
     {

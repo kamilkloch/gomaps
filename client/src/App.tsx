@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-do
 import { SetupPage } from './pages/SetupPage'
 import { ExplorerPage } from './pages/ExplorerPage'
 import { ShortlistsPage } from './pages/ShortlistsPage'
+import { ProjectsPage } from './pages/ProjectsPage'
 
 const navStyle = {
   display: 'flex',
@@ -28,8 +29,8 @@ export function App() {
     <BrowserRouter>
       <nav style={navStyle}>
         <strong style={{ marginRight: '1rem' }}>GoMaps</strong>
-        <NavLink to="/setup" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
-          Setup
+        <NavLink to="/projects" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+          Projects
         </NavLink>
         <NavLink to="/explorer" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Explorer
@@ -37,13 +38,20 @@ export function App() {
         <NavLink to="/shortlists" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Shortlists
         </NavLink>
+        <NavLink to="/settings" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+          Settings
+        </NavLink>
+        <span style={{ marginLeft: 'auto', borderRadius: '999px', background: '#223c70', color: '#dbe7ff', width: '2rem', height: '2rem', display: 'grid', placeItems: 'center', fontWeight: 700 }}>U</span>
       </nav>
 
       <Routes>
-        <Route path="/" element={<Navigate to="/setup" replace />} />
-        <Route path="/setup" element={<SetupPage />} />
+        <Route path="/" element={<Navigate to="/projects" replace />} />
+        <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/projects/:projectId/setup" element={<SetupPage />} />
+        <Route path="/setup" element={<Navigate to="/projects" replace />} />
         <Route path="/explorer" element={<ExplorerPage />} />
         <Route path="/shortlists" element={<ShortlistsPage />} />
+        <Route path="/settings" element={<div style={{ padding: '1rem' }}>Settings coming soon.</div>} />
       </Routes>
     </BrowserRouter>
   )
