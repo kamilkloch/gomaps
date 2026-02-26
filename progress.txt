@@ -12,6 +12,7 @@
 - **API integration tests:** Use `supertest` with `process.env.DB_PATH` set before importing app; cleanup with `closeDatabase()` + `unlinkSync`
 - **Client routing:** React Router v7 with `BrowserRouter`; pages in `client/src/pages/`; named exports
 - **Google Maps:** `@vis.gl/react-google-maps` with `<APIProvider apiKey={...}>` + `<Map>` pattern; key from `VITE_GOOGLE_MAPS_API_KEY`
+- **Google Maps imperative overlays:** For `google.maps.Rectangle` and map listeners, keep imperative map objects in child components using `useMap()`, then pass updates to page state via callbacks
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
@@ -193,4 +194,16 @@ Thread: https://ampcode.com/threads/T-019c9be9-89ea-719e-b4bd-faabaa2f1da5
   - For pre-mockup UI stories, it helps to centralize API calls in `client/src/lib/api.ts` first so page components stay focused on state/rendering and later stories can reuse the same CRUD helpers.
   - Project cards can render lightweight map previews with a CSS bounds overlay even before full drawing/edit flows are implemented in Setup.
   - Keep `Projects` as the router default once project selection becomes the primary entry point for downstream pages.
+---
+
+## 2026-02-26 22:54:33 CET - US-011
+Thread: https://ampcode.com/threads/T-019c9bef-17e8-778a-b41a-c9ac73a05e18
+- Implemented the Setup page two-panel layout with breadcrumbs, left Google Map panel, right "Scrape Area" sidebar controls, and a floating coordinate pill matching the selected bounds.
+- Added project setup data flow to load project details by id and persist bounds updates through `PUT /api/projects/:id` using new client API helpers.
+- Added interactive rectangle selection behavior: `Select Area` captures the current viewport into a draggable/resizable `google.maps.Rectangle`, and `Clear` removes the selection.
+- Files changed: `client/src/pages/SetupPage.tsx`, `client/src/lib/api.ts`, `client/src/styles.css`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Use a tiny bridge component with `useMap()` to safely expose the underlying map instance to page-level handlers (viewport capture, fitBounds, etc.).
+  - Keep `google.maps.Rectangle` lifecycle and listeners isolated in a child controller component so React state updates stay declarative while map overlays stay imperative.
+  - Persist bounds from drag/resize commit events (`dragend`/`mouseup`) to avoid excessive network writes while still keeping project setup durable.
 ---

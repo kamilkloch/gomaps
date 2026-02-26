@@ -233,6 +233,143 @@ a {
   color: #a9c1e3;
 }
 
+.setup-page {
+  padding: 1.25rem 1.5rem;
+}
+
+.setup-state {
+  margin: 0;
+  color: #b3c9ea;
+}
+
+.setup-header {
+  margin-bottom: 1rem;
+}
+
+.setup-header h1 {
+  margin: 0.25rem 0 0;
+  font-size: 1.65rem;
+}
+
+.setup-breadcrumbs {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #9db3d5;
+}
+
+.setup-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(280px, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.setup-map-panel {
+  min-width: 0;
+}
+
+.setup-map-shell {
+  position: relative;
+  width: 100%;
+  min-height: 620px;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid #2b476c;
+  background: radial-gradient(circle at top, #163458, #0e1d31);
+}
+
+.setup-map-fallback {
+  min-height: 620px;
+  display: grid;
+  place-items: center;
+  color: #b4c8e8;
+  padding: 1rem;
+  text-align: center;
+}
+
+.setup-coordinates-pill {
+  margin: -1.2rem auto 0;
+  width: fit-content;
+  max-width: calc(100% - 2rem);
+  border-radius: 999px;
+  border: 1px solid #2f5f9f;
+  background: rgba(9, 24, 43, 0.95);
+  box-shadow: 0 16px 30px rgba(2, 6, 14, 0.65);
+  padding: 0.5rem 1rem;
+  font-size: 0.78rem;
+  color: #d9e9ff;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.setup-sidebar {
+  border-radius: 1rem;
+  border: 1px solid #29405f;
+  background: linear-gradient(180deg, #121f33, #0f1a2b);
+  padding: 1rem;
+}
+
+.setup-sidebar h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.setup-sidebar p {
+  margin: 0.7rem 0 0;
+  color: #9db3d5;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.setup-actions {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.setup-select-button,
+.setup-clear-button {
+  border-radius: 0.7rem;
+  border: 1px solid transparent;
+  padding: 0.62rem 0.8rem;
+  color: #eff6ff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.setup-select-button {
+  background: linear-gradient(165deg, #2c7ce6, #1d5bb0);
+  border-color: #4e9dff;
+}
+
+.setup-clear-button {
+  background: linear-gradient(165deg, #2d3d54, #232f43);
+  border-color: #485a76;
+}
+
+.setup-select-button:hover,
+.setup-clear-button:hover {
+  filter: brightness(1.06);
+}
+
+.setup-status {
+  margin-top: 0.9rem;
+  font-size: 0.82rem;
+  color: #b8d3f4;
+}
+
+.setup-error {
+  margin-top: 0.55rem;
+  font-size: 0.82rem;
+  color: #ffb7c4;
+}
+
 @media (max-width: 700px) {
   .projects-page {
     padding: 1rem;
@@ -241,5 +378,18 @@ a {
   .projects-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .setup-page {
+    padding: 1rem;
+  }
+
+  .setup-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-map-shell,
+  .setup-map-fallback {
+    min-height: 430px;
   }
 }
