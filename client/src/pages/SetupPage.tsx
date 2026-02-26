@@ -1,7 +1,21 @@
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getProject, updateProject, type Project } from '../lib/api'
+import {
+  getProject,
+  getScrapeStatus,
+  listRunTiles,
+  listScrapeRuns,
+  pauseScrape,
+  resumeScrape,
+  startScrape,
+  subscribeScrapeProgress,
+  updateProject,
+  type Project,
+  type ScrapeProgress,
+  type ScrapeRun,
+  type ScrapeTile,
+} from '../lib/api'
 
 interface Bounds {
   sw: { lat: number; lng: number }
@@ -15,9 +29,16 @@ export function SetupPage() {
   const { projectId } = useParams()
   const [project, setProject] = useState<Project | null>(null)
   const [selectionBounds, setSelectionBounds] = useState<Bounds | null>(null)
+  const [query, setQuery] = useState('vacation rentals')
+  const [runs, setRuns] = useState<ScrapeRun[]>([])
+  const [activeRunId, setActiveRunId] = useState<string | null>(null)
+  const [progress, setProgress] = useState<ScrapeProgress | null>(null)
+  const [runTiles, setRunTiles] = useState<ScrapeTile[]>([])
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isStartingScrape, setIsStartingScrape] = useState(false)
+  const [isTogglingRun, setIsTogglingRun] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const hasAppliedInitialBounds = useRef(false)
 
@@ -74,6 +95,101 @@ export function SetupPage() {
     map.fitBounds(toLatLngBounds(selectionBounds), 48)
     hasAppliedInitialBounds.current = true
   }, [map, selectionBounds])
+
+  useEffect(() => {
+    if (!projectId) {
+      return
+    }
+
+    let isCancelled = false
+
+    const loadRuns = async () => {
+      try {
+        const scrapeRuns = await listScrapeRuns(projectId)
+        if (isCancelled) {
+          return
+        }
+
+        setRuns(scrapeRuns)
+        const preferredRun = scrapeRuns.find((run) => run.status === 'running' || run.status === 'paused')
+          ?? scrapeRuns[0]
+          ?? null
+        setActiveRunId(preferredRun?.id ?? null)
+      }
+      catch {
+        if (!isCancelled) {
+          setErrorMessage('Unable to load scrape runs right now.')
+        }
+      }
+    }
+
+    void loadRuns()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    if (!activeRunId) {
+      setProgress(null)
+      setRunTiles([])
+      return
+    }
+
+    let isCancelled = false
+
+    const refreshRunSnapshot = async () => {
+      try {
+        const [status, tiles] = await Promise.all([
+          getScrapeStatus(activeRunId),
+          listRunTiles(activeRunId),
+        ])
+
+        if (isCancelled) {
+          return
+        }
+
+        setProgress(status)
+        setRunTiles(tiles)
+      }
+      catch {
+        if (!isCancelled) {
+          setErrorMessage('Unable to refresh run status.')
+        }
+      }
+    }
+
+    void refreshRunSnapshot()
+
+    const unsubscribe = subscribeScrapeProgress(
+      activeRunId,
+      (nextProgress) => {
+        if (isCancelled) {
+          return
+        }
+
+        setProgress(nextProgress)
+      },
+      () => {
+        if (isCancelled) {
+          return
+        }
+
+        void refreshRunSnapshot()
+      },
+    )
+
+    const pollInterval = setInterval(() => {
+      void refreshRunSnapshot()
+    }, 4_000)
+
+    return () => {
+      isCancelled = true
+      unsubscribe()
+      clearInterval(pollInterval)
+    }
+  }, [activeRunId])
 
   const persistBounds = useCallback(
     async (nextBounds: Bounds | null) => {
@@ -147,6 +263,73 @@ export function SetupPage() {
     void persistBounds(null)
   }, [persistBounds])
 
+  const refreshRuns = useCallback(async () => {
+    if (!projectId) {
+      return
+    }
+
+    const scrapeRuns = await listScrapeRuns(projectId)
+    setRuns(scrapeRuns)
+    if (activeRunId && scrapeRuns.some((run) => run.id === activeRunId)) {
+      return
+    }
+
+    const preferredRun = scrapeRuns.find((run) => run.status === 'running' || run.status === 'paused')
+      ?? scrapeRuns[0]
+      ?? null
+    setActiveRunId(preferredRun?.id ?? null)
+  }, [activeRunId, projectId])
+
+  const handleStartScrape = useCallback(async () => {
+    if (!projectId || !selectionBounds) {
+      return
+    }
+
+    const trimmedQuery = query.trim()
+    if (!trimmedQuery) {
+      setErrorMessage('Enter a query before starting a scrape.')
+      return
+    }
+
+    try {
+      setIsStartingScrape(true)
+      setErrorMessage(null)
+      const started = await startScrape(projectId, trimmedQuery)
+      setActiveRunId(started.scrapeRunId)
+      await refreshRuns()
+    }
+    catch {
+      setErrorMessage('Unable to start scrape. Please try again.')
+    }
+    finally {
+      setIsStartingScrape(false)
+    }
+  }, [projectId, query, refreshRuns, selectionBounds])
+
+  const handleTogglePause = useCallback(async () => {
+    if (!activeRunId || !progress) {
+      return
+    }
+
+    try {
+      setIsTogglingRun(true)
+      setErrorMessage(null)
+      if (progress.status === 'running') {
+        await pauseScrape(activeRunId)
+      }
+      else if (progress.status === 'paused') {
+        await resumeScrape(activeRunId)
+      }
+      await refreshRuns()
+    }
+    catch {
+      setErrorMessage('Unable to update run state right now.')
+    }
+    finally {
+      setIsTogglingRun(false)
+    }
+  }, [activeRunId, progress, refreshRuns])
+
   if (!projectId) {
     return <main className="setup-page"><p className="setup-state">Project not found.</p></main>
   }
@@ -156,6 +339,14 @@ export function SetupPage() {
   }
 
   const mapCenter = selectionBounds ? getBoundsCenter(selectionBounds) : FALLBACK_CENTER
+  const estimate = selectionBounds ? estimateScrape(selectionBounds) : null
+  const isRunActive = progress?.status === 'running' || progress?.status === 'paused'
+  const progressPercent = progress && progress.tilesTotal > 0
+    ? Math.round((progress.tilesCompleted / progress.tilesTotal) * 100)
+    : 0
+  const estimatedRemaining = progress
+    ? estimateRemaining(progress)
+    : null
 
   return (
     <main className="setup-page">
@@ -182,6 +373,7 @@ export function SetupPage() {
                   style={{ width: '100%', height: '100%' }}
                 >
                   <MapBridge onReady={setMap} />
+                  <TileOverlayController tiles={runTiles} />
                   <BoundsRectangleController
                     selectedBounds={selectionBounds}
                     onBoundsPreview={handleBoundsPreview}
@@ -221,6 +413,100 @@ export function SetupPage() {
                 ? 'Selection saved to project.'
                 : 'No area selected yet.'}
           </p>
+
+          <div className="setup-query-block">
+            <label htmlFor="scrape-query">Query</label>
+            <div className="setup-query-input-wrap">
+              <span aria-hidden="true">⌕</span>
+              <input
+                id="scrape-query"
+                type="text"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search query (e.g. family resort with pool)"
+              />
+            </div>
+            <p className="setup-estimate-badge">
+              {estimate
+                ? `~${estimate.tiles} tiles · Est. ${estimate.minutes} min`
+                : 'Select an area to estimate tiles and timing'}
+            </p>
+            <button
+              type="button"
+              className="setup-start-button"
+              onClick={() => {
+                void handleStartScrape()
+              }}
+              disabled={!selectionBounds || isStartingScrape}
+            >
+              {isStartingScrape ? 'Starting…' : 'Start Scrape'}
+            </button>
+          </div>
+
+          <section className="setup-runs-section">
+            <h3>Previous Runs</h3>
+            {runs.length === 0 ? (
+              <p className="setup-runs-empty">No runs yet for this project.</p>
+            ) : (
+              <ul className="setup-runs-list">
+                {runs.slice(0, 6).map((run) => (
+                  <li key={run.id}>
+                    <button
+                      type="button"
+                      className={`setup-run-item ${activeRunId === run.id ? 'is-active' : ''}`}
+                      onClick={() => setActiveRunId(run.id)}
+                    >
+                      <span className="setup-run-title">{run.query}</span>
+                      <span className={`setup-run-status setup-run-status-${run.status}`}>{run.status}</span>
+                      <span className="setup-run-metrics">
+                        {run.placesFound} places · {run.tilesCompleted}/{run.tilesTotal} tiles
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {progress ? (
+            <section className="setup-progress-section">
+              <div className="setup-progress-heading">
+                <h3>Progress</h3>
+                <span>{progressPercent}%</span>
+              </div>
+
+              <div className="setup-progress-track" role="progressbar" aria-valuenow={progressPercent}>
+                <div className="setup-progress-fill" style={{ width: `${progressPercent}%` }} />
+              </div>
+
+              <p className="setup-progress-stats">
+                Tiles: {progress.tilesCompleted}/{progress.tilesTotal} ({progress.tilesSubdivided} subdivided)
+              </p>
+              <p className="setup-progress-stats">
+                Places: {progress.placesFound} ({progress.placesUnique} unique)
+              </p>
+              <p className="setup-progress-stats">
+                Time: {formatDuration(progress.elapsedMs)}
+                {estimatedRemaining !== null ? ` · Est. remaining ${formatDuration(estimatedRemaining)}` : ''}
+              </p>
+
+              {isRunActive ? (
+                <button
+                  type="button"
+                  className="setup-pause-button"
+                  onClick={() => {
+                    void handleTogglePause()
+                  }}
+                  disabled={isTogglingRun}
+                >
+                  {progress.status === 'running'
+                    ? (isTogglingRun ? 'Pausing…' : 'Pause')
+                    : (isTogglingRun ? 'Resuming…' : 'Resume')}
+                </button>
+              ) : null}
+            </section>
+          ) : null}
+
           {errorMessage ? <p className="setup-error">{errorMessage}</p> : null}
         </aside>
       </section>
@@ -236,6 +522,64 @@ function MapBridge({ onReady }: { onReady: (map: google.maps.Map) => void }) {
       onReady(map)
     }
   }, [map, onReady])
+
+  return null
+}
+
+function TileOverlayController({ tiles }: { tiles: ScrapeTile[] }) {
+  const map = useMap()
+  const rectanglesRef = useRef(new globalThis.Map<string, google.maps.Rectangle>())
+
+  useEffect(() => {
+    if (!map) {
+      return
+    }
+
+    const nextTiles = new globalThis.Map(tiles.map((tile) => [tile.id, tile]))
+
+    for (const [tileId, rectangle] of rectanglesRef.current.entries()) {
+      if (nextTiles.has(tileId)) {
+        continue
+      }
+
+      rectangle.setMap(null)
+      rectanglesRef.current.delete(tileId)
+    }
+
+    for (const tile of tiles) {
+      const bounds = parseBounds(tile.bounds)
+      if (!bounds) {
+        continue
+      }
+
+      const style = tileStyle(tile.status)
+      const existing = rectanglesRef.current.get(tile.id)
+      if (existing) {
+        existing.setOptions({
+          ...style,
+          bounds: toLatLngBounds(bounds),
+          visible: tile.status !== 'subdivided',
+        })
+        continue
+      }
+
+      const rectangle = new google.maps.Rectangle({
+        map,
+        clickable: false,
+        ...style,
+        bounds: toLatLngBounds(bounds),
+        visible: tile.status !== 'subdivided',
+      })
+      rectanglesRef.current.set(tile.id, rectangle)
+    }
+  }, [map, tiles])
+
+  useEffect(() => () => {
+    for (const rectangle of rectanglesRef.current.values()) {
+      rectangle.setMap(null)
+    }
+    rectanglesRef.current.clear()
+  }, [])
 
   return null
 }
@@ -407,3 +751,66 @@ const estimateZoom = (bounds: Bounds): number => {
 const formatLatitude = (value: number): string => `${Math.abs(value).toFixed(4)}°${value >= 0 ? 'N' : 'S'}`
 
 const formatLongitude = (value: number): string => `${Math.abs(value).toFixed(4)}°${value >= 0 ? 'E' : 'W'}`
+
+const estimateScrape = (bounds: Bounds): { tiles: number; minutes: number } => {
+  const latSpan = Math.abs(bounds.ne.lat - bounds.sw.lat)
+  const lngSpan = Math.abs(bounds.ne.lng - bounds.sw.lng)
+  const coarseTileSize = 0.1
+  const tiles = Math.max(1, Math.ceil(latSpan / coarseTileSize) * Math.ceil(lngSpan / coarseTileSize))
+  const estimatedSeconds = tiles * 28
+
+  return {
+    tiles,
+    minutes: Math.max(1, Math.round(estimatedSeconds / 60)),
+  }
+}
+
+const estimateRemaining = (progress: ScrapeProgress): number | null => {
+  if (progress.status !== 'running' || progress.tilesCompleted <= 0 || progress.tilesTotal <= progress.tilesCompleted) {
+    return null
+  }
+
+  const averageTileMs = progress.elapsedMs / progress.tilesCompleted
+  const remainingTiles = progress.tilesTotal - progress.tilesCompleted
+  return Math.max(0, Math.round(averageTileMs * remainingTiles))
+}
+
+const formatDuration = (ms: number): string => {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}m ${seconds.toString().padStart(2, '0')}s`
+}
+
+const tileStyle = (status: ScrapeTile['status']): Omit<google.maps.RectangleOptions, 'bounds'> => {
+  if (status === 'completed') {
+    return {
+      strokeColor: '#4ad18a',
+      strokeOpacity: 0.9,
+      strokeWeight: 1,
+      fillColor: '#2a9d63',
+      fillOpacity: 0.2,
+      zIndex: 2,
+    }
+  }
+
+  if (status === 'running') {
+    return {
+      strokeColor: '#f0ca53',
+      strokeOpacity: 0.95,
+      strokeWeight: 2,
+      fillColor: '#d6b443',
+      fillOpacity: 0.28,
+      zIndex: 3,
+    }
+  }
+
+  return {
+    strokeColor: '#71839f',
+    strokeOpacity: 0.65,
+    strokeWeight: 1,
+    fillColor: '#304158',
+    fillOpacity: 0.16,
+    zIndex: 1,
+  }
+}

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { Effect, Schema } from 'effect'
 import type { Db } from '../db/Db.js'
-import { createScrapeRun, getProject, getScrapeRun } from '../db/index.js'
+import { createScrapeRun, getProject, getScrapeRun, listScrapeRuns, listTiles } from '../db/index.js'
 import { NotFoundError, ValidationError } from '../errors.js'
 import {
   startScrape,
@@ -31,8 +31,21 @@ const progressSubscribers = new Map<string, Set<(progress: ScrapeProgress) => vo
 
 let scrapeExecutor: ScrapeExecutor = startScrape
 
-scrapeRouter.get('/', (_req, res) => {
-  res.json([])
+scrapeRouter.get('/', async (req, res) => {
+  const projectId = req.query.projectId
+  if (typeof projectId !== 'string' || projectId.length === 0) {
+    res.json([])
+    return
+  }
+
+  await appRuntime.runPromise(
+    listScrapeRuns(projectId).pipe(
+      Effect.andThen((runs) => Effect.sync(() => res.json(runs))),
+      Effect.catchTag('DbError', (error) =>
+        Effect.sync(() => res.status(500).json({ error: error.message }))
+      )
+    )
+  )
 })
 
 scrapeRouter.post('/start', async (req, res) => {
@@ -79,6 +92,17 @@ scrapeRouter.get('/:runId', async (req, res) => {
       Effect.catchTag('NotFoundError', () =>
         Effect.sync(() => res.status(404).json({ error: 'Scrape run not found' }))
       ),
+      Effect.catchTag('DbError', (error) =>
+        Effect.sync(() => res.status(500).json({ error: error.message }))
+      )
+    )
+  )
+})
+
+scrapeRouter.get('/:runId/tiles', async (req, res) => {
+  await appRuntime.runPromise(
+    listTiles(req.params.runId).pipe(
+      Effect.andThen((tiles) => Effect.sync(() => res.json(tiles))),
       Effect.catchTag('DbError', (error) =>
         Effect.sync(() => res.status(500).json({ error: error.message }))
       )

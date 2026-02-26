@@ -211,6 +211,56 @@ describe('scrape API', () => {
     expect(progressEvent.tilesTotal).toBeGreaterThanOrEqual(progressEvent.tilesCompleted)
     expect(progressEvent.elapsedMs).toBeGreaterThanOrEqual(0)
   })
+
+  it('lists runs for a project via query param', async () => {
+    setScrapeExecutorForTests(createMockScrapeExecutor())
+
+    const project = await request(app)
+      .post('/api/projects')
+      .send({
+        name: 'Runs Project',
+        bounds: JSON.stringify({
+          sw: { lat: 39.5, lng: 8.5 },
+          ne: { lat: 39.8, lng: 8.9 },
+        }),
+      })
+
+    const start = await request(app)
+      .post('/api/scrape/start')
+      .send({ projectId: project.body.id, query: 'villa with pool' })
+    await waitForRunStatus(start.body.scrapeRunId, 'completed')
+
+    const list = await request(app).get(`/api/scrape?projectId=${project.body.id}`)
+    expect(list.status).toBe(200)
+    expect(Array.isArray(list.body)).toBe(true)
+    expect(list.body[0].id).toBe(start.body.scrapeRunId)
+    expect(list.body[0].projectId).toBe(project.body.id)
+    expect(list.body[0].query).toBe('villa with pool')
+  })
+
+  it('returns tile snapshots for a run', async () => {
+    setScrapeExecutorForTests(createMockScrapeExecutor())
+
+    const project = await request(app)
+      .post('/api/projects')
+      .send({
+        name: 'Tiles Project',
+        bounds: JSON.stringify({
+          sw: { lat: 39.5, lng: 8.5 },
+          ne: { lat: 39.8, lng: 8.9 },
+        }),
+      })
+
+    const start = await request(app)
+      .post('/api/scrape/start')
+      .send({ projectId: project.body.id, query: 'seaside resort' })
+
+    await waitForRunStatus(start.body.scrapeRunId, 'completed')
+
+    const tiles = await request(app).get(`/api/scrape/${start.body.scrapeRunId}/tiles`)
+    expect(tiles.status).toBe(200)
+    expect(Array.isArray(tiles.body)).toBe(true)
+  })
 })
 
 describe('placeholder routers', () => {

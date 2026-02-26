@@ -15,6 +15,41 @@ interface UpdateProjectInput {
   bounds?: string
 }
 
+export interface ScrapeRun {
+  id: string
+  projectId: string
+  query: string
+  status: 'pending' | 'running' | 'paused' | 'completed' | 'failed'
+  tilesTotal: number
+  tilesCompleted: number
+  tilesSubdivided: number
+  placesFound: number
+  placesUnique: number
+  startedAt: string | null
+  completedAt: string | null
+}
+
+export interface ScrapeProgress {
+  scrapeRunId: string
+  status: ScrapeRun['status']
+  tilesTotal: number
+  tilesCompleted: number
+  tilesSubdivided: number
+  placesFound: number
+  placesUnique: number
+  elapsedMs: number
+}
+
+export interface ScrapeTile {
+  id: string
+  scrapeRunId: string
+  bounds: string
+  zoomLevel: number
+  status: 'pending' | 'running' | 'completed' | 'subdivided'
+  resultCount: number
+  parentTileId: string | null
+}
+
 const API_BASE = '/api'
 
 const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
@@ -58,3 +93,52 @@ export const deleteProject = async (projectId: string): Promise<void> =>
   requestJson<void>(`/projects/${projectId}`, {
     method: 'DELETE',
   })
+
+export const listScrapeRuns = async (projectId: string): Promise<ScrapeRun[]> =>
+  requestJson<ScrapeRun[]>(`/scrape?projectId=${encodeURIComponent(projectId)}`)
+
+export const getScrapeStatus = async (runId: string): Promise<ScrapeProgress> =>
+  requestJson<ScrapeProgress>(`/scrape/${runId}`)
+
+export const listRunTiles = async (runId: string): Promise<ScrapeTile[]> =>
+  requestJson<ScrapeTile[]>(`/scrape/${runId}/tiles`)
+
+export const startScrape = async (
+  projectId: string,
+  query: string,
+): Promise<{ scrapeRunId: string }> =>
+  requestJson<{ scrapeRunId: string }>('/scrape/start', {
+    method: 'POST',
+    body: JSON.stringify({ projectId, query }),
+  })
+
+export const pauseScrape = async (runId: string): Promise<{ status: 'pausing' }> =>
+  requestJson<{ status: 'pausing' }>(`/scrape/${runId}/pause`, {
+    method: 'POST',
+  })
+
+export const resumeScrape = async (runId: string): Promise<{ status: 'running' }> =>
+  requestJson<{ status: 'running' }>(`/scrape/${runId}/resume`, {
+    method: 'POST',
+  })
+
+export const subscribeScrapeProgress = (
+  runId: string,
+  onProgress: (progress: ScrapeProgress) => void,
+  onError?: () => void,
+): (() => void) => {
+  const source = new EventSource(`${API_BASE}/scrape/${runId}/progress`)
+
+  source.onmessage = (event) => {
+    const payload = JSON.parse(event.data) as ScrapeProgress
+    onProgress(payload)
+  }
+  source.onerror = () => {
+    source.close()
+    onError?.()
+  }
+
+  return () => {
+    source.close()
+  }
+}

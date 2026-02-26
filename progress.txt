@@ -13,6 +13,7 @@
 - **Client routing:** React Router v7 with `BrowserRouter`; pages in `client/src/pages/`; named exports
 - **Google Maps:** `@vis.gl/react-google-maps` with `<APIProvider apiKey={...}>` + `<Map>` pattern; key from `VITE_GOOGLE_MAPS_API_KEY`
 - **Google Maps imperative overlays:** For `google.maps.Rectangle` and map listeners, keep imperative map objects in child components using `useMap()`, then pass updates to page state via callbacks
+- **Map naming collision:** In React files importing the `Map` component, use `globalThis.Map` for JS map collections (`new globalThis.Map(...)`) to avoid TypeScript resolving to the component symbol
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
@@ -206,4 +207,17 @@ Thread: https://ampcode.com/threads/T-019c9bef-17e8-778a-b41a-c9ac73a05e18
   - Use a tiny bridge component with `useMap()` to safely expose the underlying map instance to page-level handlers (viewport capture, fitBounds, etc.).
   - Keep `google.maps.Rectangle` lifecycle and listeners isolated in a child controller component so React state updates stay declarative while map overlays stay imperative.
   - Persist bounds from drag/resize commit events (`dragend`/`mouseup`) to avoid excessive network writes while still keeping project setup durable.
+---
+
+## 2026-02-26 22:58:55 CET - US-012
+Thread: https://ampcode.com/threads/T-019c9bf3-4ee5-7140-a9c8-915c7d602a38
+- Implemented Setup sidebar scrape controls: query input with icon, area-based estimate badge, glowing Start Scrape button, previous-runs list, live progress panel with striped animated bar, and pause/resume actions.
+- Wired live run orchestration on the client via new API helpers for start/status/pause/resume, run history, tile snapshots, and SSE subscription.
+- Added map tile-grid overlay rendering with status colors (completed/running/pending) using an imperative rectangle controller layered into the existing map.
+- Extended scrape routes with project-scoped run listing (`GET /api/scrape?projectId=`) and tile snapshot endpoint (`GET /api/scrape/:runId/tiles`), plus integration tests for both.
+- Files changed: `client/src/pages/SetupPage.tsx`, `client/src/lib/api.ts`, `client/src/styles.css`, `server/src/routes/scrape.ts`, `server/tests/projects.test.ts`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Keep scrape status and tile data refresh as two channels: SSE for low-latency progress numbers and periodic snapshots for tile-state overlays.
+  - Route-level optional query filtering (`/api/scrape?projectId=`) is sufficient for sidebar history without adding separate route modules.
+  - In files importing `Map` from `@vis.gl/react-google-maps`, instantiate JS collections via `globalThis.Map` to avoid TypeScript constructor resolution errors.
 ---

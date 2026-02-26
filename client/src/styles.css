@@ -364,10 +364,236 @@ a {
   color: #b8d3f4;
 }
 
+.setup-query-block,
+.setup-runs-section,
+.setup-progress-section {
+  margin-top: 1rem;
+  border-top: 1px solid #263a58;
+  padding-top: 0.95rem;
+}
+
+.setup-query-block label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #d8e7fd;
+}
+
+.setup-query-input-wrap {
+  margin-top: 0.45rem;
+  border: 1px solid #32527a;
+  border-radius: 0.65rem;
+  background: #0a1526;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.6rem;
+}
+
+.setup-query-input-wrap span {
+  color: #8cadcf;
+}
+
+.setup-query-input-wrap input {
+  border: 0;
+  background: transparent;
+  color: #edf4ff;
+  font: inherit;
+  padding: 0.6rem 0;
+  min-width: 0;
+}
+
+.setup-query-input-wrap input:focus {
+  outline: none;
+}
+
+.setup-estimate-badge {
+  margin: 0.6rem 0 0;
+  background: rgba(32, 52, 81, 0.8);
+  border: 1px solid #355680;
+  border-radius: 999px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.74rem;
+  color: #cbddfb;
+}
+
+.setup-start-button {
+  margin-top: 0.75rem;
+  width: 100%;
+  border: 1px solid #56b988;
+  border-radius: 0.8rem;
+  background: linear-gradient(165deg, #2dba77, #228855);
+  color: #effff7;
+  font-weight: 700;
+  padding: 0.72rem 0.85rem;
+  box-shadow: 0 0 20px rgba(48, 180, 112, 0.35);
+  cursor: pointer;
+}
+
+.setup-start-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  box-shadow: none;
+}
+
+.setup-runs-section h3,
+.setup-progress-section h3 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.setup-runs-empty {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: #9db3d5;
+}
+
+.setup-runs-list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.setup-run-item {
+  width: 100%;
+  border: 1px solid #28415f;
+  border-radius: 0.65rem;
+  background: #0d1728;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0.45rem 0.55rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.setup-run-item.is-active {
+  border-color: #4f8ee7;
+  box-shadow: 0 0 0 1px #4f8ee7;
+}
+
+.setup-run-title {
+  font-weight: 700;
+  color: #e5f0ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.setup-run-status {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.68rem;
+  text-transform: capitalize;
+}
+
+.setup-run-status-running {
+  background: #5a4b18;
+  color: #ffd678;
+}
+
+.setup-run-status-paused {
+  background: #3f4f66;
+  color: #c5d4ea;
+}
+
+.setup-run-status-completed {
+  background: #1a563c;
+  color: #95f0c9;
+}
+
+.setup-run-status-failed {
+  background: #592337;
+  color: #ffc7d8;
+}
+
+.setup-run-status-pending {
+  background: #3c4c60;
+  color: #ccdbef;
+}
+
+.setup-run-metrics {
+  font-size: 0.73rem;
+  color: #9cb4d6;
+}
+
+.setup-progress-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.setup-progress-heading span {
+  font-size: 0.8rem;
+  color: #a7caef;
+}
+
+.setup-progress-track {
+  margin-top: 0.55rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #345377;
+  background: #0c1728;
+}
+
+.setup-progress-fill {
+  height: 100%;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(143, 208, 255, 0.85) 0,
+      rgba(143, 208, 255, 0.85) 10px,
+      rgba(73, 146, 206, 0.85) 10px,
+      rgba(73, 146, 206, 0.85) 20px
+    );
+  background-size: 28px 28px;
+  animation: setup-progress-stripes 1.2s linear infinite;
+}
+
+.setup-progress-stats {
+  margin: 0.45rem 0 0;
+  font-size: 0.76rem;
+  color: #b7cfee;
+}
+
+.setup-pause-button {
+  margin-top: 0.7rem;
+  width: 100%;
+  border: 1px solid #617ea3;
+  border-radius: 0.65rem;
+  background: #23334b;
+  color: #e1ebff;
+  font-weight: 700;
+  padding: 0.55rem;
+  cursor: pointer;
+}
+
+.setup-pause-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .setup-error {
   margin-top: 0.55rem;
   font-size: 0.82rem;
   color: #ffb7c4;
+}
+
+@keyframes setup-progress-stripes {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 28px 0;
+  }
 }
 
 @media (max-width: 700px) {
