@@ -95,10 +95,10 @@ export function ProjectsPage() {
   }
 
   return (
-    <main className="projects-page">
+    <main className="projects-page" data-testid="projects-page">
       <header className="projects-header">
         <div>
-          <h1>Projects</h1>
+          <h1 data-testid="projects-page-title">Projects</h1>
           <p>Manage your scrape areas and jump into setup quickly.</p>
         </div>
         <button

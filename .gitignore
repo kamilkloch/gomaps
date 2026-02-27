@@ -2,6 +2,8 @@ node_modules
 dist
 data
 playwright-report
+client/playwright-report
+client/e2e/test-results
 .DS_Store
 .env
 *.tsbuildinfo

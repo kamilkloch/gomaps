@@ -23,6 +23,7 @@
 - **Website classification:** Normalize website hostnames with URL parsing (add `https://` fallback for protocol-less inputs), then classify via suffix matching so `www.booking.com` and other subdomains map to the base domain allowlist
 - **Place IDs:** Use Google Place IDs from Places API (`place.id` or resource name `places/{id}`), and persist canonical map links in `google_maps_uri`
 - **Effect-TS:** All DB functions return `Effect<A, DbError | NotFoundError>`. Routes use `Effect.runPromise` at boundary. Scraper uses `Effect.runSync` for DB calls since better-sqlite3 is synchronous. Typed errors in `server/src/errors.ts`: `DbError`, `NotFoundError`, `ValidationError`, `ScrapeError`. Schema validation via `Schema.decodeUnknown` from `effect` package.
+- **Playwright harness layout:** Keep reusable e2e primitives in `client/e2e/{fixtures,utils,pages,tests}`; centralize strict locator fallback (`data-testid` → role → text), network/visibility wait helpers, screenshot helper, and console/page-error fail-fast logic inside shared fixtures/utilities.
 
 ---
 
@@ -233,4 +234,17 @@ Thread: https://ampcode.com/threads/T-019c9bf7-5eda-711d-a89d-affd98871822
   - Keep marker updates idempotent by diffing marker refs against place ids before rebuilding clusters; this avoids leaked markers and stale cluster counts.
   - A custom cluster renderer (blue circle + white count) can match product mockups closely without needing AdvancedMarker APIs.
   - Selection pulse effects are easiest to implement with a `google.maps.Circle` plus a small interval that modulates radius/opacity.
+---
+
+## 2026-02-27 23:37:19 CET - US-026
+Thread: https://ampcode.com/threads/T-019ca13b-2fb7-70df-8b66-8d88d1d520d5
+- Implemented Playwright e2e foundation for the client with config-driven startup of both backend and frontend dev servers, base URL wiring, and test output configuration
+- Added shared e2e harness modules under `client/e2e/` for context isolation, console/page-error fail-fast handling, strict locator hierarchy resolution, wait helpers, and full-page screenshot capture helpers
+- Added an initial page-object (`ProjectsPageObject`) and smoke test that navigates to `/`, captures before/after screenshots, and verifies Projects page rendering
+- Added minimal `data-testid` anchors on Projects page for stable Priority-1 selectors and added Playwright test artifacts to `.gitignore`
+- Files changed: `client/package.json`, `client/playwright.config.ts`, `client/e2e/fixtures/base.ts`, `client/e2e/utils/{locators,waiters,screenshots}.ts`, `client/e2e/pages/projects-page.ts`, `client/e2e/tests/smoke.spec.ts`, `client/src/pages/ProjectsPage.tsx`, `.gitignore`, `AGENTS.md`, `prd.json`, `progress.txt`, `package-lock.json`
+- **Learnings for future iterations:**
+  - Keep cross-test browser isolation in a custom fixture (fresh context + cleared storage) so each flow starts from a deterministic state
+  - Resolve locators through a single helper that enforces `data-testid` → role → text ordering and throws an explicit Accessibility/Testability defect when no candidate exists
+  - Capture step screenshots via a shared utility using `testInfo.outputPath(...)` so artifacts stay scoped per test run and avoid polluting the repo tree
 ---

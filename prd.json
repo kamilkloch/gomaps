@@ -488,7 +488,7 @@
         "npm run typecheck passes (if TS config covers test files)"
       ],
       "priority": 0,
-      "passes": false,
+      "passes": true,
       "notes": "Top priority. Foundation for all subsequent UI tests. Follow AGENTS.md § LLM Agent Testing Guide and § Tooling & Execution Mechanics (Playwright) conventions strictly."
     },
     {

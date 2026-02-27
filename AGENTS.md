@@ -157,3 +157,6 @@ Since this is a visual browser test, you must actively capture the visual state:
 
 Always execute interactions from a clean state. Ensure you are resetting the browser context or clearing cookies/local storage between distinct logical test flows to prevent React state bleed over.
 
+### 5. E2E Test Harness Pattern
+
+- Keep Playwright helpers under `client/e2e/` with shared fixtures/utilities/page objects (`fixtures/`, `utils/`, `pages/`, `tests/`) so future stories reuse the same stability primitives.
