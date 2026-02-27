@@ -79,3 +79,81 @@ npm run dev --workspace=client
 - The legacy MVP code is preserved in `legacy/` for reference — do not modify it
 - SQLite database file goes in `data/gomaps.db` — ensure `data/` is in `.gitignore`
 - Never commit `.env` files or API keys
+
+## LLM Agent Testing Guide (Visual Browser Tests)
+
+When verifying features via browser testing, you must systematically test every interactive element. Do not assume background processes (like API calls) succeed without visual confirmation in the UI. Follow this checklist for rigorous visual testing:
+
+### 1. Project Management
+- **Create Project:** Navigate to `/` (Projects page), click "New Project", enter a name, and submit. Verify the new project appears in the list.
+- **Open Project:** Click on a project in the list. Verify the app navigates to the Setup page for that project.
+
+### 2. Scrape Setup & Execution
+- **Map Interaction:** Ensure the Google Maps container renders. Try clicking and dragging to pan.
+- **Area Selection:** Click "Select Area". Verify the drawing tools activate and a rectangular bounding box overlay appears. Drag the handles of the rectangle to resize it.
+- **Scrape Launch:** Type a query (e.g., "hotel") in the search input. Click "Start Scrape".
+- **Live Progress:** Verify the progress panel appears. Visually confirm that stats update (tiles completed, places found). Check the map overlay for color changes (tiles turning from gray to yellow to green).
+- **Control:** Test pausing and resuming the scrape run if those controls are available in the UI.
+
+### 3. Explorer UI (Map & Table)
+- **Navigation:** Navigate to the Explorer view.
+- **Map View:** Verify place markers render. Zoom and pan the map to ensure clustering works.
+- **Table View:** Scroll the table to test virtual scrolling. Click column headers to test sorting (verify order changes). Check the inline quick-filter updates results.
+- **Selection Sync:** 
+  - Click a row in the table: verify the map centers on the corresponding marker and the Detail Panel opens.
+  - Click a marker on the map: verify the table scrolls to and highlights the corresponding row, and the Detail Panel opens.
+
+### 4. Search & Filters
+- **Fuzzy Search:** Type a keyword in the search bar. Verify both the table rows and map markers filter instantly to match the query.
+- **Filter Panel:** 
+  - **Sliders:** Adjust the Rating or Price sliders; verify results update.
+  - **Checkboxes:** Toggle Category and Website Type checkboxes. Ensure combinations use AND logic.
+  - **Review Keyword Search:** Enter a specific string. Verify the Detail Panel highlights the keyword in the reviews section.
+  - **Distance Filter:** Click the map point selector and adjust the radius slider. Verify filtering works based on the selected point.
+
+### 5. Detail Panel & Actions
+- **Content:** With a place selected, verify the panel displays name, rating, address, amenities, opening hours, and photos.
+- **Website Badges:** Check the visual color coding of the website link (Green = Book Direct, Orange = OTA, Gray = No website).
+- **Links & Exports:** Click "Open in Google Maps", "Search on Booking.com", and "Search on Airbnb" to ensure they construct correct URLs and open in a new tab.
+- **Re-scrape / Stale Data:** Look for "stale" indicators on places scraped >7 days ago. Test the "Refresh Data" (re-scrape) button and observe the progress indicator.
+
+### 6. Shortlists
+- **Starring:** Click the ⭐ icon on a place (in table, map popup, or detail panel). Verify it is saved to a shortlist.
+- **Shortlist View:** Navigate to the Shortlists page. Verify the starred place appears.
+- **Comparison:** Select 2-3 places and verify the side-by-side comparison table renders correctly.
+- **Notes:** Add free-text notes to a shortlisted place and confirm they save.
+- **Export:** Click the "Export CSV" button and verify a download is triggered containing all place fields plus notes.
+
+**General Rule:** Always verify that URL routes update appropriately during navigation, and check the browser console for any silent errors when interacting with complex components like the map or virtualized table.
+
+## Tooling & Execution Mechanics (Playwright)
+
+You will execute all interactions using the Playwright framework. You must adhere strictly to the following Playwright best practices for React applications to prevent flaky tests:
+
+### 1. Locator Strategy (Strict Hierarchy)
+
+Do NOT use XPath or fragile CSS selectors (e.g., `div > span:nth-child(2)`). You must select elements using the following priority:
+* **Priority 1:** `page.getByTestId('...')` (Use this whenever `data-testid` attributes are present in the DOM).
+* **Priority 2:** `page.getByRole('button', { name: 'Submit' })` (Use accessible roles).
+* **Priority 3:** `page.getByText('Specific text')`.
+* *Rule:* If an element cannot be found using these three methods, log it as an "Accessibility / Testability Defect" before proceeding.
+
+
+### 2. Handling React Asynchrony (Waiting)
+
+React batches state updates. You must never assume an action resolves instantly.
+* **Never use hardcoded sleeps** (e.g., `page.waitForTimeout(5000)`).
+* **Wait for state:** After clicking or typing, wait for the specific visual change to appear in the DOM using `await expect(locator).toBeVisible()` or wait for the network to settle using `await page.waitForLoadState('networkidle')`.
+
+
+### 3. Visual Verification Mechanisms
+
+Since this is a visual browser test, you must actively capture the visual state:
+* **Screenshots:** Take a full-page screenshot before and after complex interactions or when entering a new view using `await page.screenshot({ path: 'step-[n].png', fullPage: true })`. Use these screenshots to verify layout integrity.
+* **Console Errors:** Actively monitor the page console. Fail the interaction immediately if Playwright captures a React `ErrorBoundary` trigger or a severe console error (`page.on('pageerror', exception => ...)`).
+
+
+### 4. Interaction Isolation
+
+Always execute interactions from a clean state. Ensure you are resetting the browser context or clearing cookies/local storage between distinct logical test flows to prevent React state bleed over.
+
