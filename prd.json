@@ -470,6 +470,49 @@
       "priority": 25,
       "passes": false,
       "notes": ""
+    },
+    {
+      "id": "US-026",
+      "title": "Setup hardened UI testing mechanics with Playwright",
+      "description": "Install and configure Playwright for end-to-end browser testing of the React client. Create test infrastructure: base fixtures with browser context isolation, automatic console-error capture (fail on React ErrorBoundary or severe errors), screenshot helpers (before/after each major interaction), network-idle waiters, and a shared page-object layer using the strict locator hierarchy (data-testid > role > text). Add npm scripts for running e2e tests. Configure Playwright to proxy API requests to the dev server. Ensure all test utilities follow the conventions in AGENTS.md § LLM Agent Testing Guide and § Tooling & Execution Mechanics.",
+      "acceptanceCriteria": [
+        "@playwright/test installed in client/ (or root)",
+        "playwright.config.ts configured: baseURL pointing to Vite dev server, webServer auto-start for both client and server",
+        "Base test fixture: fresh browser context per test, clears cookies/localStorage for isolation",
+        "Console-error listener fixture: captures page errors, fails test on React ErrorBoundary or severe console errors",
+        "Screenshot utility: helper to capture full-page screenshots at named steps (e.g., step-1-before.png)",
+        "Locator helpers following strict hierarchy: prefer getByTestId, then getByRole, then getByText",
+        "waitForNetworkIdle and waitForVisible helper utilities (no hardcoded sleeps)",
+        "npm run test:e2e script runs Playwright tests",
+        "At least one smoke test: navigates to /, verifies Projects page renders",
+        "npm run typecheck passes (if TS config covers test files)"
+      ],
+      "priority": 0,
+      "passes": false,
+      "notes": "Top priority. Foundation for all subsequent UI tests. Follow AGENTS.md § LLM Agent Testing Guide and § Tooling & Execution Mechanics (Playwright) conventions strictly."
+    },
+    {
+      "id": "US-027",
+      "title": "Write rigorous end-to-end tests for all existing features",
+      "description": "Using the Playwright infrastructure from US-026, write comprehensive e2e tests covering every implemented feature. Follow the AGENTS.md § LLM Agent Testing Guide checklist systematically. Tests should cover: project CRUD (create, open, delete), map rendering and area selection on Setup page, scrape launch with live SSE progress, Explorer page (map markers, clustering, table rendering, sorting), map↔table selection sync, detail panel content, and navigation between pages. Each test must use proper waiting strategies, take verification screenshots, and monitor for console errors. Add data-testid attributes to components where needed for reliable selection.",
+      "acceptanceCriteria": [
+        "Project management tests: create project, verify in list, open project navigates to Setup, delete project with confirmation",
+        "Setup page tests: Google Maps renders and is interactive, area selection creates draggable rectangle, coordinates pill updates, clear removes selection",
+        "Scrape tests: enter query, click Start Scrape, verify progress panel appears with SSE updates, tile overlay colors change, pause/resume controls work",
+        "Explorer map tests: markers render with correct color coding (green/yellow/red by rating), clustering shows numeric counts when zoomed out",
+        "Explorer table tests: columns render correctly, sorting toggles ascending/descending, virtual scrolling handles large datasets, filter input narrows results",
+        "Selection sync tests: clicking table row centers map and opens detail panel, clicking map marker highlights table row and opens detail panel",
+        "Detail panel tests: displays name, rating, address, amenities, photos, reviews; website badge color-coded correctly; action buttons construct correct URLs",
+        "Navigation tests: URL routes update during navigation, breadcrumbs are correct",
+        "All tests use strict locator hierarchy (data-testid > role > text)",
+        "No hardcoded sleeps — all waits use DOM assertions or network-idle",
+        "Screenshots captured at key verification points",
+        "Console errors monitored and cause test failure",
+        "All tests pass: npm run test:e2e succeeds"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Depends on US-026. Add data-testid attributes to React components as needed. Follow AGENTS.md checklist sections 1–6 exhaustively."
     }
   ]
 }
