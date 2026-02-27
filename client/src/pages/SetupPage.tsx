@@ -331,11 +331,11 @@ export function SetupPage() {
   }, [activeRunId, progress, refreshRuns])
 
   if (!projectId) {
-    return <main className="setup-page"><p className="setup-state">Project not found.</p></main>
+    return <main className="setup-page" data-testid="setup-page"><p className="setup-state">Project not found.</p></main>
   }
 
   if (isLoading) {
-    return <main className="setup-page"><p className="setup-state">Loading setup…</p></main>
+    return <main className="setup-page" data-testid="setup-page"><p className="setup-state">Loading setup…</p></main>
   }
 
   const mapCenter = selectionBounds ? getBoundsCenter(selectionBounds) : FALLBACK_CENTER
@@ -349,7 +349,7 @@ export function SetupPage() {
     : null
 
   return (
-    <main className="setup-page">
+    <main className="setup-page" data-testid="setup-page">
       <header className="setup-header">
         <p className="setup-breadcrumbs">
           <span>Projects</span>
@@ -363,7 +363,7 @@ export function SetupPage() {
 
       <section className="setup-layout">
         <div className="setup-map-panel">
-          <div className="setup-map-shell">
+          <div className="setup-map-shell" data-testid="setup-map-shell">
             {hasMapsKey ? (
               <APIProvider apiKey={API_KEY ?? ''}>
                 <Map
@@ -382,12 +382,12 @@ export function SetupPage() {
                 </Map>
               </APIProvider>
             ) : (
-              <div className="setup-map-fallback">Set `VITE_GOOGLE_MAPS_API_KEY` to enable map setup.</div>
+              <div className="setup-map-fallback" data-testid="setup-map-fallback">Set `VITE_GOOGLE_MAPS_API_KEY` to enable map setup.</div>
             )}
           </div>
 
           {selectionBounds ? (
-            <p className="setup-coordinates-pill">
+            <p className="setup-coordinates-pill" data-testid="setup-coordinates-pill">
               {`SW: ${formatLatitude(selectionBounds.sw.lat)}, ${formatLongitude(selectionBounds.sw.lng)} — NE: ${formatLatitude(selectionBounds.ne.lat)}, ${formatLongitude(selectionBounds.ne.lng)}`}
             </p>
           ) : null}
@@ -398,15 +398,15 @@ export function SetupPage() {
           <p>Capture the visible map viewport, then fine-tune the rectangle by dragging or resizing corners.</p>
 
           <div className="setup-actions">
-            <button type="button" className="setup-select-button" onClick={handleSelectArea}>
+            <button data-testid="setup-select-area-button" type="button" className="setup-select-button" onClick={handleSelectArea}>
               Select Area
             </button>
-            <button type="button" className="setup-clear-button" onClick={handleClearArea}>
+            <button data-testid="setup-clear-area-button" type="button" className="setup-clear-button" onClick={handleClearArea}>
               Clear
             </button>
           </div>
 
-          <p className="setup-status">
+          <p className="setup-status" data-testid="setup-status-copy">
             {isSaving
               ? 'Saving bounds…'
               : selectionBounds
@@ -419,6 +419,7 @@ export function SetupPage() {
             <div className="setup-query-input-wrap">
               <span aria-hidden="true">⌕</span>
               <input
+                data-testid="setup-query-input"
                 id="scrape-query"
                 type="text"
                 value={query}
@@ -426,12 +427,13 @@ export function SetupPage() {
                 placeholder="Search query (e.g. family resort with pool)"
               />
             </div>
-            <p className="setup-estimate-badge">
+            <p className="setup-estimate-badge" data-testid="setup-estimate-badge">
               {estimate
                 ? `~${estimate.tiles} tiles · Est. ${estimate.minutes} min`
                 : 'Select an area to estimate tiles and timing'}
             </p>
             <button
+              data-testid="setup-start-scrape-button"
               type="button"
               className="setup-start-button"
               onClick={() => {
@@ -443,7 +445,7 @@ export function SetupPage() {
             </button>
           </div>
 
-          <section className="setup-runs-section">
+          <section className="setup-runs-section" data-testid="setup-runs-section">
             <h3>Previous Runs</h3>
             {runs.length === 0 ? (
               <p className="setup-runs-empty">No runs yet for this project.</p>
@@ -452,6 +454,7 @@ export function SetupPage() {
                 {runs.slice(0, 6).map((run) => (
                   <li key={run.id}>
                     <button
+                      data-testid={`setup-run-${run.id}`}
                       type="button"
                       className={`setup-run-item ${activeRunId === run.id ? 'is-active' : ''}`}
                       onClick={() => setActiveRunId(run.id)}
@@ -469,13 +472,13 @@ export function SetupPage() {
           </section>
 
           {progress ? (
-            <section className="setup-progress-section">
+            <section className="setup-progress-section" data-testid="setup-progress-section">
               <div className="setup-progress-heading">
                 <h3>Progress</h3>
                 <span>{progressPercent}%</span>
               </div>
 
-              <div className="setup-progress-track" role="progressbar" aria-valuenow={progressPercent}>
+              <div className="setup-progress-track" data-testid="setup-progress-track" role="progressbar" aria-valuenow={progressPercent}>
                 <div className="setup-progress-fill" style={{ width: `${progressPercent}%` }} />
               </div>
 
@@ -492,6 +495,7 @@ export function SetupPage() {
 
               {isRunActive ? (
                 <button
+                  data-testid="setup-pause-resume-button"
                   type="button"
                   className="setup-pause-button"
                   onClick={() => {
@@ -507,7 +511,7 @@ export function SetupPage() {
             </section>
           ) : null}
 
-          {errorMessage ? <p className="setup-error">{errorMessage}</p> : null}
+          {errorMessage ? <p className="setup-error" data-testid="setup-error">{errorMessage}</p> : null}
         </aside>
       </section>
     </main>

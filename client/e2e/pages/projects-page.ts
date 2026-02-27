@@ -32,6 +32,56 @@ class ProjectsPageObject {
     await waitForVisible(locator)
     return locator
   }
+
+  async newProjectButton(): Promise<Locator> {
+    const locator = await resolveLocator(this.page, {
+      testId: 'projects-new-button',
+      role: 'button',
+      name: /new project/i,
+      text: '+ New Project',
+      defectLabel: 'New project button',
+    })
+    await waitForVisible(locator)
+    return locator
+  }
+
+  async createProject(name: string): Promise<void> {
+    const newProjectButton = await this.newProjectButton()
+    await newProjectButton.click()
+
+    const nameInput = await resolveLocator(this.page, {
+      testId: 'projects-create-name-input',
+      role: 'textbox',
+      name: /project name/i,
+      defectLabel: 'Project name input',
+    })
+    await waitForVisible(nameInput)
+    await nameInput.fill(name)
+
+    const submitButton = await resolveLocator(this.page, {
+      testId: 'projects-create-submit',
+      role: 'button',
+      name: /^create$/i,
+      text: 'Create',
+      defectLabel: 'Create project submit button',
+    })
+    await submitButton.click()
+    await waitForNetworkIdle(this.page)
+  }
+
+  async projectCard(projectId: string): Promise<Locator> {
+    const locator = this.page.getByTestId(`project-card-${projectId}`)
+    await waitForVisible(locator)
+    return locator
+  }
+
+  async deleteProject(projectId: string): Promise<void> {
+    this.page.once('dialog', (dialog) => dialog.accept())
+    const deleteButton = this.page.getByTestId(`project-delete-${projectId}`)
+    await waitForVisible(deleteButton)
+    await deleteButton.click()
+    await waitForNetworkIdle(this.page)
+  }
 }
 
 export function createProjectsPage(page: Page): ProjectsPageObject {

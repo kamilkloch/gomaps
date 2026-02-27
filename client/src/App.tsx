@@ -27,18 +27,18 @@ const activeLinkStyle = {
 export function App() {
   return (
     <BrowserRouter>
-      <nav style={navStyle}>
+      <nav style={navStyle} data-testid="app-nav">
         <strong style={{ marginRight: '1rem' }}>GoMaps</strong>
-        <NavLink to="/projects" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+        <NavLink data-testid="nav-projects" to="/projects" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Projects
         </NavLink>
-        <NavLink to="/explorer" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+        <NavLink data-testid="nav-explorer" to="/explorer" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Explorer
         </NavLink>
-        <NavLink to="/shortlists" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+        <NavLink data-testid="nav-shortlists" to="/shortlists" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Shortlists
         </NavLink>
-        <NavLink to="/settings" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+        <NavLink data-testid="nav-settings" to="/settings" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Settings
         </NavLink>
         <span style={{ marginLeft: 'auto', borderRadius: '999px', background: '#223c70', color: '#dbe7ff', width: '2rem', height: '2rem', display: 'grid', placeItems: 'center', fontWeight: 700 }}>U</span>

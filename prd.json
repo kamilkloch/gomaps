@@ -511,7 +511,7 @@
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Depends on US-026. Add data-testid attributes to React components as needed. Follow AGENTS.md checklist sections 1–6 exhaustively."
     }
   ]

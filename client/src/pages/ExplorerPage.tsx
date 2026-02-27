@@ -145,11 +145,12 @@ export function ExplorerPage() {
   }, [navigate])
 
   return (
-    <main className="explorer-page">
+    <main className="explorer-page" data-testid="explorer-page">
       <header className="explorer-header">
         <div className="explorer-project-switcher">
           <label htmlFor="explorer-project">Project</label>
           <select
+            data-testid="explorer-project-select"
             id="explorer-project"
             value={selectedProjectId ?? ''}
             onChange={(event) => handleProjectChange(event.target.value)}
@@ -164,6 +165,7 @@ export function ExplorerPage() {
 
         <div className="explorer-search-wrap">
           <input
+            data-testid="explorer-search-input"
             type="search"
             placeholder="Search places"
             value={searchText}
@@ -177,11 +179,11 @@ export function ExplorerPage() {
         </button>
       </header>
 
-      {errorMessage ? <p className="explorer-error">{errorMessage}</p> : null}
+      {errorMessage ? <p className="explorer-error" data-testid="explorer-error">{errorMessage}</p> : null}
 
       <section className="explorer-layout">
         <section className="explorer-main-grid">
-          <div className="explorer-map-panel">
+          <div className="explorer-map-panel" data-testid="explorer-map-panel">
             {hasMapsKey ? (
               <APIProvider apiKey={API_KEY ?? ''}>
                 <Map
@@ -199,15 +201,15 @@ export function ExplorerPage() {
                 </Map>
               </APIProvider>
             ) : (
-              <div className="explorer-map-fallback">Set `VITE_GOOGLE_MAPS_API_KEY` to view Explorer map.</div>
+              <div className="explorer-map-fallback" data-testid="explorer-map-fallback">Set `VITE_GOOGLE_MAPS_API_KEY` to view Explorer map.</div>
             )}
           </div>
 
-          <aside className="explorer-detail-panel">
+          <aside className="explorer-detail-panel" data-testid="explorer-detail-panel">
             {selectedPlace ? (
               <>
                 <p className="explorer-detail-kicker">Selected Place</p>
-                <h2>{selectedPlace.name}</h2>
+                <h2 data-testid="explorer-detail-name">{selectedPlace.name}</h2>
                 <p>{selectedPlace.category ?? 'Uncategorized'} · {selectedPlace.rating?.toFixed(1) ?? 'N/A'}★</p>
                 <p>{selectedPlace.address ?? 'No address available'}</p>
               </>
@@ -216,13 +218,13 @@ export function ExplorerPage() {
             )}
           </aside>
 
-          <section className="explorer-table-panel">
+          <section className="explorer-table-panel" data-testid="explorer-table-panel">
             <div className="explorer-table-toolbar">
-              <span>{isLoadingPlaces ? 'Loading places…' : `${filteredPlaces.length} places`}</span>
+              <span data-testid="explorer-table-count">{isLoadingPlaces ? 'Loading places…' : `${filteredPlaces.length} places`}</span>
             </div>
 
             <div className="explorer-table-scroll">
-              <table>
+              <table data-testid="explorer-table">
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -236,6 +238,8 @@ export function ExplorerPage() {
                   {filteredPlaces.slice(0, 120).map((place) => (
                     <tr
                       key={place.id}
+                      data-testid={`explorer-row-${place.id}`}
+                      data-selected={place.id === selectedPlaceId ? 'true' : 'false'}
                       className={place.id === selectedPlaceId ? 'is-selected' : ''}
                       onClick={() => setSelectedPlaceId(place.id)}
                     >

@@ -102,6 +102,7 @@ export function ProjectsPage() {
           <p>Manage your scrape areas and jump into setup quickly.</p>
         </div>
         <button
+          data-testid="projects-new-button"
           className="new-project-button"
           type="button"
           onClick={() => setShowCreateForm((open) => !open)}
@@ -111,10 +112,11 @@ export function ProjectsPage() {
       </header>
 
       {showCreateForm ? (
-        <form className="project-form" onSubmit={handleCreateProject}>
+        <form className="project-form" data-testid="projects-create-form" onSubmit={handleCreateProject}>
           <label htmlFor="project-name">Project name</label>
           <div className="project-form-row">
             <input
+              data-testid="projects-create-name-input"
               id="project-name"
               type="text"
               value={newProjectName}
@@ -122,7 +124,7 @@ export function ProjectsPage() {
               placeholder="Sardinia Summer 2026"
               required
             />
-            <button type="submit" disabled={isCreating}>
+            <button data-testid="projects-create-submit" type="submit" disabled={isCreating}>
               {isCreating ? 'Creating…' : 'Create'}
             </button>
           </div>
@@ -136,6 +138,7 @@ export function ProjectsPage() {
       {!isLoading && !hasProjects ? (
         <section className="projects-grid" aria-label="Projects list">
           <button
+            data-testid="projects-empty-create-button"
             className="empty-project-card"
             type="button"
             onClick={() => setShowCreateForm(true)}
@@ -167,6 +170,7 @@ export function ProjectsPage() {
       return (
         <article
           key={project.id}
+          data-testid={`project-card-${project.id}`}
           className={`project-card ${isSelected ? 'is-selected' : ''}`}
           onClick={() => {
             setSelectedProjectId(project.id)
@@ -218,6 +222,7 @@ export function ProjectsPage() {
           </footer>
 
           <button
+            data-testid={`project-delete-${project.id}`}
             className="delete-project-button"
             type="button"
             onClick={(event) => {

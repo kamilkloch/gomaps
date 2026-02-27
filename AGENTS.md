@@ -160,3 +160,4 @@ Always execute interactions from a clean state. Ensure you are resetting the bro
 ### 5. E2E Test Harness Pattern
 
 - Keep Playwright helpers under `client/e2e/` with shared fixtures/utilities/page objects (`fixtures/`, `utils/`, `pages/`, `tests/`) so future stories reuse the same stability primitives.
+- For deterministic UI-flow coverage, prefer a single stateful `page.route('**/api/**', ...)` mock per test and mutate in-memory fixtures instead of relying on live backend/external API behavior.
