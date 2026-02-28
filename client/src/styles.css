@@ -290,6 +290,22 @@ a {
   text-align: center;
 }
 
+.setup-map-diagnostic {
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  margin: 0;
+  border-radius: 0.7rem;
+  border: 1px solid #7a5a33;
+  background: rgba(39, 25, 10, 0.92);
+  color: #ffd9b0;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  z-index: 2;
+}
+
 .setup-coordinates-pill {
   margin: -1.2rem auto 0;
   width: fit-content;

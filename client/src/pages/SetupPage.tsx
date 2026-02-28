@@ -24,6 +24,10 @@ interface Bounds {
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 const FALLBACK_CENTER = { lat: 40, lng: 9 }
+const MAPS_KEY_PLACEHOLDERS = new Set([
+  'your_google_maps_api_key_here',
+  'your_key_here',
+])
 
 export function SetupPage() {
   const { projectId } = useParams()
@@ -35,6 +39,8 @@ export function SetupPage() {
   const [progress, setProgress] = useState<ScrapeProgress | null>(null)
   const [runTiles, setRunTiles] = useState<ScrapeTile[]>([])
   const [map, setMap] = useState<google.maps.Map | null>(null)
+  const [mapLoadErrorMessage, setMapLoadErrorMessage] = useState<string | null>(null)
+  const [didMapInitTimeout, setDidMapInitTimeout] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isStartingScrape, setIsStartingScrape] = useState(false)
@@ -42,7 +48,8 @@ export function SetupPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const hasAppliedInitialBounds = useRef(false)
 
-  const hasMapsKey = Boolean(API_KEY)
+  const trimmedMapsKey = API_KEY?.trim() ?? ''
+  const hasMapsKey = trimmedMapsKey.length > 0 && !MAPS_KEY_PLACEHOLDERS.has(trimmedMapsKey)
 
   useEffect(() => {
     hasAppliedInitialBounds.current = false
@@ -95,6 +102,27 @@ export function SetupPage() {
     map.fitBounds(toLatLngBounds(selectionBounds), 48)
     hasAppliedInitialBounds.current = true
   }, [map, selectionBounds])
+
+  useEffect(() => {
+    if (!hasMapsKey || map) {
+      setDidMapInitTimeout(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setDidMapInitTimeout(true)
+    }, 8_000)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [hasMapsKey, map])
+
+  useEffect(() => {
+    if (!hasMapsKey || map) {
+      setMapLoadErrorMessage(null)
+    }
+  }, [hasMapsKey, map])
 
   useEffect(() => {
     if (!projectId) {
@@ -365,7 +393,12 @@ export function SetupPage() {
         <div className="setup-map-panel">
           <div className="setup-map-shell" data-testid="setup-map-shell">
             {hasMapsKey ? (
-              <APIProvider apiKey={API_KEY ?? ''}>
+              <APIProvider
+                apiKey={trimmedMapsKey}
+                onError={() => {
+                  setMapLoadErrorMessage('Unable to load Google Maps. Check that your API key is valid and allows Maps JavaScript API for localhost.')
+                }}
+              >
                 <Map
                   defaultCenter={mapCenter}
                   defaultZoom={selectionBounds ? estimateZoom(selectionBounds) : 6}
@@ -382,8 +415,19 @@ export function SetupPage() {
                 </Map>
               </APIProvider>
             ) : (
-              <div className="setup-map-fallback" data-testid="setup-map-fallback">Set `VITE_GOOGLE_MAPS_API_KEY` to enable map setup.</div>
+              <div className="setup-map-fallback" data-testid="setup-map-fallback">
+                {trimmedMapsKey.length === 0
+                  ? 'Set `VITE_GOOGLE_MAPS_API_KEY` to enable map setup.'
+                  : 'Replace `VITE_GOOGLE_MAPS_API_KEY` placeholder with a real key to enable map setup.'}
+              </div>
             )}
+
+            {mapLoadErrorMessage || didMapInitTimeout ? (
+              <p className="setup-map-diagnostic" data-testid="setup-map-diagnostic">
+                {mapLoadErrorMessage
+                  ?? 'Map did not initialize. Verify `VITE_GOOGLE_MAPS_API_KEY`, ensure Maps JavaScript API is enabled, and allow `http://localhost:5173/*` in key referrer restrictions.'}
+              </p>
+            ) : null}
           </div>
 
           {selectionBounds ? (
