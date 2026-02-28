@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   createProject,
   deleteProject,
+  getErrorMessage,
   listProjects,
   type Project,
 } from '../lib/api'
@@ -49,8 +50,8 @@ export function ProjectsPage() {
           : loadedProjects[0]?.id ?? null,
       )
     }
-    catch {
-      setErrorMessage('Unable to load projects. Please try again.')
+    catch (error) {
+      setErrorMessage(getErrorMessage(error, 'Unable to load projects. Please try again.'))
     }
     finally {
       setIsLoading(false)
@@ -71,8 +72,8 @@ export function ProjectsPage() {
       setShowCreateForm(false)
       await loadProjects()
     }
-    catch {
-      setErrorMessage('Unable to create project. Please try again.')
+    catch (error) {
+      setErrorMessage(getErrorMessage(error, 'Unable to create project. Please try again.'))
     }
     finally {
       setIsCreating(false)
@@ -89,8 +90,8 @@ export function ProjectsPage() {
       await deleteProject(project.id)
       await loadProjects()
     }
-    catch {
-      setErrorMessage('Unable to delete project. Please try again.')
+    catch (error) {
+      setErrorMessage(getErrorMessage(error, 'Unable to delete project. Please try again.'))
     }
   }
 

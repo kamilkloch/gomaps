@@ -8,8 +8,9 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Projects | Empty-state `Create your first project` button | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
 | Projects | Header `+ New Project` button | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
 | Projects | Create form name input + submit (keyboard Enter + mouse click) | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
-| Projects | Project card activation (keyboard Enter) | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
+| Projects | Project card activation (keyboard Enter + Space) | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
 | Projects | Delete action with dialog cancel + confirm | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
+| Projects | Actionable API misrouting error banner on load + create failure (`Cannot /api/projects`) | `ui-components.spec.ts` → `projects page surfaces actionable API-routing errors when /api points to the wrong backend` |
 | Setup | Map render + drag pan (interactive mode) | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | `Select Area` + coordinate pill updates | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | `Clear` selection + status copy | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |

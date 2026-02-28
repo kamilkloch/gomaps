@@ -6,6 +6,44 @@ import { seedFixtures } from '../utils/test-backdoor'
 import { expectGoogleMapRendered, panGoogleMap } from '../utils/waiters'
 
 test.describe('ui component interaction coverage', () => {
+  test('projects page surfaces actionable API-routing errors when /api points to the wrong backend', async ({ page }, testInfo) => {
+    await page.route('**/api/projects*', async (route) => {
+      const method = route.request().method()
+
+      if (method === 'GET') {
+        await route.fulfill({
+          status: 404,
+          contentType: 'text/html; charset=utf-8',
+          body: '<pre>Cannot GET /api/projects</pre>',
+        })
+        return
+      }
+
+      if (method === 'POST') {
+        await route.fulfill({
+          status: 404,
+          contentType: 'text/html; charset=utf-8',
+          body: '<pre>Cannot POST /api/projects</pre>',
+        })
+        return
+      }
+
+      await route.fallback()
+    })
+
+    await page.goto('/projects')
+    await captureStepScreenshot(page, testInfo, 'projects-routing-error-on-load')
+
+    await expect(page.getByTestId('projects-error')).toContainText('GoMaps API is not reachable at /api.')
+
+    await page.getByTestId('projects-new-button').click()
+    await page.getByTestId('projects-create-name-input').fill('Will Fail')
+    await page.getByTestId('projects-create-submit').click()
+
+    await expect(page.getByTestId('projects-error')).toContainText('GoMaps API is not reachable at /api.')
+    await captureStepScreenshot(page, testInfo, 'projects-routing-error-on-create')
+  })
+
   test('projects page supports mouse + keyboard create/open/delete flows', async ({ page }, testInfo) => {
     const projectsPage = createProjectsPage(page)
     await projectsPage.goto()
@@ -52,9 +90,16 @@ test.describe('ui component interaction coverage', () => {
       throw new Error('Could not resolve mouse-created project id')
     }
 
+    await mouseCard.focus()
+    await page.keyboard.press(' ')
+    await expect(page).toHaveURL(/\/projects\/[^/]+\/setup$/)
+
+    await page.getByTestId('nav-projects').click()
+    await expect(page).toHaveURL(/\/projects$/)
+
     page.once('dialog', (dialog) => dialog.dismiss())
     await page.getByTestId(`project-delete-${mouseCardId}`).click()
-    await expect(mouseCard).toBeVisible()
+    await expect(page.getByTestId(`project-card-${mouseCardId}`)).toBeVisible()
 
     page.once('dialog', (dialog) => dialog.accept())
     await page.getByTestId(`project-delete-${mouseCardId}`).click()

@@ -35,7 +35,7 @@ VITE_GOOGLE_MAPS_API_KEY=your_key_here
 ### Running locally
 
 ```bash
-# Terminal 1 — Express API server (http://localhost:3000)
+# Terminal 1 — Express API server (http://localhost:3180)
 npm run dev --workspace=server
 
 # Terminal 2 — React dev server (http://localhost:5173)
@@ -53,6 +53,12 @@ npm run typecheck --workspace=client
 
 # Run server tests
 npm test --workspace=server
+
+# Run client E2E tests (headless)
+npm run test:e2e --workspace=client
+
+# Run client E2E tests headed with slow motion
+PW_SLOW_MO=25 npm run test:e2e --workspace=client -- --headed
 
 # Production build
 npm run build --workspace=server

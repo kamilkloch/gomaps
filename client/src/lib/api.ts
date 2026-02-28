@@ -72,6 +72,27 @@ export interface Place {
 
 const API_BASE = '/api'
 
+const API_ROUTING_HINT =
+  'GoMaps API is not reachable at /api. Start the server (`npm run dev --workspace=server`) or set `VITE_API_PROXY_TARGET` to your GoMaps server URL before starting the client.'
+
+export class ApiRequestError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+  }
+}
+
+export const getErrorMessage = (error: unknown, fallbackMessage: string): string => {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message
+  }
+
+  return fallbackMessage
+}
+
 const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -82,7 +103,21 @@ const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   })
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`)
+    const responseBody = await response.text()
+    const isLikelyWrongBackend =
+      response.status === 404 && /Cannot\s+(GET|POST|PUT|PATCH|DELETE)\s+\/api\//i.test(responseBody)
+
+    if (isLikelyWrongBackend) {
+      throw new ApiRequestError(API_ROUTING_HINT, response.status)
+    }
+
+    const responseMessage = responseBody.trim()
+    throw new ApiRequestError(
+      responseMessage.length > 0
+        ? `Request failed (${response.status}): ${responseMessage}`
+        : `Request failed with status ${response.status}`,
+      response.status,
+    )
   }
 
   if (response.status === 204) {

@@ -7,7 +7,7 @@ import { testSupportRouter } from './routes/test-support.js'
 import { appRuntime } from './runtime.js'
 
 const app = express()
-const port = process.env.PORT ?? 3000
+const port = process.env.PORT ?? 3180
 const isTestBackdoorEnabled = process.env.E2E_TEST_MODE === '1'
 
 app.use(express.json())
