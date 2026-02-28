@@ -11,7 +11,7 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Projects | Project card activation (keyboard Enter + Space) | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
 | Projects | Delete action with dialog cancel + confirm | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
 | Projects | Actionable API misrouting error banner on load + create failure (`Cannot /api/projects`) | `ui-components.spec.ts` → `projects page surfaces actionable API-routing errors when /api points to the wrong backend` |
-| Setup | Map render + drag pan (interactive mode) | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Setup | Map render + tile/canvas content assertion + drag pan (interactive mode) | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls`; `app-flows.spec.ts` setup scenarios |
 | Setup | `Select Area` + coordinate pill updates | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | `Clear` selection + status copy | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | Query input keyboard editing | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
@@ -22,6 +22,7 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Explorer | `Filters` button | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | Table quick-filter + clear | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | All sortable headers (Name/Category/Rating/Reviews/Price/Website/Address) | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | Map render + tile/canvas content assertion | `ui-components.spec.ts` + `app-flows.spec.ts` explorer scenarios |
 | Explorer | Row selection + detail panel sync | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | Favorite star toggle | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | Virtualized table scroll container | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |

@@ -32,6 +32,15 @@ export async function expectGoogleMapRendered(
   }
 }
 
+export async function expectGoogleMapHasContent(page: Page, mapShellTestId: string): Promise<void> {
+  const mapShell = page.getByTestId(mapShellTestId)
+  const interactiveMap = mapShell.locator('.gm-style').first()
+  await expect(interactiveMap).toBeVisible({ timeout: 20_000 })
+
+  const renderedTileMedia = mapShell.locator('.gm-style img, .gm-style canvas').first()
+  await expect(renderedTileMedia).toBeVisible({ timeout: 20_000 })
+}
+
 export async function panGoogleMap(page: Page, mapShellTestId: string): Promise<void> {
   const mapRoot = page.locator(`[data-testid="${mapShellTestId}"] .gm-style`).first()
   await expect(mapRoot).toBeVisible({ timeout: 20_000 })

@@ -5,7 +5,7 @@ import { expect, test } from '../fixtures/base'
 import { resolveLocator } from '../utils/locators'
 import { captureStepScreenshot } from '../utils/screenshots'
 import { seedFixtures } from '../utils/test-backdoor'
-import { expectGoogleMapRendered, panGoogleMap } from '../utils/waiters'
+import { expectGoogleMapHasContent, expectGoogleMapRendered, panGoogleMap } from '../utils/waiters'
 
 const E2E_SERVER_BASE_URL = process.env.E2E_SERVER_BASE_URL ?? 'http://127.0.0.1:3100'
 
@@ -32,6 +32,7 @@ test.describe('core app flows (integrated backend + UI)', () => {
     await expect(await setupPage.root()).toBeVisible()
     const setupMapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
     if (setupMapMode === 'interactive') {
+      await expectGoogleMapHasContent(page, 'setup-map-shell')
       await panGoogleMap(page, 'setup-map-shell')
       await setupPage.selectArea()
       await expect(page.getByTestId('setup-coordinates-pill')).toBeVisible()
@@ -105,6 +106,7 @@ test.describe('core app flows (integrated backend + UI)', () => {
 
     const setupMapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
     if (setupMapMode === 'interactive') {
+      await expectGoogleMapHasContent(page, 'setup-map-shell')
       await panGoogleMap(page, 'setup-map-shell')
     }
     await expect(page.getByTestId('setup-runs-section')).toContainText('seeded hotels')
@@ -170,6 +172,7 @@ test.describe('core app flows (integrated backend + UI)', () => {
 
     const explorerMapMode = await expectGoogleMapRendered(page, 'explorer-map-panel', 'explorer-map-fallback')
     if (explorerMapMode === 'interactive') {
+      await expectGoogleMapHasContent(page, 'explorer-map-panel')
       await panGoogleMap(page, 'explorer-map-panel')
     }
     await expect(await explorerPage.root()).toBeVisible()

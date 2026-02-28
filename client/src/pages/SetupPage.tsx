@@ -41,6 +41,8 @@ export function SetupPage() {
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [mapLoadErrorMessage, setMapLoadErrorMessage] = useState<string | null>(null)
   const [didMapInitTimeout, setDidMapInitTimeout] = useState(false)
+  const [hasMapTilesLoaded, setHasMapTilesLoaded] = useState(false)
+  const [didMapTilesTimeout, setDidMapTilesTimeout] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isStartingScrape, setIsStartingScrape] = useState(false)
@@ -119,10 +121,36 @@ export function SetupPage() {
   }, [hasMapsKey, map])
 
   useEffect(() => {
+    if (!hasMapsKey || !map) {
+      setDidMapTilesTimeout(false)
+      return
+    }
+
+    if (hasMapTilesLoaded) {
+      setDidMapTilesTimeout(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setDidMapTilesTimeout(true)
+    }, 8_000)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [hasMapTilesLoaded, hasMapsKey, map])
+
+  useEffect(() => {
     if (!hasMapsKey || map) {
       setMapLoadErrorMessage(null)
     }
   }, [hasMapsKey, map])
+
+  useEffect(() => {
+    if (!map) {
+      setHasMapTilesLoaded(false)
+    }
+  }, [map])
 
   useEffect(() => {
     if (!projectId) {
@@ -391,7 +419,11 @@ export function SetupPage() {
 
       <section className="setup-layout">
         <div className="setup-map-panel">
-          <div className="setup-map-shell" data-testid="setup-map-shell">
+          <div
+            className="setup-map-shell"
+            data-testid="setup-map-shell"
+            data-map-tiles-loaded={hasMapTilesLoaded ? 'true' : 'false'}
+          >
             {hasMapsKey ? (
               <APIProvider
                 apiKey={trimmedMapsKey}
@@ -405,7 +437,7 @@ export function SetupPage() {
                   gestureHandling="greedy"
                   style={{ width: '100%', height: '100%' }}
                 >
-                  <MapBridge onReady={setMap} />
+                  <MapBridge onReady={setMap} onTilesLoaded={() => setHasMapTilesLoaded(true)} />
                   <TileOverlayController tiles={runTiles} />
                   <BoundsRectangleController
                     selectedBounds={selectionBounds}
@@ -422,10 +454,12 @@ export function SetupPage() {
               </div>
             )}
 
-            {mapLoadErrorMessage || didMapInitTimeout ? (
+            {mapLoadErrorMessage || didMapInitTimeout || didMapTilesTimeout ? (
               <p className="setup-map-diagnostic" data-testid="setup-map-diagnostic">
                 {mapLoadErrorMessage
-                  ?? 'Map did not initialize. Verify `VITE_GOOGLE_MAPS_API_KEY`, ensure Maps JavaScript API is enabled, and allow `http://localhost:5173/*` in key referrer restrictions.'}
+                  ?? (didMapTilesTimeout
+                    ? 'Google Maps initialized but tiles did not render. Check network/ad-blockers and key referrer restrictions for map tile requests.'
+                    : 'Map did not initialize. Verify `VITE_GOOGLE_MAPS_API_KEY`, ensure Maps JavaScript API is enabled, and allow `http://localhost:5173/*` in key referrer restrictions.')}
               </p>
             ) : null}
           </div>
@@ -562,7 +596,13 @@ export function SetupPage() {
   )
 }
 
-function MapBridge({ onReady }: { onReady: (map: google.maps.Map) => void }) {
+function MapBridge({
+  onReady,
+  onTilesLoaded,
+}: {
+  onReady: (map: google.maps.Map) => void
+  onTilesLoaded: () => void
+}) {
   const map = useMap()
 
   useEffect(() => {
@@ -570,6 +610,20 @@ function MapBridge({ onReady }: { onReady: (map: google.maps.Map) => void }) {
       onReady(map)
     }
   }, [map, onReady])
+
+  useEffect(() => {
+    if (!map) {
+      return
+    }
+
+    const listener = map.addListener('tilesloaded', () => {
+      onTilesLoaded()
+    })
+
+    return () => {
+      listener.remove()
+    }
+  }, [map, onTilesLoaded])
 
   return null
 }

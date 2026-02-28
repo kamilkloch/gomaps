@@ -3,7 +3,7 @@ import { createProjectsPage } from '../pages/projects-page'
 import { createSetupPage } from '../pages/setup-page'
 import { captureStepScreenshot } from '../utils/screenshots'
 import { seedFixtures } from '../utils/test-backdoor'
-import { expectGoogleMapRendered, panGoogleMap } from '../utils/waiters'
+import { expectGoogleMapHasContent, expectGoogleMapRendered, panGoogleMap } from '../utils/waiters'
 
 test.describe('ui component interaction coverage', () => {
   test('projects page surfaces actionable API-routing errors when /api points to the wrong backend', async ({ page }, testInfo) => {
@@ -142,6 +142,7 @@ test.describe('ui component interaction coverage', () => {
 
     const mapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
     if (mapMode === 'interactive') {
+      await expectGoogleMapHasContent(page, 'setup-map-shell')
       await setupPage.selectArea()
       await expect(page.getByTestId('setup-coordinates-pill')).toBeVisible()
       const firstCoordinates = await page.getByTestId('setup-coordinates-pill').textContent()
@@ -234,6 +235,7 @@ test.describe('ui component interaction coverage', () => {
 
     const mapMode = await expectGoogleMapRendered(page, 'explorer-map-panel', 'explorer-map-fallback')
     if (mapMode === 'interactive') {
+      await expectGoogleMapHasContent(page, 'explorer-map-panel')
       await panGoogleMap(page, 'explorer-map-panel')
     }
 
