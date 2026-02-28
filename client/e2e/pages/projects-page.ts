@@ -1,4 +1,5 @@
 import { resolveLocator } from '../utils/locators'
+import { expect } from '../fixtures/base'
 import { waitForNetworkIdle, waitForVisible } from '../utils/waiters'
 import type { Locator, Page } from '@playwright/test'
 
@@ -65,8 +66,22 @@ class ProjectsPageObject {
       text: 'Create',
       defectLabel: 'Create project submit button',
     })
+
+    const createResponsePromise = this.page.waitForResponse((response) =>
+      response.url().includes('/api/projects')
+      && response.request().method() === 'POST'
+    )
+
     await submitButton.click()
+    const createResponse = await createResponsePromise
+    expect(createResponse.status(), 'project creation API should return 201').toBe(201)
     await waitForNetworkIdle(this.page)
+
+    const projectsError = this.page.getByTestId('projects-error')
+    await expect(projectsError).toHaveCount(0)
+
+    const projectHeading = this.page.getByRole('heading', { name })
+    await expect(projectHeading).toBeVisible()
   }
 
   async projectCard(projectId: string): Promise<Locator> {

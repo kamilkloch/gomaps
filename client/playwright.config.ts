@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test'
 
+const e2eServerBaseUrl = process.env.E2E_SERVER_BASE_URL ?? 'http://127.0.0.1:3100'
+process.env.E2E_SERVER_BASE_URL = e2eServerBaseUrl
+
 export default defineConfig({
   testDir: './e2e/tests',
   fullyParallel: false,
@@ -19,14 +22,15 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run dev --workspace=server',
-      url: 'http://127.0.0.1:3000/health',
+      url: `${e2eServerBaseUrl}/health`,
       cwd: '..',
       env: {
         ...process.env,
         E2E_TEST_MODE: '1',
+        PORT: '3100',
         DB_PATH: 'data/gomaps.e2e.db',
       },
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {
@@ -35,9 +39,10 @@ export default defineConfig({
       cwd: '..',
       env: {
         ...process.env,
+        VITE_API_PROXY_TARGET: e2eServerBaseUrl,
         VITE_GOOGLE_MAPS_API_KEY: process.env.VITE_GOOGLE_MAPS_API_KEY ?? '',
       },
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 120_000,
     },
   ],

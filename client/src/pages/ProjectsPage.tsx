@@ -131,7 +131,7 @@ export function ProjectsPage() {
         </form>
       ) : null}
 
-      {errorMessage ? <p className="projects-error">{errorMessage}</p> : null}
+      {errorMessage ? <p className="projects-error" data-testid="projects-error">{errorMessage}</p> : null}
 
       {isLoading ? <p className="projects-loading">Loading projects…</p> : null}
 
@@ -188,7 +188,7 @@ export function ProjectsPage() {
           }}
         >
           <div className="project-card-header">
-            <h2>{project.name}</h2>
+            <h2 data-testid={`project-name-${project.id}`}>{project.name}</h2>
             <span className={`project-status project-status-${status.toLowerCase()}`}>
               {status}
             </span>

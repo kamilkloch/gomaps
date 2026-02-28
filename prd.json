@@ -494,9 +494,11 @@
     {
       "id": "US-027",
       "title": "Write rigorous end-to-end tests for all existing features",
-      "description": "Using the Playwright infrastructure from US-026, write comprehensive e2e tests covering every implemented feature. Follow the AGENTS.md § LLM Agent Testing Guide checklist systematically. Tests should cover: project CRUD (create, open, delete), map rendering and area selection on Setup page, scrape launch with live SSE progress, Explorer page (map markers, clustering, table rendering, sorting), map↔table selection sync, detail panel content, and navigation between pages. Each test must use proper waiting strategies, take verification screenshots, and monitor for console errors. Add data-testid attributes to components where needed for reliable selection.",
+      "description": "Using the Playwright infrastructure from US-026, write comprehensive e2e tests covering every implemented feature and every user interaction that is available in the browser UI. Follow the AGENTS.md § LLM Agent Testing Guide checklist systematically. Tests must cover: project CRUD (create, open, delete), map rendering and area selection on Setup page, scrape launch with live SSE progress, Explorer page (map markers, clustering, table rendering, sorting), map↔table selection sync, detail panel content, and navigation between pages. Each test must use proper waiting strategies, take verification screenshots, and monitor for console errors. Add data-testid attributes to components where needed for reliable selection.",
       "acceptanceCriteria": [
         "Project management tests: create project, verify in list, open project navigates to Setup, delete project with confirmation",
+        "Every interactive control visible in browser UI is exercised by at least one e2e assertion path (buttons, links, inputs, selects, toggles, sortable headers, table rows, marker clicks, keyboard-accessible card actions)",
+        "No interaction may be marked as covered implicitly; each interaction has an explicit action + expected result assertion",
         "Setup page tests: Google Maps renders and is interactive, area selection creates draggable rectangle, coordinates pill updates, clear removes selection",
         "Scrape tests: enter query, click Start Scrape, verify progress panel appears with SSE updates, tile overlay colors change, pause/resume controls work",
         "Explorer map tests: markers render with correct color coding (green/yellow/red by rating), clustering shows numeric counts when zoomed out",
@@ -508,11 +510,12 @@
         "No hardcoded sleeps — all waits use DOM assertions or network-idle",
         "Screenshots captured at key verification points",
         "Console errors monitored and cause test failure",
+        "A coverage checklist artifact is maintained in the test suite mapping each interactive UI element to the e2e test(s) that validate it",
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "Depends on US-026. Add data-testid attributes to React components as needed. Follow AGENTS.md checklist sections 1–6 exhaustively."
+      "passes": false,
+      "notes": "Depends on US-026. Reopened: e2e suite is currently not passing in local runs and must be executed comprehensively before new feature stories. Add data-testid attributes to React components as needed. Follow AGENTS.md checklist sections 1–6 exhaustively."
     }
   ]
 }
