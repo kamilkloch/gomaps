@@ -41,7 +41,7 @@ export function App() {
         <NavLink data-testid="nav-settings" to="/settings" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Settings
         </NavLink>
-        <span style={{ marginLeft: 'auto', borderRadius: '999px', background: '#223c70', color: '#dbe7ff', width: '2rem', height: '2rem', display: 'grid', placeItems: 'center', fontWeight: 700 }}>U</span>
+        <span data-testid="nav-avatar" style={{ marginLeft: 'auto', borderRadius: '999px', background: '#223c70', color: '#dbe7ff', width: '2rem', height: '2rem', display: 'grid', placeItems: 'center', fontWeight: 700 }}>U</span>
       </nav>
 
       <Routes>
@@ -52,7 +52,7 @@ export function App() {
         <Route path="/setup" element={<Navigate to="/projects" replace />} />
         <Route path="/explorer" element={<ExplorerPage />} />
         <Route path="/shortlists" element={<ShortlistsPage />} />
-        <Route path="/settings" element={<div style={{ padding: '1rem' }}>Settings coming soon.</div>} />
+        <Route path="/settings" element={<div data-testid="settings-page" style={{ padding: '1rem' }}>Settings coming soon.</div>} />
       </Routes>
     </BrowserRouter>
   )

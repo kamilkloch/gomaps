@@ -302,7 +302,7 @@ export function ExplorerPage() {
           />
         </div>
 
-        <button type="button" className="explorer-filters-button">
+        <button data-testid="explorer-filters-button" type="button" className="explorer-filters-button">
           Filters
           <span>0</span>
         </button>
@@ -370,6 +370,7 @@ export function ExplorerPage() {
             </div>
 
             <div
+              data-testid="explorer-table-scroll"
               className="explorer-table-scroll"
               ref={tableScrollRef}
               onScroll={handleTableScroll}

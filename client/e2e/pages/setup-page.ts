@@ -1,5 +1,5 @@
 import { resolveLocator } from '../utils/locators'
-import { waitForNetworkIdle, waitForVisible } from '../utils/waiters'
+import { waitForVisible } from '../utils/waiters'
 import type { Locator, Page } from '@playwright/test'
 
 class SetupPageObject {
@@ -7,7 +7,7 @@ class SetupPageObject {
 
   async goto(projectId: string): Promise<void> {
     await this.page.goto(`/projects/${projectId}/setup`)
-    await waitForNetworkIdle(this.page)
+    await waitForVisible(this.page.getByTestId('setup-page'))
   }
 
   async root(): Promise<Locator> {
@@ -30,7 +30,6 @@ class SetupPageObject {
       defectLabel: 'Setup clear area button',
     })
     await clearButton.click()
-    await waitForNetworkIdle(this.page)
   }
 
   async selectArea(): Promise<void> {
@@ -42,7 +41,6 @@ class SetupPageObject {
       defectLabel: 'Setup select area button',
     })
     await selectButton.click()
-    await waitForNetworkIdle(this.page)
   }
 
   async startScrape(query: string): Promise<void> {
@@ -62,7 +60,6 @@ class SetupPageObject {
       defectLabel: 'Setup start scrape button',
     })
     await startButton.click()
-    await waitForNetworkIdle(this.page)
   }
 
   async pauseOrResumeRun(): Promise<void> {
@@ -72,7 +69,6 @@ class SetupPageObject {
       defectLabel: 'Setup pause resume button',
     })
     await pauseButton.click()
-    await waitForNetworkIdle(this.page)
   }
 }
 

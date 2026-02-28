@@ -27,6 +27,7 @@
 - **Playwright harness layout:** Keep reusable e2e primitives in `client/e2e/{fixtures,utils,pages,tests}`; centralize strict locator fallback (`data-testid` → role → text), network/visibility wait helpers, screenshot helper, and console/page-error fail-fast logic inside shared fixtures/utilities.
 - **Playwright API stubbing:** For deterministic UI flows, install a single stateful `page.route('**/api/**', ...)` handler per test and mutate in-memory project/run/place fixtures so create/delete/start/pause/search behaviors can be verified without depending on external APIs.
 - **Playwright env loading:** Parse root `.env` in `client/playwright.config.ts` before web server startup so both `VITE_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` flow into client/server e2e processes consistently.
+- **Playwright waits on SSE pages:** Avoid `networkidle` waits on Setup-like pages with long-lived SSE requests; wait for deterministic UI locators/state transitions instead.
 
 ---
 
@@ -287,4 +288,16 @@ Thread: https://ampcode.com/threads/T-019ca53c-ac4a-768f-b6e3-1ab3626e8013
   - Treat Google Maps assertions as dual-mode in e2e (`interactive` vs `fallback`) so suites remain reliable across environments with and without valid map credentials.
   - Use one shared `E2E_SERVER_BASE_URL` constant in tests to avoid hardcoded port drift from Playwright webServer config.
   - Keep a checklist artifact alongside specs so each UI control has explicit test linkage and future features can extend coverage incrementally.
+---
+
+## 2026-02-28 18:40:03 CET - US-027
+Thread: https://ampcode.com/threads/T-019ca53c-ac4a-768f-b6e3-1ab3626e8013
+- Added a new comprehensive `ui-components` Playwright suite covering keyboard + mouse interactions across all currently shipped user-facing controls (global nav, projects CRUD controls, setup controls, explorer controls, and placeholder routes).
+- Added targeted test hooks (`data-testid`) for missing user-visible surfaces (`nav-avatar`, settings root, shortlists root, explorer filters button, explorer table scroll viewport) and updated the coverage checklist to map every current UI control to explicit tests.
+- Hardened Setup page object waits by removing `networkidle` usage (which stalls with long-lived SSE progress streams) and switching to locator/state-driven waits.
+- Files changed: `client/e2e/tests/ui-components.spec.ts`, `client/e2e/tests/coverage-checklist.md`, `client/e2e/pages/setup-page.ts`, `client/src/App.tsx`, `client/src/pages/ShortlistsPage.tsx`, `client/src/pages/ExplorerPage.tsx`, `AGENTS.md`, `progress.txt`
+- **Learnings for future iterations:**
+  - Setup e2e flows must not rely on network-idle semantics when SSE is active; this creates false timeouts even when UI is healthy.
+  - For virtualized tables, target rows through the visible viewport (or scroll-first + assert) rather than assuming specific IDs are always mounted.
+  - Keep route placeholders test-addressable with explicit `data-testid` anchors so navigation coverage stays stable as pages evolve.
 ---

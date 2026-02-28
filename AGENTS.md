@@ -164,3 +164,4 @@ Always execute interactions from a clean state. Ensure you are resetting the bro
 - For deterministic UI-flow coverage, prefer a single stateful `page.route('**/api/**', ...)` mock per test and mutate in-memory fixtures instead of relying on live backend/external API behavior.
 - For backend-integration e2e coverage, run server in `E2E_TEST_MODE=1` and reset SQLite state before each test via `POST /api/test/reset-db`; this endpoint must stay disabled outside test mode.
 - In `client/playwright.config.ts`, load root `.env` values before defining web servers so `VITE_GOOGLE_MAPS_API_KEY`/`GOOGLE_MAPS_API_KEY` are available consistently in local and CI-style runs.
+- Avoid `waitForLoadState('networkidle')` on pages that keep long-lived requests open (e.g., SSE progress streams in Setup); prefer waiting on stable UI locators/state changes.

@@ -4,19 +4,28 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 
 | UI area | Interactive element | Covered by |
 | --- | --- | --- |
-| Projects | `+ New Project` button | `app-flows.spec.ts` → `project CRUD, setup navigation, and bounds persistence` |
-| Projects | Create form name input + submit | `app-flows.spec.ts` → `project CRUD, setup navigation, and bounds persistence` |
-| Projects | Project card click (open setup) | `app-flows.spec.ts` → `project CRUD, setup navigation, and bounds persistence` |
-| Projects | Delete project action + confirm dialog | `app-flows.spec.ts` → `project CRUD, setup navigation, and bounds persistence` |
-| Global nav | `Projects` navigation link | `app-flows.spec.ts` → `project CRUD, setup navigation, and bounds persistence` |
-| Setup | Map render + pan (when API key exists) | `app-flows.spec.ts` → first + second tests |
-| Setup | Area selection (`Select Area`) | `app-flows.spec.ts` → `project CRUD, setup navigation, and bounds persistence` |
-| Setup | Progress panel and metrics rendering | `app-flows.spec.ts` → `setup page shows seeded run progress and tile metrics` |
-| Explorer | Map render + pan (when API key exists) | `app-flows.spec.ts` → `explorer map, table filtering, and detail-panel selection` |
-| Explorer | Table row selection + detail panel sync | `app-flows.spec.ts` → `explorer map, table filtering, and detail-panel selection` |
-| Explorer | Header search input | `app-flows.spec.ts` → `explorer map, table filtering, and detail-panel selection` |
-| Explorer | Table quick-filter input + clear button | `app-flows.spec.ts` → `explorer map, table filtering, and detail-panel selection` |
-| Explorer | Sortable column header (`Rating`) | `app-flows.spec.ts` → `explorer map, table filtering, and detail-panel selection` |
+| Global nav | `Projects`, `Shortlists`, `Settings` links + avatar | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows`, `navigation links reach shortlists and settings placeholders` |
+| Projects | Empty-state `Create your first project` button | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
+| Projects | Header `+ New Project` button | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
+| Projects | Create form name input + submit (keyboard Enter + mouse click) | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
+| Projects | Project card activation (keyboard Enter) | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
+| Projects | Delete action with dialog cancel + confirm | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
+| Setup | Map render + drag pan (interactive mode) | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Setup | `Select Area` + coordinate pill updates | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Setup | `Clear` selection + status copy | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Setup | Query input keyboard editing | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Setup | `Start Scrape` action | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Setup | Run list selection context + `Pause` control | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Explorer | Project selector dropdown | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | Header search input | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | `Filters` button | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | Table quick-filter + clear | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | All sortable headers (Name/Category/Rating/Reviews/Price/Website/Address) | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | Row selection + detail panel sync | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | Favorite star toggle | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | Virtualized table scroll container | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Shortlists | Placeholder page route and content | `ui-components.spec.ts` → `navigation links reach shortlists and settings placeholders` |
+| Settings | Placeholder page route and content | `ui-components.spec.ts` → `navigation links reach shortlists and settings placeholders` |
 
 ## Notes
 
