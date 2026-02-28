@@ -23,6 +23,7 @@
 - **Website classification:** Normalize website hostnames with URL parsing (add `https://` fallback for protocol-less inputs), then classify via suffix matching so `www.booking.com` and other subdomains map to the base domain allowlist
 - **Place IDs:** Use Google Place IDs from Places API (`place.id` or resource name `places/{id}`), and persist canonical map links in `google_maps_uri`
 - **Effect-TS:** All DB functions return `Effect<A, DbError | NotFoundError>`. Routes use `Effect.runPromise` at boundary. Scraper uses `Effect.runSync` for DB calls since better-sqlite3 is synchronous. Typed errors in `server/src/errors.ts`: `DbError`, `NotFoundError`, `ValidationError`, `ScrapeError`. Schema validation via `Schema.decodeUnknown` from `effect` package.
+- **Effect Schema array mutability:** Values decoded through `Schema.decodeUnknown` can infer readonly arrays; clone (`[...value]`) before passing arrays into mutable DB input types (`CreatePlaceInput`) to satisfy strict TypeScript checks.
 - **Playwright harness layout:** Keep reusable e2e primitives in `client/e2e/{fixtures,utils,pages,tests}`; centralize strict locator fallback (`data-testid` → role → text), network/visibility wait helpers, screenshot helper, and console/page-error fail-fast logic inside shared fixtures/utilities.
 - **Playwright API stubbing:** For deterministic UI flows, install a single stateful `page.route('**/api/**', ...)` handler per test and mutate in-memory project/run/place fixtures so create/delete/start/pause/search behaviors can be verified without depending on external APIs.
 
@@ -260,4 +261,17 @@ Thread: https://ampcode.com/threads/T-019ca140-ec31-733d-aeb9-f024b4a0e3df
   - Keep high-level flow tests deterministic by mocking API state transitions (create/delete project, start/pause scrape, filtered place lists) instead of depending on live external services.
   - Add `data-selected` or comparable lightweight state attributes on interactive rows to assert selection sync behavior without brittle style assertions.
   - Page-object methods should prefer direct `getByTestId` locators for dynamic entities (IDs created at runtime) to avoid accidental fallback to generic role matches.
+---
+
+## 2026-02-28 10:51:10 CET - US-014
+Thread: https://ampcode.com/threads/T-019ca39b-f3df-75dc-bc4d-bd48f0adf292
+- Implemented Explorer bottom table upgrades: all requested columns (Name, Category, Rating, Reviews, Price, Website badge, Address, Favorite), sortable headers with direction indicators, selected-row highlight retention, and quick filter + Clear controls in the table toolbar.
+- Added lightweight row virtualization in the table viewport (spacer-row windowing) so only visible rows render while preserving horizontal scrolling and sticky table headers for large result sets.
+- Added website-type badge styling (`Direct`, `OTA`, `Social`, `Unknown`) and local favorite-star toggling in the Favorite column, plus formatting helpers for price-level display.
+- Fixed a strict typing issue uncovered by required checks in `server/src/routes/test-support.ts` by cloning Schema-decoded array fields before passing them to mutable DB inputs.
+- Files changed: `client/src/pages/ExplorerPage.tsx`, `client/src/styles.css`, `server/src/routes/test-support.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For large tables without extra dependencies, spacer-based windowing inside an `overflow:auto` container is sufficient to keep rendering responsive while preserving native table semantics.
+  - Clickable sort headers are easiest to maintain when sort state is centralized (`{ key, direction }`) and comparator helpers handle null ordering consistently.
+  - Effect Schema-decoded arrays should be copied before being passed into mutable persistence contracts to avoid readonly-vs-mutable regressions during strict typecheck.
 ---

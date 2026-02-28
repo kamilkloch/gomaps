@@ -52,6 +52,7 @@ npm run dev --workspace=client
 - **Running effects**: use `ManagedRuntime.make(layer)` → `appRuntime.runPromise()` / `appRuntime.runSync()` — never bare `Effect.runPromise` when the effect requires services
 - **Typed errors**: extend `Data.TaggedError('Tag')<{ ... }>`, catch with `Effect.catchTag('Tag', ...)`
 - **Schema**: import from `effect` (`import { Schema } from 'effect'`), not `@effect/schema`
+- **Schema decode mutability**: values decoded from Effect `Schema` can be inferred as readonly arrays; clone array fields (`[...value]`) when passing to mutable DB input types like `CreatePlaceInput`
 - **Do not invent Effect APIs** — if you're unsure whether a function exists, check the installed types in `node_modules/effect/dist/dts/`
 
 ## File organization

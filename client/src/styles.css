@@ -740,6 +740,44 @@ a {
   border-bottom: 1px solid #294364;
   color: #a9c4e6;
   font-size: 0.85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.explorer-table-filter-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.explorer-table-filter-wrap input {
+  width: min(320px, 48vw);
+  height: 2rem;
+  border-radius: 0.6rem;
+  border: 1px solid #3a5f8c;
+  background: #0a1729;
+  color: #deebff;
+  padding: 0 0.65rem;
+  font: inherit;
+}
+
+.explorer-table-filter-wrap button {
+  height: 2rem;
+  border-radius: 0.55rem;
+  border: 1px solid #506f98;
+  background: #20334f;
+  color: #d8e8ff;
+  padding: 0 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.explorer-table-filter-wrap button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .explorer-table-scroll {
@@ -754,10 +792,11 @@ a {
 
 .explorer-table-scroll th,
 .explorer-table-scroll td {
-  padding: 0.55rem 0.65rem;
+  padding: 0.45rem 0.65rem;
   border-bottom: 1px solid #243a58;
   font-size: 0.82rem;
   text-align: left;
+  height: 44px;
 }
 
 .explorer-table-scroll th {
@@ -766,6 +805,23 @@ a {
   z-index: 1;
   background: #11203a;
   color: #cfe1fb;
+}
+
+.explorer-sort-button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.explorer-spacer-row td {
+  border-bottom: 0;
+  padding: 0;
 }
 
 .explorer-table-scroll tr {
@@ -778,6 +834,46 @@ a {
 
 .explorer-table-scroll tr.is-selected {
   background: rgba(74, 142, 227, 0.28);
+}
+
+.explorer-website-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid transparent;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.explorer-website-direct {
+  background: rgba(41, 123, 87, 0.35);
+  border-color: #3fa878;
+  color: #8ef0c6;
+}
+
+.explorer-website-ota {
+  background: rgba(172, 98, 30, 0.32);
+  border-color: #df9953;
+  color: #ffd8ab;
+}
+
+.explorer-website-social,
+.explorer-website-unknown {
+  background: rgba(67, 91, 123, 0.35);
+  border-color: #6f8fb8;
+  color: #d2e3ff;
+}
+
+.explorer-favorite-button {
+  border: 0;
+  background: transparent;
+  color: #f8d77b;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .explorer-filter-sidebar {

@@ -135,7 +135,11 @@ testSupportRouter.post('/seed-fixtures', async (req, res) => {
         }
 
         for (const place of places) {
-          yield* createPlace(place)
+          yield* createPlace({
+            ...place,
+            photoUrls: place.photoUrls ? [...place.photoUrls] : undefined,
+            amenities: place.amenities ? [...place.amenities] : undefined,
+          })
           yield* linkPlaceToScrapeRun(place.id, scrapeRun.id)
         }
       }

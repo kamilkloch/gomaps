@@ -1,11 +1,28 @@
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps'
 import { MarkerClusterer } from '@googlemaps/markerclusterer'
+import type { UIEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getProject, listPlaces, listProjects, type Place, type Project } from '../lib/api'
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 const FALLBACK_CENTER = { lat: 40, lng: 9 }
+const TABLE_ROW_HEIGHT = 44
+const TABLE_OVERSCAN = 10
+
+type SortKey =
+  | 'name'
+  | 'category'
+  | 'rating'
+  | 'reviewCount'
+  | 'priceLevel'
+  | 'websiteType'
+  | 'address'
+
+interface SortState {
+  key: SortKey
+  direction: 'asc' | 'desc'
+}
 
 export function ExplorerPage() {
   const { projectId: routeProjectId } = useParams()
@@ -16,6 +33,12 @@ export function ExplorerPage() {
   const [places, setPlaces] = useState<Place[]>([])
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
   const [searchText, setSearchText] = useState('')
+  const [tableFilterText, setTableFilterText] = useState('')
+  const [sortState, setSortState] = useState<SortState>({ key: 'rating', direction: 'desc' })
+  const [favoritePlaceIds, setFavoritePlaceIds] = useState<Set<string>>(new Set())
+  const tableScrollRef = useRef<HTMLDivElement | null>(null)
+  const [tableScrollTop, setTableScrollTop] = useState(0)
+  const [tableViewportHeight, setTableViewportHeight] = useState(220)
   const [isLoadingProjects, setIsLoadingProjects] = useState(true)
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -130,6 +153,54 @@ export function ExplorerPage() {
     )
   }, [places, searchText])
 
+  const tableFilteredPlaces = useMemo(() => {
+    const trimmedFilter = tableFilterText.trim().toLowerCase()
+    if (!trimmedFilter) {
+      return filteredPlaces
+    }
+
+    return filteredPlaces.filter((place) =>
+      [
+        place.name,
+        place.category ?? '',
+        place.address ?? '',
+        place.priceLevel ?? '',
+        place.websiteType,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(trimmedFilter)
+    )
+  }, [filteredPlaces, tableFilterText])
+
+  const sortedPlaces = useMemo(() => {
+    const sorted = [...tableFilteredPlaces]
+
+    sorted.sort((left, right) => comparePlaces(left, right, sortState))
+
+    return sorted
+  }, [tableFilteredPlaces, sortState])
+
+  const visibleRange = useMemo(() => {
+    const totalRows = sortedPlaces.length
+    if (totalRows === 0) {
+      return { start: 0, end: 0 }
+    }
+
+    const visibleCount = Math.ceil(tableViewportHeight / TABLE_ROW_HEIGHT)
+    const start = Math.max(0, Math.floor(tableScrollTop / TABLE_ROW_HEIGHT) - TABLE_OVERSCAN)
+    const end = Math.min(totalRows, start + visibleCount + TABLE_OVERSCAN * 2)
+    return { start, end }
+  }, [sortedPlaces.length, tableViewportHeight, tableScrollTop])
+
+  const visibleRows = useMemo(
+    () => sortedPlaces.slice(visibleRange.start, visibleRange.end),
+    [sortedPlaces, visibleRange]
+  )
+
+  const topSpacerHeight = visibleRange.start * TABLE_ROW_HEIGHT
+  const bottomSpacerHeight = Math.max(0, (sortedPlaces.length - visibleRange.end) * TABLE_ROW_HEIGHT)
+
   const selectedPlace = useMemo(
     () => filteredPlaces.find((place) => place.id === selectedPlaceId) ?? null,
     [filteredPlaces, selectedPlaceId],
@@ -143,6 +214,64 @@ export function ExplorerPage() {
     setSelectedProjectId(nextProjectId)
     navigate(`/projects/${nextProjectId}/explorer`)
   }, [navigate])
+
+  const handleSortChange = useCallback((key: SortKey) => {
+    setSortState((current) => {
+      if (current.key !== key) {
+        return { key, direction: 'asc' }
+      }
+
+      return {
+        key,
+        direction: current.direction === 'asc' ? 'desc' : 'asc',
+      }
+    })
+  }, [])
+
+  const toggleFavorite = useCallback((placeId: string) => {
+    setFavoritePlaceIds((current) => {
+      const next = new Set(current)
+      if (next.has(placeId)) {
+        next.delete(placeId)
+      }
+      else {
+        next.add(placeId)
+      }
+
+      return next
+    })
+  }, [])
+
+  const handleTableScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
+    const scrollContainer = event.currentTarget
+    setTableScrollTop(scrollContainer.scrollTop)
+    setTableViewportHeight(scrollContainer.clientHeight)
+  }, [])
+
+  useEffect(() => {
+    const scrollContainer = tableScrollRef.current
+    if (!scrollContainer) {
+      return
+    }
+
+    setTableViewportHeight(scrollContainer.clientHeight)
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setTableViewportHeight(entry.contentRect.height)
+      }
+    })
+    resizeObserver.observe(scrollContainer)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [sortedPlaces.length])
+
+  useEffect(() => {
+    setTableScrollTop(0)
+    tableScrollRef.current?.scrollTo({ top: 0 })
+  }, [selectedProjectId, searchText, tableFilterText, sortState])
 
   return (
     <main className="explorer-page" data-testid="explorer-page">
@@ -220,22 +349,80 @@ export function ExplorerPage() {
 
           <section className="explorer-table-panel" data-testid="explorer-table-panel">
             <div className="explorer-table-toolbar">
-              <span data-testid="explorer-table-count">{isLoadingPlaces ? 'Loading places…' : `${filteredPlaces.length} places`}</span>
+              <span data-testid="explorer-table-count">{isLoadingPlaces ? 'Loading places…' : `${sortedPlaces.length} places`}</span>
+              <div className="explorer-table-filter-wrap">
+                <input
+                  data-testid="explorer-table-filter-input"
+                  type="search"
+                  placeholder="Filter results..."
+                  value={tableFilterText}
+                  onChange={(event) => setTableFilterText(event.target.value)}
+                />
+                <button
+                  data-testid="explorer-table-filter-clear"
+                  type="button"
+                  onClick={() => setTableFilterText('')}
+                  disabled={tableFilterText.length === 0}
+                >
+                  Clear
+                </button>
+              </div>
             </div>
 
-            <div className="explorer-table-scroll">
+            <div
+              className="explorer-table-scroll"
+              ref={tableScrollRef}
+              onScroll={handleTableScroll}
+            >
               <table data-testid="explorer-table">
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>Rating</th>
-                    <th>Reviews</th>
-                    <th>Website</th>
+                    <th>
+                      <button type="button" className="explorer-sort-button" onClick={() => handleSortChange('name')}>
+                        Name {sortIndicator(sortState, 'name')}
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" className="explorer-sort-button" onClick={() => handleSortChange('category')}>
+                        Category {sortIndicator(sortState, 'category')}
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" className="explorer-sort-button" onClick={() => handleSortChange('rating')}>
+                        Rating {sortIndicator(sortState, 'rating')}
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" className="explorer-sort-button" onClick={() => handleSortChange('reviewCount')}>
+                        Reviews {sortIndicator(sortState, 'reviewCount')}
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" className="explorer-sort-button" onClick={() => handleSortChange('priceLevel')}>
+                        Price {sortIndicator(sortState, 'priceLevel')}
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" className="explorer-sort-button" onClick={() => handleSortChange('websiteType')}>
+                        Website {sortIndicator(sortState, 'websiteType')}
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" className="explorer-sort-button" onClick={() => handleSortChange('address')}>
+                        Address {sortIndicator(sortState, 'address')}
+                      </button>
+                    </th>
+                    <th>Favorite</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPlaces.slice(0, 120).map((place) => (
+                  {topSpacerHeight > 0 ? (
+                    <tr aria-hidden="true" className="explorer-spacer-row">
+                      <td colSpan={8} style={{ height: `${topSpacerHeight}px` }} />
+                    </tr>
+                  ) : null}
+
+                  {visibleRows.map((place) => (
                     <tr
                       key={place.id}
                       data-testid={`explorer-row-${place.id}`}
@@ -247,9 +434,35 @@ export function ExplorerPage() {
                       <td>{place.category ?? '—'}</td>
                       <td>{place.rating?.toFixed(1) ?? '—'}</td>
                       <td>{place.reviewCount ?? '—'}</td>
-                      <td>{place.websiteType}</td>
+                      <td>{formatPriceLevel(place.priceLevel)}</td>
+                      <td>
+                        <span className={`explorer-website-badge explorer-website-${place.websiteType}`}>
+                          {websiteLabel(place.websiteType)}
+                        </span>
+                      </td>
+                      <td>{place.address ?? '—'}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="explorer-favorite-button"
+                          aria-label={`Toggle favorite for ${place.name}`}
+                          aria-pressed={favoritePlaceIds.has(place.id)}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            toggleFavorite(place.id)
+                          }}
+                        >
+                          {favoritePlaceIds.has(place.id) ? '★' : '☆'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
+
+                  {bottomSpacerHeight > 0 ? (
+                    <tr aria-hidden="true" className="explorer-spacer-row">
+                      <td colSpan={8} style={{ height: `${bottomSpacerHeight}px` }} />
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
@@ -473,6 +686,113 @@ const ratingColor = (rating: number | null): string => {
   }
 
   return '#5dd58b'
+}
+
+const websiteLabel = (websiteType: Place['websiteType']): string => {
+  if (websiteType === 'ota') {
+    return 'OTA'
+  }
+
+  if (websiteType === 'direct') {
+    return 'Direct'
+  }
+
+  if (websiteType === 'social') {
+    return 'Social'
+  }
+
+  return 'Unknown'
+}
+
+const formatPriceLevel = (priceLevel: string | null): string => {
+  if (!priceLevel) {
+    return '—'
+  }
+
+  const normalized = priceLevel.trim()
+  if (!normalized) {
+    return '—'
+  }
+
+  if (normalized.startsWith('$')) {
+    return normalized
+  }
+
+  return normalized
+    .replace('PRICE_LEVEL_', '')
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+const sortIndicator = (sortState: SortState, key: SortKey): string => {
+  if (sortState.key !== key) {
+    return '↕'
+  }
+
+  return sortState.direction === 'asc' ? '↑' : '↓'
+}
+
+const comparePlaces = (left: Place, right: Place, sortState: SortState): number => {
+  const directionMultiplier = sortState.direction === 'asc' ? 1 : -1
+
+  const compareResult = (() => {
+    switch (sortState.key) {
+      case 'rating':
+        return compareNullableNumber(left.rating, right.rating)
+      case 'reviewCount':
+        return compareNullableNumber(left.reviewCount, right.reviewCount)
+      case 'name':
+        return compareNullableString(left.name, right.name)
+      case 'category':
+        return compareNullableString(left.category, right.category)
+      case 'priceLevel':
+        return compareNullableString(formatPriceLevel(left.priceLevel), formatPriceLevel(right.priceLevel))
+      case 'websiteType':
+        return compareNullableString(websiteLabel(left.websiteType), websiteLabel(right.websiteType))
+      case 'address':
+        return compareNullableString(left.address, right.address)
+      default:
+        return 0
+    }
+  })()
+
+  if (compareResult !== 0) {
+    return compareResult * directionMultiplier
+  }
+
+  return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })
+}
+
+const compareNullableNumber = (left: number | null, right: number | null): number => {
+  if (left === null && right === null) {
+    return 0
+  }
+  if (left === null) {
+    return 1
+  }
+  if (right === null) {
+    return -1
+  }
+  return left - right
+}
+
+const compareNullableString = (left: string | null, right: string | null): number => {
+  const leftValue = (left ?? '').trim()
+  const rightValue = (right ?? '').trim()
+
+  if (!leftValue && !rightValue) {
+    return 0
+  }
+  if (!leftValue) {
+    return 1
+  }
+  if (!rightValue) {
+    return -1
+  }
+
+  return leftValue.localeCompare(rightValue, undefined, { sensitivity: 'base' })
 }
 
 const getProjectCenter = (boundsRaw: string | null | undefined): { lat: number; lng: number } | null => {
