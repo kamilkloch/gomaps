@@ -1,7 +1,34 @@
 import { defineConfig } from '@playwright/test'
+import { existsSync, readFileSync } from 'node:fs'
+
+const rootEnvUrl = new URL('../.env', import.meta.url)
+
+if (existsSync(rootEnvUrl)) {
+  const envEntries = readFileSync(rootEnvUrl, 'utf8').split(/\r?\n/)
+  for (const entry of envEntries) {
+    const trimmed = entry.trim()
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue
+    }
+
+    const equalsIndex = trimmed.indexOf('=')
+    if (equalsIndex <= 0) {
+      continue
+    }
+
+    const key = trimmed.slice(0, equalsIndex).trim().replace(/^export\s+/, '')
+    if (!key || process.env[key]) {
+      continue
+    }
+
+    const rawValue = trimmed.slice(equalsIndex + 1).trim()
+    process.env[key] = rawValue.replace(/^['\"]|['\"]$/g, '')
+  }
+}
 
 const e2eServerBaseUrl = process.env.E2E_SERVER_BASE_URL ?? 'http://127.0.0.1:3100'
 process.env.E2E_SERVER_BASE_URL = e2eServerBaseUrl
+const e2eMapsKey = process.env.VITE_GOOGLE_MAPS_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? ''
 
 export default defineConfig({
   testDir: './e2e/tests',
@@ -40,7 +67,7 @@ export default defineConfig({
       env: {
         ...process.env,
         VITE_API_PROXY_TARGET: e2eServerBaseUrl,
-        VITE_GOOGLE_MAPS_API_KEY: process.env.VITE_GOOGLE_MAPS_API_KEY ?? '',
+        VITE_GOOGLE_MAPS_API_KEY: e2eMapsKey,
       },
       reuseExistingServer: false,
       timeout: 120_000,

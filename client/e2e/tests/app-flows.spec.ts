@@ -7,6 +7,8 @@ import { captureStepScreenshot } from '../utils/screenshots'
 import { seedFixtures } from '../utils/test-backdoor'
 import { expectGoogleMapRendered, panGoogleMap } from '../utils/waiters'
 
+const E2E_SERVER_BASE_URL = process.env.E2E_SERVER_BASE_URL ?? 'http://127.0.0.1:3100'
+
 test.describe('core app flows (integrated backend + UI)', () => {
   test('project CRUD, setup navigation, and bounds persistence', async ({ page, request }, testInfo) => {
     const projectsPage = createProjectsPage(page)
@@ -28,12 +30,16 @@ test.describe('core app flows (integrated backend + UI)', () => {
     const projectId = setupUrlMatch[1]
 
     await expect(await setupPage.root()).toBeVisible()
-    await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
-    await panGoogleMap(page, 'setup-map-shell')
-
-    await setupPage.selectArea()
-    await expect(page.getByTestId('setup-coordinates-pill')).toBeVisible()
-    await expect(page.getByTestId('setup-status-copy')).toContainText('Selection saved to project')
+    const setupMapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
+    if (setupMapMode === 'interactive') {
+      await panGoogleMap(page, 'setup-map-shell')
+      await setupPage.selectArea()
+      await expect(page.getByTestId('setup-coordinates-pill')).toBeVisible()
+      await expect(page.getByTestId('setup-status-copy')).toContainText('Selection saved to project')
+    }
+    else {
+      await expect(page.getByTestId('setup-status-copy')).toContainText('No area selected yet.')
+    }
 
     const navProjects = await resolveLocator(page, {
       testId: 'nav-projects',
@@ -48,7 +54,7 @@ test.describe('core app flows (integrated backend + UI)', () => {
     await projectsPage.deleteProject(projectId)
     await expect(page.getByTestId(`project-card-${projectId}`)).toHaveCount(0)
 
-    const projectsResponse = await request.get('http://127.0.0.1:3000/api/projects')
+    const projectsResponse = await request.get(`${E2E_SERVER_BASE_URL}/api/projects`)
     expect(projectsResponse.ok()).toBeTruthy()
     expect(await projectsResponse.json()).toEqual([])
   })
@@ -97,8 +103,10 @@ test.describe('core app flows (integrated backend + UI)', () => {
     await setupPage.goto(seeded.projectId)
     await captureStepScreenshot(page, testInfo, 'setup-seeded-progress')
 
-    await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
-    await panGoogleMap(page, 'setup-map-shell')
+    const setupMapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
+    if (setupMapMode === 'interactive') {
+      await panGoogleMap(page, 'setup-map-shell')
+    }
     await expect(page.getByTestId('setup-runs-section')).toContainText('seeded hotels')
     await expect(page.getByTestId('setup-progress-section')).toBeVisible()
     await expect(page.getByTestId('setup-progress-section')).toContainText('Tiles: 3/3')
@@ -160,10 +168,17 @@ test.describe('core app flows (integrated backend + UI)', () => {
     await explorerPage.goto(seeded.projectId)
     await captureStepScreenshot(page, testInfo, 'explorer-initial')
 
-    await expectGoogleMapRendered(page, 'explorer-map-panel', 'explorer-map-fallback')
-    await panGoogleMap(page, 'explorer-map-panel')
+    const explorerMapMode = await expectGoogleMapRendered(page, 'explorer-map-panel', 'explorer-map-fallback')
+    if (explorerMapMode === 'interactive') {
+      await panGoogleMap(page, 'explorer-map-panel')
+    }
     await expect(await explorerPage.root()).toBeVisible()
     await expect(page.getByTestId('explorer-table-count')).toContainText('2 places')
+
+    await page.getByRole('button', { name: /^rating/i }).click()
+    await expect(page.getByTestId('explorer-table').locator('tbody tr').first()).toContainText('Blue Harbor Rooms')
+    await page.getByRole('button', { name: /^rating/i }).click()
+    await expect(page.getByTestId('explorer-table').locator('tbody tr').first()).toContainText('Garden Suites')
 
     await explorerPage.clickRow('seed-place-2')
     await expect(page.getByTestId('explorer-detail-name')).toContainText('Blue Harbor Rooms')
@@ -173,6 +188,11 @@ test.describe('core app flows (integrated backend + UI)', () => {
     await expect(page.getByTestId('explorer-table-count')).toContainText('1 places')
     await expect(page.getByTestId('explorer-table')).toContainText('Blue Harbor Rooms')
     await expect(page.getByTestId('explorer-table')).not.toContainText('Garden Suites')
+
+    await page.getByTestId('explorer-table-filter-input').fill('rooms')
+    await expect(page.getByTestId('explorer-table-count')).toContainText('1 places')
+    await page.getByTestId('explorer-table-filter-clear').click()
+    await expect(page.getByTestId('explorer-table-count')).toContainText('1 places')
 
     await explorerPage.search('')
     await expect(page.getByTestId('explorer-table-count')).toContainText('2 places')

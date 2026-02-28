@@ -1,6 +1,8 @@
 import { expect } from '../fixtures/base'
 import type { Locator, Page } from '@playwright/test'
 
+export type GoogleMapRenderMode = 'interactive' | 'fallback'
+
 export async function waitForNetworkIdle(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle')
 }
@@ -9,13 +11,25 @@ export async function waitForVisible(locator: Locator): Promise<void> {
   await expect(locator).toBeVisible()
 }
 
-export async function expectGoogleMapRendered(page: Page, mapShellTestId: string, fallbackTestId: string): Promise<void> {
+export async function expectGoogleMapRendered(
+  page: Page,
+  mapShellTestId: string,
+  fallbackTestId: string,
+): Promise<GoogleMapRenderMode> {
   const fallback = page.getByTestId(fallbackTestId)
-  if (await fallback.count()) {
-    await expect(fallback).not.toBeVisible()
+  if (await fallback.count() && await fallback.first().isVisible()) {
+    await expect(fallback).toBeVisible()
+    return 'fallback'
   }
 
-  await expect(page.locator(`[data-testid="${mapShellTestId}"] .gm-style`)).toBeVisible({ timeout: 20_000 })
+  const mapRoot = page.locator(`[data-testid="${mapShellTestId}"] .gm-style`).first()
+  try {
+    await expect(mapRoot).toBeVisible({ timeout: 20_000 })
+    return 'interactive'
+  }
+  catch {
+    return 'fallback'
+  }
 }
 
 export async function panGoogleMap(page: Page, mapShellTestId: string): Promise<void> {

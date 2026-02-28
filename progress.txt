@@ -26,6 +26,7 @@
 - **Effect Schema array mutability:** Values decoded through `Schema.decodeUnknown` can infer readonly arrays; clone (`[...value]`) before passing arrays into mutable DB input types (`CreatePlaceInput`) to satisfy strict TypeScript checks.
 - **Playwright harness layout:** Keep reusable e2e primitives in `client/e2e/{fixtures,utils,pages,tests}`; centralize strict locator fallback (`data-testid` → role → text), network/visibility wait helpers, screenshot helper, and console/page-error fail-fast logic inside shared fixtures/utilities.
 - **Playwright API stubbing:** For deterministic UI flows, install a single stateful `page.route('**/api/**', ...)` handler per test and mutate in-memory project/run/place fixtures so create/delete/start/pause/search behaviors can be verified without depending on external APIs.
+- **Playwright env loading:** Parse root `.env` in `client/playwright.config.ts` before web server startup so both `VITE_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` flow into client/server e2e processes consistently.
 
 ---
 
@@ -274,4 +275,16 @@ Thread: https://ampcode.com/threads/T-019ca39b-f3df-75dc-bc4d-bd48f0adf292
   - For large tables without extra dependencies, spacer-based windowing inside an `overflow:auto` container is sufficient to keep rendering responsive while preserving native table semantics.
   - Clickable sort headers are easiest to maintain when sort state is centralized (`{ key, direction }`) and comparator helpers handle null ordering consistently.
   - Effect Schema-decoded arrays should be copied before being passed into mutable persistence contracts to avoid readonly-vs-mutable regressions during strict typecheck.
+---
+
+## 2026-02-28 18:19:39 CET - US-027
+Thread: https://ampcode.com/threads/T-019ca53c-ac4a-768f-b6e3-1ab3626e8013
+- Stabilized and expanded Playwright e2e coverage in `client/e2e/tests/app-flows.spec.ts`: fixed backend base URL usage, added explicit Explorer sort + quick-filter assertions, and made map assertions resilient to both fully interactive and fallback map states.
+- Updated Playwright config to load root `.env` before server startup so e2e runs automatically inherit `VITE_GOOGLE_MAPS_API_KEY`/`GOOGLE_MAPS_API_KEY` where available.
+- Added `client/e2e/tests/coverage-checklist.md` mapping implemented interactive controls to concrete e2e assertion paths.
+- Files changed: `client/playwright.config.ts`, `client/e2e/utils/waiters.ts`, `client/e2e/tests/app-flows.spec.ts`, `client/e2e/tests/coverage-checklist.md`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Treat Google Maps assertions as dual-mode in e2e (`interactive` vs `fallback`) so suites remain reliable across environments with and without valid map credentials.
+  - Use one shared `E2E_SERVER_BASE_URL` constant in tests to avoid hardcoded port drift from Playwright webServer config.
+  - Keep a checklist artifact alongside specs so each UI control has explicit test linkage and future features can extend coverage incrementally.
 ---

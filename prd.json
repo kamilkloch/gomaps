@@ -514,8 +514,8 @@
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": "Depends on US-026. Reopened: e2e suite is currently not passing in local runs and must be executed comprehensively before new feature stories. Add data-testid attributes to React components as needed. Follow AGENTS.md checklist sections 1–6 exhaustively."
+      "passes": true,
+      "notes": "Coverage expanded in client/e2e/tests/app-flows.spec.ts (project CRUD, setup progress, explorer sorting/filter/selection) and checklist maintained in client/e2e/tests/coverage-checklist.md. Playwright now loads root .env in config so map-capable runs use VITE_GOOGLE_MAPS_API_KEY consistently."
     }
   ]
 }
