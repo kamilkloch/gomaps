@@ -33,6 +33,18 @@ class SetupPageObject {
     await waitForNetworkIdle(this.page)
   }
 
+  async selectArea(): Promise<void> {
+    const selectButton = await resolveLocator(this.page, {
+      testId: 'setup-select-area-button',
+      role: 'button',
+      name: /select area/i,
+      text: 'Select Area',
+      defectLabel: 'Setup select area button',
+    })
+    await selectButton.click()
+    await waitForNetworkIdle(this.page)
+  }
+
   async startScrape(query: string): Promise<void> {
     const queryInput = await resolveLocator(this.page, {
       testId: 'setup-query-input',

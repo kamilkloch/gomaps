@@ -75,6 +75,17 @@ class ProjectsPageObject {
     return locator
   }
 
+  async openProjectByName(name: string): Promise<void> {
+    const heading = await resolveLocator(this.page, {
+      role: 'heading',
+      name,
+      text: name,
+      defectLabel: `Project card heading for ${name}`,
+    })
+    await heading.click()
+    await waitForNetworkIdle(this.page)
+  }
+
   async deleteProject(projectId: string): Promise<void> {
     this.page.once('dialog', (dialog) => dialog.accept())
     const deleteButton = this.page.getByTestId(`project-delete-${projectId}`)

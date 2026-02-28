@@ -1,14 +1,23 @@
 import { test as base } from '@playwright/test'
 import type { BrowserContext, Page } from '@playwright/test'
+import { resetDatabaseForE2E } from '../utils/test-backdoor'
 
 interface TestFixtures {
   context: BrowserContext
   page: Page
+  resetDatabase: void
 }
 
 const severeConsolePattern = /errorboundary|uncaught|typeerror|referenceerror|unhandled/i
 
 const test = base.extend<TestFixtures>({
+  resetDatabase: [
+    async ({ request }, use) => {
+      await resetDatabaseForE2E(request)
+      await use()
+    },
+    { auto: true },
+  ],
   context: async ({ browser }, use) => {
     const context = await browser.newContext()
     await context.clearCookies()
