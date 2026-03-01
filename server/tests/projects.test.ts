@@ -10,12 +10,37 @@ import type { ScrapeProgress, StartScrapeConfig } from '../src/scraper/engine.js
 
 const dbPath = join(tmpdir(), `gomaps-test-${randomUUID()}.db`)
 
-// Set DB_PATH before importing app so the singleton uses the test DB
+// Set env flags before importing app so singletons use test settings.
 process.env.DB_PATH = dbPath
+process.env.E2E_TEST_MODE = '1'
 
-const { getScrapeRun, updateScrapeRun, closeDatabase } = await import('../src/db/index.js')
-const { createPlace, createReview, createScrapeRun, linkPlaceToScrapeRun } = await import('../src/db/index.js')
-const { truncateAllTables } = await import('../src/db/index.js')
+const {
+  addShortlistEntry,
+  closeDatabase,
+  createPlace,
+  createProject,
+  createReview,
+  createScrapeRun,
+  createShortlist,
+  deleteReview,
+  deleteReviewsByPlace,
+  deleteShortlist,
+  getReview,
+  getScrapeRun,
+  getShortlist,
+  getShortlistEntry,
+  linkPlaceToScrapeRun,
+  listPlaceScrapeRuns,
+  listReviews,
+  listShortlistEntries,
+  listShortlists,
+  removeShortlistEntry,
+  truncateAllTables,
+  unlinkPlaceFromScrapeRun,
+  updateScrapeRun,
+  updateShortlist,
+  updateShortlistEntryNotes,
+} = await import('../src/db/index.js')
 const { appRuntime } = await import('../src/runtime.js')
 const {
   resetScrapeRouteStateForTests,
@@ -466,6 +491,194 @@ describe('placeholder routers', () => {
     const res = await request(app).get('/api/shortlists')
     expect(res.status).toBe(200)
     expect(res.body).toEqual([])
+  })
+})
+
+describe('test support API', () => {
+  beforeEach(async () => {
+    resetScrapeRouteStateForTests()
+    await appRuntime.runPromise(truncateAllTables())
+  })
+
+  it('POST /api/test/reset-db truncates persisted fixtures', async () => {
+    const project = await request(app)
+      .post('/api/projects')
+      .send({
+        name: 'Reset Fixtures Project',
+        bounds: JSON.stringify({
+          sw: { lat: 39.0, lng: 8.0 },
+          ne: { lat: 39.2, lng: 8.2 },
+        }),
+      })
+    expect(project.status).toBe(201)
+
+    const seeded = await request(app)
+      .post('/api/test/seed-fixtures')
+      .send({
+        existingProjectId: project.body.id as string,
+        project: {
+          name: 'Ignored Name',
+          bounds: JSON.stringify({
+            sw: { lat: 39.0, lng: 8.0 },
+            ne: { lat: 39.2, lng: 8.2 },
+          }),
+        },
+        scrapeRun: {
+          query: 'seed query',
+          status: 'completed',
+          tilesTotal: 1,
+          tilesCompleted: 1,
+          placesFound: 1,
+          placesUnique: 1,
+        },
+        places: [
+          {
+            id: 'seed-place-1',
+            googleMapsUri: 'https://maps.google.com/?cid=seed-place-1',
+            name: 'Seed Place 1',
+            lat: 39.11,
+            lng: 8.11,
+          },
+        ],
+      })
+    expect(seeded.status).toBe(201)
+    expect(seeded.body.projectId).toBe(project.body.id)
+
+    const reset = await request(app).post('/api/test/reset-db').send({})
+    expect(reset.status).toBe(204)
+
+    const projects = await request(app).get('/api/projects')
+    expect(projects.status).toBe(200)
+    expect(projects.body).toEqual([])
+  })
+
+  it('POST /api/test/seed-fixtures validates payloads', async () => {
+    const response = await request(app)
+      .post('/api/test/seed-fixtures')
+      .send({
+        project: {
+          name: 'Invalid Fixtures',
+          bounds: 42,
+        },
+      })
+
+    expect(response.status).toBe(400)
+    expect(response.body.error).toBe('Invalid fixture payload for /api/test/seed-fixtures')
+  })
+})
+
+describe('db modules', () => {
+  beforeEach(async () => {
+    await appRuntime.runPromise(truncateAllTables())
+  })
+
+  it('covers shortlist lifecycle and not-found paths', async () => {
+    const project = await appRuntime.runPromise(createProject('Shortlist Project'))
+    const shortlist = await appRuntime.runPromise(createShortlist(project.id, 'Favorites'))
+    expect(shortlist.projectId).toBe(project.id)
+    expect(shortlist.name).toBe('Favorites')
+
+    const fetchedShortlist = await appRuntime.runPromise(getShortlist(shortlist.id))
+    expect(fetchedShortlist.id).toBe(shortlist.id)
+
+    const listedShortlists = await appRuntime.runPromise(listShortlists(project.id))
+    expect(listedShortlists).toHaveLength(1)
+    expect(listedShortlists[0].id).toBe(shortlist.id)
+
+    const updatedShortlist = await appRuntime.runPromise(updateShortlist(shortlist.id, 'Top Picks'))
+    expect(updatedShortlist.name).toBe('Top Picks')
+
+    await expect(appRuntime.runPromise(getShortlist(randomUUID()))).rejects.toBeDefined()
+
+    const place = await appRuntime.runPromise(
+      createPlace({
+        id: 'shortlist-place-1',
+        googleMapsUri: 'https://maps.google.com/?cid=shortlist-place-1',
+        name: 'Shortlist Place 1',
+        lat: 40.12,
+        lng: 9.12,
+      })
+    )
+
+    const createdEntry = await appRuntime.runPromise(addShortlistEntry(shortlist.id, place.id))
+    expect(createdEntry.notes).toBe('')
+
+    const fetchedEntry = await appRuntime.runPromise(getShortlistEntry(shortlist.id, place.id))
+    expect(fetchedEntry.placeId).toBe(place.id)
+
+    const listedEntries = await appRuntime.runPromise(listShortlistEntries(shortlist.id))
+    expect(listedEntries).toHaveLength(1)
+
+    const updatedEntry = await appRuntime.runPromise(
+      updateShortlistEntryNotes(shortlist.id, place.id, 'Has pool and parking')
+    )
+    expect(updatedEntry.notes).toBe('Has pool and parking')
+
+    await expect(appRuntime.runPromise(getShortlistEntry(shortlist.id, randomUUID()))).rejects.toBeDefined()
+
+    await expect(
+      appRuntime.runPromise(updateShortlistEntryNotes(shortlist.id, randomUUID(), 'Missing entry'))
+    ).rejects.toBeDefined()
+
+    expect(await appRuntime.runPromise(removeShortlistEntry(shortlist.id, place.id))).toBe(true)
+    expect(await appRuntime.runPromise(removeShortlistEntry(shortlist.id, place.id))).toBe(false)
+
+    expect(await appRuntime.runPromise(deleteShortlist(shortlist.id))).toBe(true)
+    expect(await appRuntime.runPromise(deleteShortlist(shortlist.id))).toBe(false)
+  })
+
+  it('covers review and place-scrape-run lifecycle functions', async () => {
+    const project = await appRuntime.runPromise(createProject('Review Project'))
+    const scrapeRun = await appRuntime.runPromise(createScrapeRun(project.id, 'boutique hotels'))
+    const place = await appRuntime.runPromise(
+      createPlace({
+        id: 'review-place-1',
+        googleMapsUri: 'https://maps.google.com/?cid=review-place-1',
+        name: 'Review Place 1',
+        lat: 41.21,
+        lng: 10.31,
+      })
+    )
+
+    await appRuntime.runPromise(linkPlaceToScrapeRun(place.id, scrapeRun.id))
+    await appRuntime.runPromise(linkPlaceToScrapeRun(place.id, scrapeRun.id))
+
+    const links = await appRuntime.runPromise(listPlaceScrapeRuns(scrapeRun.id))
+    expect(links).toHaveLength(1)
+    expect(links[0]).toEqual({
+      placeId: place.id,
+      scrapeRunId: scrapeRun.id,
+    })
+
+    expect(await appRuntime.runPromise(unlinkPlaceFromScrapeRun(place.id, scrapeRun.id))).toBe(true)
+    expect(await appRuntime.runPromise(unlinkPlaceFromScrapeRun(place.id, scrapeRun.id))).toBe(false)
+
+    const reviewOne = await appRuntime.runPromise(createReview(place.id, 5, 'Amazing stay'))
+    const reviewTwo = await appRuntime.runPromise(createReview(place.id, 4, 'Great location', '1 week ago'))
+    expect(reviewTwo.relativeDate).toBe('1 week ago')
+
+    const fetchedReview = await appRuntime.runPromise(getReview(reviewOne.id))
+    expect(fetchedReview.text).toBe('Amazing stay')
+
+    const reviews = await appRuntime.runPromise(listReviews(place.id))
+    expect(reviews).toHaveLength(2)
+
+    expect(await appRuntime.runPromise(deleteReview(reviewOne.id))).toBe(true)
+    expect(await appRuntime.runPromise(deleteReview(reviewOne.id))).toBe(false)
+
+    expect(await appRuntime.runPromise(deleteReviewsByPlace(place.id))).toBe(1)
+
+    await expect(appRuntime.runPromise(getReview(reviewOne.id))).rejects.toBeDefined()
+  })
+
+  it('returns current run when scrape run updates are empty', async () => {
+    const project = await appRuntime.runPromise(createProject('No-op Update Project'))
+    const scrapeRun = await appRuntime.runPromise(createScrapeRun(project.id, 'no-op query'))
+
+    const unchangedRun = await appRuntime.runPromise(updateScrapeRun(scrapeRun.id, {}))
+    expect(unchangedRun.id).toBe(scrapeRun.id)
+    expect(unchangedRun.query).toBe('no-op query')
+    expect(unchangedRun.status).toBe('pending')
   })
 })
 
