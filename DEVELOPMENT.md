@@ -23,6 +23,22 @@ The project is built incrementally via a Ralph loop: an AI coding agent picks on
 while :; do amp -x < prompt.md; done
 ```
 
+### E2E Test Modes
+
+```bash
+# Default deterministic E2E suite (fixtures + test backdoor)
+npm run test:e2e --workspace=client
+
+# Live scrape E2E smoke test (hits real Google Places API)
+E2E_LIVE_SCRAPE=1 npm run test:e2e --workspace=client -- client/e2e/tests/live-scrape.spec.ts
+```
+
+Live scrape notes:
+- The live scrape test starts from an empty DB state (the Playwright base fixture resets DB via `POST /api/test/reset-db` before each test).
+- It performs a real `POST /api/scrape/start` run on a very small bounding box and waits for terminal status.
+- `E2E_LIVE_SCRAPE` is opt-in so the default suite remains deterministic and does not depend on external APIs.
+- Use a server-side key for Places API (`GOOGLE_PLACES_API_KEY`) that is not HTTP-referrer restricted.
+
 ## Project structure (target)
 
 ```

@@ -140,7 +140,7 @@ const fetchJson = <T>(url: string, init: RequestInit): Effect.Effect<T, ScrapeEr
       const response = await fetch(url, init)
       if (!response.ok) {
         const body = await response.text().catch(() => '')
-        throw new Error(`Places API request failed (${response.status}): ${body}`)
+        throw new Error(derivePlacesApiErrorMessage(response.status, body))
       }
       return (await response.json()) as T
     },
@@ -152,11 +152,24 @@ const fetchJson = <T>(url: string, init: RequestInit): Effect.Effect<T, ScrapeEr
   })
 
 const getApiKey = (): string => {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) {
-    throw new ScrapeError({ message: 'GOOGLE_MAPS_API_KEY is not set' })
+    throw new ScrapeError({
+      message: 'Missing Places API key. Set GOOGLE_PLACES_API_KEY (preferred) or GOOGLE_MAPS_API_KEY.',
+    })
   }
   return apiKey
+}
+
+const derivePlacesApiErrorMessage = (status: number, body: string): string => {
+  if (status === 403 && body.includes('API_KEY_HTTP_REFERRER_BLOCKED')) {
+    return [
+      'Places API request failed (403): API key is HTTP-referrer restricted, but server-side requests have no referrer.',
+      'Use a dedicated server key in GOOGLE_PLACES_API_KEY with Places API enabled and no HTTP referrer restriction (IP restriction is fine).',
+    ].join(' ')
+  }
+
+  return `Places API request failed (${status}): ${body}`
 }
 
 const parsePlace = (place: PlaceResult, apiKey: string): ParsedPlace => {

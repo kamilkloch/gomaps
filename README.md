@@ -25,12 +25,17 @@ cp .env.example .env
 # Edit .env and add your Google Maps API key
 ```
 
-The `.env` file needs two entries (both use the same key):
+The `.env` file should define separate server and browser keys:
 
 ```
-GOOGLE_MAPS_API_KEY=your_key_here
-VITE_GOOGLE_MAPS_API_KEY=your_key_here
+GOOGLE_PLACES_API_KEY=your_server_key_here
+VITE_GOOGLE_MAPS_API_KEY=your_browser_key_here
 ```
+
+Notes:
+- `GOOGLE_PLACES_API_KEY` is used by the server for Places API HTTP calls and should not be HTTP-referrer restricted (IP restrictions are OK).
+- `VITE_GOOGLE_MAPS_API_KEY` is used in the browser for Maps JavaScript and can be HTTP-referrer restricted to localhost.
+- `GOOGLE_MAPS_API_KEY` is still supported by the server as a fallback when `GOOGLE_PLACES_API_KEY` is unset.
 
 ### Running locally
 
