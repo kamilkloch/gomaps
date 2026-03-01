@@ -8,7 +8,7 @@ You are an autonomous coding agent working on the GoMaps project.
 2. Read the progress log at `progress.txt` (check Codebase Patterns section first)
 3. Read the specification at `SPEC.md` and implementation guide at `DEVELOPMENT.md`
 4. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
-5. Pick the **highest priority** user story where `passes: false`
+5. Pick the **highest priority** user story where `passes: false` (unfinished task with the lowest priority value (negative values are allowed) wins
 6. Implement that single user story
 7. Run quality checks: `npm run typecheck --workspace=server`, `npm run typecheck --workspace=client`, `npm test --workspace=server`
 8. Update AGENTS.md files if you discover reusable patterns
