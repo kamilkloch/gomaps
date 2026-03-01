@@ -585,6 +585,9 @@ a {
       rgba(73, 146, 206, 0.85) 20px
     );
   background-size: 28px 28px;
+}
+
+.setup-progress-fill.is-running {
   animation: setup-progress-stripes 1.2s linear infinite;
 }
 

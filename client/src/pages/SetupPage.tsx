@@ -409,8 +409,11 @@ export function SetupPage() {
   const mapCenter = selectionBounds ? getBoundsCenter(selectionBounds) : FALLBACK_CENTER
   const estimate = selectionBounds ? estimateScrape(selectionBounds) : null
   const isRunActive = progress?.status === 'running' || progress?.status === 'paused'
+  const effectiveCompletedTiles = progress
+    ? Math.min(progress.tilesTotal, progress.tilesCompleted + progress.tilesSubdivided)
+    : 0
   const progressPercent = progress && progress.tilesTotal > 0
-    ? Math.round((progress.tilesCompleted / progress.tilesTotal) * 100)
+    ? Math.round((effectiveCompletedTiles / progress.tilesTotal) * 100)
     : 0
   const estimatedRemaining = progress
     ? estimateRemaining(progress)
@@ -569,7 +572,10 @@ export function SetupPage() {
               </div>
 
               <div className="setup-progress-track" data-testid="setup-progress-track" role="progressbar" aria-valuenow={progressPercent}>
-                <div className="setup-progress-fill" style={{ width: `${progressPercent}%` }} />
+                <div
+                  className={`setup-progress-fill ${progress.status === 'running' ? 'is-running' : ''}`}
+                  style={{ width: `${progressPercent}%` }}
+                />
               </div>
 
               <p className="setup-progress-stats">
