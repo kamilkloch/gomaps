@@ -1,34 +1,29 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { Db } from './Db.js'
+import { tryDb } from './effect-helpers.js'
 import type { ScrapeRun } from './types.js'
 import { DbError, NotFoundError } from '../errors.js'
 
 export const createScrapeRun = (projectId: string, query: string): Effect.Effect<ScrapeRun, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('create scrape run', () => {
         const id = randomUUID()
         db.prepare(
           'INSERT INTO scrape_runs (id, project_id, query) VALUES (?, ?, ?)'
         ).run(id, projectId, query)
         const row = db.prepare('SELECT * FROM scrape_runs WHERE id = ?').get(id) as Record<string, unknown>
         return mapScrapeRun(row)
-      },
-      catch: (e) => new DbError({ message: `Failed to create scrape run: ${String(e)}`, cause: e }),
     })
   )
 
 export const getScrapeRun = (id: string): Effect.Effect<ScrapeRun, DbError | NotFoundError, Db> =>
   Effect.gen(function* () {
     const { db } = yield* Db
-    const row = yield* Effect.try({
-      try: () =>
+    const row = yield* tryDb('get scrape run', () =>
         db.prepare('SELECT * FROM scrape_runs WHERE id = ?').get(id) as
           | Record<string, unknown>
-          | undefined,
-      catch: (e) => new DbError({ message: `Failed to get scrape run: ${String(e)}`, cause: e }),
-    })
+          | undefined)
     if (!row) {
       return yield* Effect.fail(new NotFoundError({ entity: 'ScrapeRun', id }))
     }
@@ -37,14 +32,11 @@ export const getScrapeRun = (id: string): Effect.Effect<ScrapeRun, DbError | Not
 
 export const listScrapeRuns = (projectId: string): Effect.Effect<ScrapeRun[], DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('list scrape runs', () => {
         const rows = db
           .prepare('SELECT * FROM scrape_runs WHERE project_id = ? ORDER BY started_at DESC')
           .all(projectId) as Record<string, unknown>[]
         return rows.map(mapScrapeRun)
-      },
-      catch: (e) => new DbError({ message: `Failed to list scrape runs: ${String(e)}`, cause: e }),
     })
   )
 
@@ -77,23 +69,17 @@ export const updateScrapeRun = (
 
     if (sets.length === 0) return yield* getScrapeRun(id)
     values.push(id)
-    yield* Effect.try({
-      try: () => {
+    yield* tryDb('update scrape run', () => {
         db.prepare(`UPDATE scrape_runs SET ${sets.join(', ')} WHERE id = ?`).run(...values)
-      },
-      catch: (e) => new DbError({ message: `Failed to update scrape run: ${String(e)}`, cause: e }),
     })
     return yield* getScrapeRun(id)
   })
 
 export const deleteScrapeRun = (id: string): Effect.Effect<boolean, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('delete scrape run', () => {
         const result = db.prepare('DELETE FROM scrape_runs WHERE id = ?').run(id)
         return result.changes > 0
-      },
-      catch: (e) => new DbError({ message: `Failed to delete scrape run: ${String(e)}`, cause: e }),
     })
   )
 

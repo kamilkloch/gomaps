@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { Db } from './Db.js'
+import { tryDb } from './effect-helpers.js'
 import type { Review } from './types.js'
 import { DbError, NotFoundError } from '../errors.js'
 
@@ -11,29 +12,23 @@ export const createReview = (
   relativeDate?: string
 ): Effect.Effect<Review, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('create review', () => {
         const id = randomUUID()
         db.prepare(
           'INSERT INTO reviews (id, place_id, rating, text, relative_date) VALUES (?, ?, ?, ?, ?)'
         ).run(id, placeId, rating, text, relativeDate ?? null)
         const row = db.prepare('SELECT * FROM reviews WHERE id = ?').get(id) as Record<string, unknown>
         return mapReview(row)
-      },
-      catch: (e) => new DbError({ message: `Failed to create review: ${String(e)}`, cause: e }),
     })
   )
 
 export const getReview = (id: string): Effect.Effect<Review, DbError | NotFoundError, Db> =>
   Effect.gen(function* () {
     const { db } = yield* Db
-    const row = yield* Effect.try({
-      try: () =>
+    const row = yield* tryDb('get review', () =>
         db.prepare('SELECT * FROM reviews WHERE id = ?').get(id) as
           | Record<string, unknown>
-          | undefined,
-      catch: (e) => new DbError({ message: `Failed to get review: ${String(e)}`, cause: e }),
-    })
+          | undefined)
     if (!row) {
       return yield* Effect.fail(new NotFoundError({ entity: 'Review', id }))
     }
@@ -42,36 +37,27 @@ export const getReview = (id: string): Effect.Effect<Review, DbError | NotFoundE
 
 export const listReviews = (placeId: string): Effect.Effect<Review[], DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('list reviews', () => {
         const rows = db
           .prepare('SELECT * FROM reviews WHERE place_id = ?')
           .all(placeId) as Record<string, unknown>[]
         return rows.map(mapReview)
-      },
-      catch: (e) => new DbError({ message: `Failed to list reviews: ${String(e)}`, cause: e }),
     })
   )
 
 export const deleteReview = (id: string): Effect.Effect<boolean, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('delete review', () => {
         const result = db.prepare('DELETE FROM reviews WHERE id = ?').run(id)
         return result.changes > 0
-      },
-      catch: (e) => new DbError({ message: `Failed to delete review: ${String(e)}`, cause: e }),
     })
   )
 
 export const deleteReviewsByPlace = (placeId: string): Effect.Effect<number, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('delete reviews', () => {
         const result = db.prepare('DELETE FROM reviews WHERE place_id = ?').run(placeId)
         return result.changes
-      },
-      catch: (e) => new DbError({ message: `Failed to delete reviews: ${String(e)}`, cause: e }),
     })
   )
 

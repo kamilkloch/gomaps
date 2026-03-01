@@ -1,34 +1,29 @@
 import { randomUUID } from 'node:crypto'
 import { Effect } from 'effect'
 import { Db } from './Db.js'
+import { tryDb } from './effect-helpers.js'
 import type { Shortlist, ShortlistEntry } from './types.js'
 import { DbError, NotFoundError } from '../errors.js'
 
 export const createShortlist = (projectId: string, name: string): Effect.Effect<Shortlist, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('create shortlist', () => {
         const id = randomUUID()
         db.prepare(
           'INSERT INTO shortlists (id, project_id, name) VALUES (?, ?, ?)'
         ).run(id, projectId, name)
         const row = db.prepare('SELECT * FROM shortlists WHERE id = ?').get(id) as Record<string, unknown>
         return mapShortlist(row)
-      },
-      catch: (e) => new DbError({ message: `Failed to create shortlist: ${String(e)}`, cause: e }),
     })
   )
 
 export const getShortlist = (id: string): Effect.Effect<Shortlist, DbError | NotFoundError, Db> =>
   Effect.gen(function* () {
     const { db } = yield* Db
-    const row = yield* Effect.try({
-      try: () =>
+    const row = yield* tryDb('get shortlist', () =>
         db.prepare('SELECT * FROM shortlists WHERE id = ?').get(id) as
           | Record<string, unknown>
-          | undefined,
-      catch: (e) => new DbError({ message: `Failed to get shortlist: ${String(e)}`, cause: e }),
-    })
+          | undefined)
     if (!row) {
       return yield* Effect.fail(new NotFoundError({ entity: 'Shortlist', id }))
     }
@@ -37,37 +32,26 @@ export const getShortlist = (id: string): Effect.Effect<Shortlist, DbError | Not
 
 export const listShortlists = (projectId: string): Effect.Effect<Shortlist[], DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('list shortlists', () => {
         const rows = db
           .prepare('SELECT * FROM shortlists WHERE project_id = ?')
           .all(projectId) as Record<string, unknown>[]
         return rows.map(mapShortlist)
-      },
-      catch: (e) => new DbError({ message: `Failed to list shortlists: ${String(e)}`, cause: e }),
     })
   )
 
 export const updateShortlist = (id: string, name: string): Effect.Effect<Shortlist, DbError | NotFoundError, Db> =>
   Effect.gen(function* () {
     const { db } = yield* Db
-    yield* Effect.try({
-      try: () => {
-        db.prepare('UPDATE shortlists SET name = ? WHERE id = ?').run(name, id)
-      },
-      catch: (e) => new DbError({ message: `Failed to update shortlist: ${String(e)}`, cause: e }),
-    })
+    yield* tryDb('update shortlist', () => db.prepare('UPDATE shortlists SET name = ? WHERE id = ?').run(name, id))
     return yield* getShortlist(id)
   })
 
 export const deleteShortlist = (id: string): Effect.Effect<boolean, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('delete shortlist', () => {
         const result = db.prepare('DELETE FROM shortlists WHERE id = ?').run(id)
         return result.changes > 0
-      },
-      catch: (e) => new DbError({ message: `Failed to delete shortlist: ${String(e)}`, cause: e }),
     })
   )
 
@@ -77,8 +61,7 @@ export const addShortlistEntry = (
   notes?: string
 ): Effect.Effect<ShortlistEntry, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('add shortlist entry', () => {
         db.prepare(
           'INSERT OR REPLACE INTO shortlist_entries (shortlist_id, place_id, notes) VALUES (?, ?, ?)'
         ).run(shortlistId, placeId, notes ?? '')
@@ -86,8 +69,6 @@ export const addShortlistEntry = (
           .prepare('SELECT * FROM shortlist_entries WHERE shortlist_id = ? AND place_id = ?')
           .get(shortlistId, placeId) as Record<string, unknown>
         return mapShortlistEntry(row)
-      },
-      catch: (e) => new DbError({ message: `Failed to add shortlist entry: ${String(e)}`, cause: e }),
     })
   )
 
@@ -97,13 +78,10 @@ export const getShortlistEntry = (
 ): Effect.Effect<ShortlistEntry, DbError | NotFoundError, Db> =>
   Effect.gen(function* () {
     const { db } = yield* Db
-    const row = yield* Effect.try({
-      try: () =>
+    const row = yield* tryDb('get shortlist entry', () =>
         db
           .prepare('SELECT * FROM shortlist_entries WHERE shortlist_id = ? AND place_id = ?')
-          .get(shortlistId, placeId) as Record<string, unknown> | undefined,
-      catch: (e) => new DbError({ message: `Failed to get shortlist entry: ${String(e)}`, cause: e }),
-    })
+          .get(shortlistId, placeId) as Record<string, unknown> | undefined)
     if (!row) {
       return yield* Effect.fail(new NotFoundError({ entity: 'ShortlistEntry', id: `${shortlistId}/${placeId}` }))
     }
@@ -112,14 +90,11 @@ export const getShortlistEntry = (
 
 export const listShortlistEntries = (shortlistId: string): Effect.Effect<ShortlistEntry[], DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('list shortlist entries', () => {
         const rows = db
           .prepare('SELECT * FROM shortlist_entries WHERE shortlist_id = ?')
           .all(shortlistId) as Record<string, unknown>[]
         return rows.map(mapShortlistEntry)
-      },
-      catch: (e) => new DbError({ message: `Failed to list shortlist entries: ${String(e)}`, cause: e }),
     })
   )
 
@@ -130,27 +105,21 @@ export const updateShortlistEntryNotes = (
 ): Effect.Effect<ShortlistEntry, DbError | NotFoundError, Db> =>
   Effect.gen(function* () {
     const { db } = yield* Db
-    yield* Effect.try({
-      try: () => {
+    yield* tryDb('update shortlist entry notes', () => {
         db.prepare(
           'UPDATE shortlist_entries SET notes = ? WHERE shortlist_id = ? AND place_id = ?'
         ).run(notes, shortlistId, placeId)
-      },
-      catch: (e) => new DbError({ message: `Failed to update shortlist entry notes: ${String(e)}`, cause: e }),
     })
     return yield* getShortlistEntry(shortlistId, placeId)
   })
 
 export const removeShortlistEntry = (shortlistId: string, placeId: string): Effect.Effect<boolean, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('remove shortlist entry', () => {
         const result = db
           .prepare('DELETE FROM shortlist_entries WHERE shortlist_id = ? AND place_id = ?')
           .run(shortlistId, placeId)
         return result.changes > 0
-      },
-      catch: (e) => new DbError({ message: `Failed to remove shortlist entry: ${String(e)}`, cause: e }),
     })
   )
 

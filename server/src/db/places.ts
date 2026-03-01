@@ -1,5 +1,6 @@
 import { Effect } from 'effect'
 import { Db } from './Db.js'
+import { tryDb } from './effect-helpers.js'
 import type { Place } from './types.js'
 import { DbError, NotFoundError } from '../errors.js'
 
@@ -24,8 +25,7 @@ export interface CreatePlaceInput {
 
 export const createPlace = (input: CreatePlaceInput): Effect.Effect<Place, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('create place', () => {
         db.prepare(`
           INSERT INTO places (id, google_maps_uri, name, category, rating, review_count, price_level, phone, website, website_type, address, lat, lng, photo_urls, opening_hours, amenities)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -49,21 +49,16 @@ export const createPlace = (input: CreatePlaceInput): Effect.Effect<Place, DbErr
         )
         const row = db.prepare('SELECT * FROM places WHERE id = ?').get(input.id) as Record<string, unknown>
         return mapPlace(row)
-      },
-      catch: (e) => new DbError({ message: `Failed to create place: ${String(e)}`, cause: e }),
     })
   )
 
 export const getPlace = (id: string): Effect.Effect<Place, DbError | NotFoundError, Db> =>
   Effect.gen(function* () {
     const { db } = yield* Db
-    const row = yield* Effect.try({
-      try: () =>
+    const row = yield* tryDb('get place', () =>
         db.prepare('SELECT * FROM places WHERE id = ?').get(id) as
           | Record<string, unknown>
-          | undefined,
-      catch: (e) => new DbError({ message: `Failed to get place: ${String(e)}`, cause: e }),
-    })
+          | undefined)
     if (!row) {
       return yield* Effect.fail(new NotFoundError({ entity: 'Place', id }))
     }
@@ -72,8 +67,7 @@ export const getPlace = (id: string): Effect.Effect<Place, DbError | NotFoundErr
 
 export const listPlaces = (projectId?: string): Effect.Effect<Place[], DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('list places', () => {
         if (projectId) {
           const rows = db
             .prepare(
@@ -88,8 +82,6 @@ export const listPlaces = (projectId?: string): Effect.Effect<Place[], DbError, 
         }
         const rows = db.prepare('SELECT * FROM places ORDER BY name').all() as Record<string, unknown>[]
         return rows.map(mapPlace)
-      },
-      catch: (e) => new DbError({ message: `Failed to list places: ${String(e)}`, cause: e }),
     })
   )
 
@@ -136,23 +128,17 @@ export const updatePlace = (
 
     if (sets.length === 0) return yield* getPlace(id)
     values.push(id)
-    yield* Effect.try({
-      try: () => {
+    yield* tryDb('update place', () => {
         db.prepare(`UPDATE places SET ${sets.join(', ')} WHERE id = ?`).run(...values)
-      },
-      catch: (e) => new DbError({ message: `Failed to update place: ${String(e)}`, cause: e }),
     })
     return yield* getPlace(id)
   })
 
 export const deletePlace = (id: string): Effect.Effect<boolean, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
-    Effect.try({
-      try: () => {
+    tryDb('delete place', () => {
         const result = db.prepare('DELETE FROM places WHERE id = ?').run(id)
         return result.changes > 0
-      },
-      catch: (e) => new DbError({ message: `Failed to delete place: ${String(e)}`, cause: e }),
     })
   )
 
