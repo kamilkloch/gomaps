@@ -17,6 +17,8 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Setup | Query input keyboard editing | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | `Start Scrape` action | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | Run list selection context + `Pause` control | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Setup + Explorer | Real scrape launched from Setup UI and reflected in Explorer table count | `live-scrape.spec.ts` → `setup UI launches live scrape and explorer reflects persisted results` |
+| Setup + Backend | Legacy SQLite schema (`places.google_url`) auto-migration before real scrape writes | `live-scrape.spec.ts` → `migrates legacy places schema and persists scraped places`; `server/tests/db.test.ts` migration case |
 | Explorer | Project selector dropdown | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | Header search input | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | `Filters` button | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |

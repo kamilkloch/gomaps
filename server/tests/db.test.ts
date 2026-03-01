@@ -51,6 +51,72 @@ describe('schema', () => {
     const result = db.pragma('foreign_keys') as { foreign_keys: number }[]
     expect(result[0].foreign_keys).toBe(1)
   })
+
+  it('migrates legacy places.google_url schema to places.google_maps_uri', () => {
+    db.exec('DROP TABLE places')
+    db.exec(`
+      CREATE TABLE places (
+        id TEXT PRIMARY KEY,
+        google_url TEXT NOT NULL,
+        name TEXT NOT NULL,
+        category TEXT,
+        rating REAL,
+        review_count INTEGER,
+        price_level TEXT,
+        phone TEXT,
+        website TEXT,
+        website_type TEXT NOT NULL DEFAULT 'unknown',
+        address TEXT,
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        photo_urls TEXT NOT NULL DEFAULT '[]',
+        opening_hours TEXT,
+        amenities TEXT NOT NULL DEFAULT '[]',
+        scraped_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `)
+    db.prepare(`
+      INSERT INTO places (
+        id,
+        google_url,
+        name,
+        lat,
+        lng
+      )
+      VALUES (?, ?, ?, ?, ?)
+    `).run('legacy-place', 'https://maps.google.com/?cid=legacy', 'Legacy Place', 39.2, 9.1)
+    db.close()
+    db = createDatabase(dbPath)
+
+    const columns = db
+      .prepare('PRAGMA table_info(places)')
+      .all() as Array<{ name: string }>
+    const columnNames = columns.map((column) => column.name)
+    expect(columnNames).toContain('google_maps_uri')
+    expect(columnNames).not.toContain('google_url')
+
+    const legacyRow = db.prepare('SELECT * FROM places WHERE id = ?').get('legacy-place') as Record<string, unknown>
+    expect(legacyRow.google_maps_uri).toBe('https://maps.google.com/?cid=legacy')
+
+    const placeScrapeRunForeignKeys = db
+      .prepare('PRAGMA foreign_key_list(place_scrape_runs)')
+      .all() as Array<{ table: string }>
+    expect(placeScrapeRunForeignKeys.some((foreignKey) => foreignKey.table === 'places')).toBe(true)
+
+    db.prepare(`
+      INSERT INTO places (
+        id,
+        google_maps_uri,
+        name,
+        lat,
+        lng
+      )
+      VALUES (?, ?, ?, ?, ?)
+    `).run('new-place', 'https://maps.google.com/?cid=new', 'New Place', 39.3, 9.2)
+
+    const insertedRow = db.prepare('SELECT * FROM places WHERE id = ?').get('new-place') as Record<string, unknown>
+    expect(insertedRow.google_maps_uri).toBe('https://maps.google.com/?cid=new')
+  })
 })
 
 describe('project CRUD', () => {
