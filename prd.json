@@ -676,8 +676,8 @@
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": -2,
-      "passes": false,
-      "notes": "Part 7 of 7 E2E story-board expansion. Add to a new spec file (e.g., error-resilience.spec.ts). Use page.route() mocking for API failure scenarios."
+      "passes": true,
+      "notes": "Completed with `client/e2e/tests/error-resilience.spec.ts` covering API 500 handling (Projects/Explorer/Setup start), deferred-route bounds save timeout UI, cross-project place isolation, concurrent run switching on Setup, cascading delete verification via API, favorite toggle-off regression, and Explorer sort stability/direction toggle assertions."
     }
   ]
 }

@@ -30,6 +30,7 @@
 - **Playwright fixture seeding:** `POST /api/test/seed-fixtures` accepts optional `existingProjectId` to append runs/tiles/places onto an existing seeded project; use this to create mixed run histories for cross-view regressions.
 - **Playwright env loading:** Parse root `.env` in `client/playwright.config.ts` before web server startup so both `VITE_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` flow into client/server e2e processes consistently.
 - **Playwright waits on SSE pages:** Avoid `networkidle` waits on Setup-like pages with long-lived SSE requests; wait for deterministic UI locators/state transitions instead.
+- **Playwright pending-request UI assertions:** For loading-state copy tied to slow API responses (e.g., "Saving bounds…"), block the matching `page.route` fulfillment with a deferred promise, assert the temporary UI state, then resolve the request.
 - **Playwright map debug snapshots:** For map overlays/markers, expose Playwright-only hidden JSON snapshots (gated by `VITE_E2E_TEST_MODE`) and assert those snapshots instead of brittle `.gm-style` internals.
 - **Explorer map interaction E2E hooks:** For marker-click/map-click/zoom tests, expose a Playwright-only map controller (`window.__gomapsExplorerDebug`) plus hidden snapshots (`explorer-marker-debug`, `explorer-cluster-debug`, `explorer-selection-circle-debug`) instead of probing Google Maps DOM internals.
 - **SQLite timestamp ordering:** When listing rows by timestamp fields (`created_at`, etc.), add a deterministic tie-breaker (`rowid DESC`) so rapid same-second inserts keep stable ordering in UI tests and cards.
@@ -407,4 +408,15 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - Route-focused E2E stories are most stable when they assert semantic landmarks (`main`, named regions) and deterministic `data-testid` hooks together.
   - For keyboard accessibility checks, Tab-driven focus + `toHaveCSS` outline assertions catch regressions in focus-visible styling that click-only tests miss.
   - Keeping Setup map and controls panels explicitly labeled as regions aligns accessibility intent with Playwright locator resilience.
+---
+## 2026-03-02 00:01:33 CET - US-E2E-07
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Added `client/e2e/tests/error-resilience.spec.ts` with 10 Playwright story-board tests for API failure handling (`/api/projects`, `/api/places`, `/api/scrape/start`), pending bounds-save UI state (`Saving bounds…`), multi-project Explorer isolation, concurrent running-run switching in Setup, cascading delete verification, favorite toggle-off behavior, and Explorer sort stability/direction toggles.
+- Updated `AGENTS.md` and `progress.txt` Codebase Patterns with a reusable deferred-route pattern for asserting pending-request loading copy without hardcoded sleeps.
+- Ran quality gates and full E2E: `npm run typecheck --workspace=server`, `npm run typecheck --workspace=client`, `npm test --workspace=server`, `npm run test:e2e --workspace=client` (49 passed, 3 skipped).
+- Files changed: `client/e2e/tests/error-resilience.spec.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For transient loading states tied to slow APIs, defer `page.route()` fulfillment and assert the in-flight copy before resolving the request.
+  - Keep resilience scenarios in their own E2E spec so failure-mode regressions stay isolated from happy-path suites.
+  - For sort regressions, pair indicator assertions (`↑`/`↓`) with row-order snapshots to verify both visual affordance and data behavior.
 ---

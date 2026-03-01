@@ -150,6 +150,7 @@ Do NOT use XPath or fragile CSS selectors (e.g., `div > span:nth-child(2)`). You
 React batches state updates. You must never assume an action resolves instantly.
 * **Never use hardcoded sleeps** (e.g., `page.waitForTimeout(5000)`).
 * **Wait for state:** After clicking or typing, wait for the specific visual change to appear in the DOM using `await expect(locator).toBeVisible()` or wait for the network to settle using `await page.waitForLoadState('networkidle')`.
+* **Pending-request states:** To verify temporary loading copy (e.g., "Saving bounds…"), hold the matching `page.route()` response behind a deferred promise, assert the loading UI, then resolve the request.
 
 
 ### 3. Visual Verification Mechanisms
