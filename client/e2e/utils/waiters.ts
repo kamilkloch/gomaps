@@ -60,3 +60,29 @@ export async function panGoogleMap(page: Page, mapShellTestId: string): Promise<
   await page.mouse.move(endX, endY)
   await page.mouse.up()
 }
+
+export async function getGoogleMapCenter(
+  page: Page,
+  mapShellTestId: string,
+): Promise<{ lat: number; lng: number }> {
+  return page.evaluate((testId) => {
+    const shell = document.querySelector(`[data-testid="${testId}"]`)
+    if (!shell) {
+      throw new Error(`Map shell [data-testid="${testId}"] not found`)
+    }
+    const gmStyle = shell.querySelector('.gm-style') as HTMLElement | null
+    if (!gmStyle) {
+      throw new Error('No .gm-style element found inside map shell')
+    }
+    // The __gm property on the .gm-style div holds the internal map reference
+    const internal = (gmStyle as unknown as Record<string, unknown>).__gm as
+      | { get: (key: string) => google.maps.Map | undefined }
+      | undefined
+    const mapInstance = internal?.get?.('map')
+    if (!mapInstance) {
+      throw new Error('Unable to locate google.maps.Map instance')
+    }
+    const center = mapInstance.getCenter()!
+    return { lat: center.lat(), lng: center.lng() }
+  }, mapShellTestId)
+}

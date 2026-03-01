@@ -3,7 +3,7 @@ import { createProjectsPage } from '../pages/projects-page'
 import { createSetupPage } from '../pages/setup-page'
 import { captureStepScreenshot } from '../utils/screenshots'
 import { seedFixtures } from '../utils/test-backdoor'
-import { expectGoogleMapHasContent, expectGoogleMapRendered, panGoogleMap } from '../utils/waiters'
+import { expectGoogleMapHasContent, expectGoogleMapRendered, getGoogleMapCenter, panGoogleMap } from '../utils/waiters'
 
 const mapsKeyForE2E = (process.env.VITE_GOOGLE_MAPS_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? '').trim()
 const shouldRequireInteractiveMaps = mapsKeyForE2E.length > 0
@@ -246,7 +246,12 @@ test.describe('ui component interaction coverage', () => {
     }
     if (mapMode === 'interactive') {
       await expectGoogleMapHasContent(page, 'explorer-map-panel')
+      const centerBefore = await getGoogleMapCenter(page, 'explorer-map-panel')
       await panGoogleMap(page, 'explorer-map-panel')
+      const centerAfter = await getGoogleMapCenter(page, 'explorer-map-panel')
+      expect(
+        Math.abs(centerAfter.lat - centerBefore.lat) + Math.abs(centerAfter.lng - centerBefore.lng),
+      ).toBeGreaterThan(0.0001)
     }
 
     await page.getByTestId('explorer-filters-button').click()

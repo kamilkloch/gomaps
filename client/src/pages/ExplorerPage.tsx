@@ -206,9 +206,7 @@ export function ExplorerPage() {
     [filteredPlaces, selectedPlaceId],
   )
 
-  const mapCenter = selectedPlace
-    ? { lat: selectedPlace.lat, lng: selectedPlace.lng }
-    : getProjectCenter(selectedProject?.bounds) ?? FALLBACK_CENTER
+  const defaultMapCenter = getProjectCenter(selectedProject?.bounds) ?? FALLBACK_CENTER
 
   const handleProjectChange = useCallback((nextProjectId: string) => {
     setSelectedProjectId(nextProjectId)
@@ -316,7 +314,7 @@ export function ExplorerPage() {
             {hasMapsKey ? (
               <APIProvider apiKey={API_KEY ?? ''}>
                 <Map
-                  center={mapCenter}
+                  defaultCenter={defaultMapCenter}
                   defaultZoom={8}
                   gestureHandling="greedy"
                   style={{ width: '100%', height: '100%' }}
@@ -608,8 +606,11 @@ function PlaceMarkerController({ places, selectedPlaceId, onSelectPlace }: Place
         fillOpacity: 0.22,
       })
 
+    const target = { lat: selectedPlace.lat, lng: selectedPlace.lng }
+    map.panTo(target)
+
     selectionCircleRef.current = circle
-    circle.setCenter({ lat: selectedPlace.lat, lng: selectedPlace.lng })
+    circle.setCenter(target)
     circle.setRadius(150)
 
     let phase = 0
