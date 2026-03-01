@@ -15,6 +15,7 @@
 - **Google Maps imperative overlays:** For `google.maps.Rectangle` and map listeners, keep imperative map objects in child components using `useMap()`, then pass updates to page state via callbacks
 - **Map naming collision:** In React files importing the `Map` component, use `globalThis.Map` for JS map collections (`new globalThis.Map(...)`) to avoid TypeScript resolving to the component symbol
 - **Explorer markers + clustering:** Manage `google.maps.Marker`, `google.maps.Circle`, and `MarkerClusterer` refs inside a dedicated `useMap()` controller; on data updates, diff markers by place id and refresh cluster membership (`clearMarkers()` + `addMarkers()`) to keep map state in sync with React state
+- **Explorer virtualized selection sync:** Keep a single `selectedPlaceId` source of truth across map/table/detail state, and when selection changes, scroll the virtualized table viewport only if the selected row index is outside the current visible range
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
@@ -430,4 +431,14 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - For panel-rich UI stories, keep existing `data-testid` anchors stable while upgrading markup/styles to avoid regressing the established Playwright harness.
   - A tiny per-place review cache in client state (`Record<placeId, Review[]>`) avoids repeated API calls during table/map reselection without adding new global state machinery.
   - Keep external-action URL construction in pure helper functions (query label builder + provider URL builders) so future stories can reuse link behavior in other views.
+---
+## 2026-03-02 00:49:36 CET - US-016
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Completed Explorer map↔table bidirectional selection sync by auto-scrolling the virtualized table to the selected place row when marker selection lands off-screen, while keeping marker click -> row highlight/detail open and table row click -> map center/detail open behavior unified under one selected-place state.
+- Preserved single-selection semantics and existing deselect-on-empty-map-click behavior, with selected-marker emphasis continuing via larger marker icon and pulse circle overlay.
+- Ran required quality gates: `npm run typecheck --workspace=server`, `npm run typecheck --workspace=client`, `npm test --workspace=server`.
+- Files changed: `client/src/pages/ExplorerPage.tsx`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For virtualized tables, selection sync should scroll by row index math (`index * rowHeight`) only when the selected row is outside the visible viewport to avoid jitter on in-view clicks.
+  - Keeping map and table selection wired to a single `selectedPlaceId` state minimizes divergence between marker styling, detail-panel visibility, and row-highlight state.
 ---

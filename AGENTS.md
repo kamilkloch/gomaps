@@ -73,6 +73,7 @@ npm run dev --workspace=client
 - For advanced map overlays in React (`Rectangle`, listeners, imperative map APIs), keep imperative Google Maps objects in small child components that use `useMap()` (for map access) and forward state changes to parent callbacks
 - In client files importing the `Map` component from `@vis.gl/react-google-maps`, use `globalThis.Map` for JS map collections to avoid TypeScript symbol collisions
 - For Explorer marker rendering, keep marker/cluster lifecycles in a dedicated `useMap()` child controller (manage `google.maps.Marker` + `MarkerClusterer` refs there, and update via props/state) instead of creating map objects directly in page components
+- For Explorer map↔table sync with virtualized rows, keep a single selected-place id source of truth and scroll the table viewport to the selected row index when marker selection lands on an off-screen row
 - Scraping/discovery now uses Google Places API (New) over server-side HTTP (`places:searchText`, `places/{placeId}`)
 - Keep Places field masks explicit with `X-Goog-FieldMask` headers to control SKU/cost and avoid over-fetching
 - Classify place websites by normalized hostname (supporting protocol-less URLs and subdomains) in `server/src/scraper/classifier.ts`, and persist `websiteType` from that classifier instead of hardcoded defaults

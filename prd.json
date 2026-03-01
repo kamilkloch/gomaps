@@ -325,8 +325,8 @@
         "npm run typecheck --workspace=client passes"
       ],
       "priority": 31,
-      "passes": false,
-      "notes": "Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
+      "passes": true,
+      "notes": "Implemented with map marker/table row single-selection sync, map-click deselect, selected-marker visual emphasis (larger marker + pulse circle), and automatic virtualized table scroll-to-row when marker selection is off-screen."
     },
     {
       "id": "US-017",

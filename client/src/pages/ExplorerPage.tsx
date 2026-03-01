@@ -368,6 +368,42 @@ export function ExplorerPage() {
   }, [selectedProjectId, searchText, tableFilterText, sortState])
 
   useEffect(() => {
+    if (!selectedPlaceId) {
+      return
+    }
+
+    const selectedIndex = sortedPlaces.findIndex((place) => place.id === selectedPlaceId)
+    if (selectedIndex < 0) {
+      return
+    }
+
+    const scrollContainer = tableScrollRef.current
+    if (!scrollContainer) {
+      return
+    }
+
+    const viewportHeight = scrollContainer.clientHeight
+    if (viewportHeight <= 0) {
+      return
+    }
+
+    const visibleStart = Math.floor(scrollContainer.scrollTop / TABLE_ROW_HEIGHT)
+    const visibleCount = Math.ceil(viewportHeight / TABLE_ROW_HEIGHT)
+    const visibleEnd = visibleStart + visibleCount - 1
+
+    if (selectedIndex >= visibleStart && selectedIndex <= visibleEnd) {
+      return
+    }
+
+    const targetTop = Math.max(
+      0,
+      (selectedIndex * TABLE_ROW_HEIGHT) - (viewportHeight / 2) + (TABLE_ROW_HEIGHT / 2),
+    )
+
+    scrollContainer.scrollTo({ top: targetTop })
+  }, [selectedPlaceId, sortedPlaces])
+
+  useEffect(() => {
     setIsOpeningHoursExpanded(true)
   }, [selectedPlaceId])
 
