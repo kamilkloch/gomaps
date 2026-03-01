@@ -655,8 +655,8 @@
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": -3,
-      "passes": false,
-      "notes": "Part 6 of 7 E2E story-board expansion. Add to a new spec file (e.g., navigation-a11y.spec.ts)."
+      "passes": true,
+      "notes": "Completed with `client/e2e/tests/navigation-a11y.spec.ts` covering `/setup` redirect, bare `/explorer` auto-selection, invalid/valid deep links, active-nav style assertions, browser back/forward flow, avatar badge checks, keyboard row selection, and landmark assertions. Added Setup map/controls region labels and checklist mappings."
     },
     {
       "id": "US-E2E-07",

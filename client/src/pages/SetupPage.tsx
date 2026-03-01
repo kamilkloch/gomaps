@@ -492,7 +492,12 @@ export function SetupPage() {
       </header>
 
       <section className="setup-layout">
-        <div className="setup-map-panel">
+        <div
+          className="setup-map-panel"
+          data-testid="setup-map-panel"
+          role="region"
+          aria-label="Setup map panel"
+        >
           <div
             className="setup-map-shell"
             data-testid="setup-map-shell"
@@ -551,7 +556,12 @@ export function SetupPage() {
           ) : null}
         </div>
 
-        <aside className="setup-sidebar">
+        <aside
+          className="setup-sidebar"
+          data-testid="setup-controls-panel"
+          role="region"
+          aria-label="Setup controls panel"
+        >
           <h2>Scrape Area</h2>
           <p>Capture the visible map viewport, then fine-tune the rectangle by dragging or resizing corners.</p>
 

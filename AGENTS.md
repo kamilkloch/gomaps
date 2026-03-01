@@ -80,7 +80,7 @@ npm run dev --workspace=client
 - When ordering SQLite rows by timestamp fields like `created_at`, add a deterministic tie-breaker (`rowid DESC` or equivalent) so rapid same-second inserts keep stable UI ordering
 - In Setup, treat run selection as run-scoped state: when `activeRunId` changes, clear prior progress/tile snapshots before loading the new run so stale counters cannot leak across run switches
 - For deep links like `/projects/:projectId/setup`, map API `404` responses to a deterministic "Project not found." UI state instead of showing generic transient load errors
-- For Explorer and Projects accessibility/E2E stability, expose named regions (`role="region"` + `aria-label`) for key panels and keep table row selection keyboard-accessible via `tabIndex` + Enter/Space handlers
+- For Projects, Setup, and Explorer accessibility/E2E stability, expose named regions (`role="region"` + `aria-label`) for key panels and keep table row selection keyboard-accessible via `tabIndex` + Enter/Space handlers
 - The Google Maps JavaScript API (embedded maps in the React UI) is a separate concern from scraping
 - The legacy MVP code is preserved in `legacy/` for reference — do not modify it
 - SQLite database file goes in `data/gomaps.db` — ensure `data/` is in `.gitignore`

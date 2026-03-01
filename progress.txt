@@ -35,6 +35,7 @@
 - **SQLite timestamp ordering:** When listing rows by timestamp fields (`created_at`, etc.), add a deterministic tie-breaker (`rowid DESC`) so rapid same-second inserts keep stable ordering in UI tests and cards.
 - **Setup deep-link not-found handling:** For `/projects/:projectId/setup`, treat API `404` as a deterministic "Project not found." page state instead of generic load-error copy.
 - **Explorer keyboard row selection:** Make table rows focusable (`tabIndex={0}`) with Enter/Space selection handlers, and keep key map/table containers discoverable via named region labels for accessibility-first E2E locators.
+- **Route-level a11y landmarks:** Keep page roots as `<main>` landmarks and expose named regions (`role="region"` + `aria-label`) for Projects/Setup/Explorer panels so navigation + accessibility e2e tests can assert routing and keyboard behavior without brittle selectors.
 
 ---
 
@@ -395,4 +396,15 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - For Google Maps marker/circle/cluster checks, keep assertions deterministic by exposing E2E-only JSON snapshots and map-action hooks rather than clicking brittle `.gm-style` internals.
   - Cluster assertions are most stable when validating grouped-cluster counts plus numeric label payloads from a debug snapshot, instead of relying on rendered SVG/text nodes.
   - Separate global search (map + table) and table quick-filter (table-only) expectations in one flow to guard composition regressions.
+---
+## 2026-03-01 23:49:32 CET - US-E2E-06
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Added `client/e2e/tests/navigation-a11y.spec.ts` with Playwright coverage for `/setup` redirect, bare `/explorer` auto-select, invalid setup deep link, valid explorer deep link, active-nav style assertions, browser back/forward flow, avatar badge visibility, keyboard row selection, and landmark checks.
+- Added Setup accessibility/test hooks by labeling map and controls panels as named regions (`setup-map-panel`, `setup-controls-panel`).
+- Updated E2E interaction checklist mappings for the new routing/navigation/accessibility coverage.
+- Files changed: `client/e2e/tests/navigation-a11y.spec.ts`, `client/src/pages/SetupPage.tsx`, `client/e2e/tests/coverage-checklist.md`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Route-focused E2E stories are most stable when they assert semantic landmarks (`main`, named regions) and deterministic `data-testid` hooks together.
+  - For keyboard accessibility checks, Tab-driven focus + `toHaveCSS` outline assertions catch regressions in focus-visible styling that click-only tests miss.
+  - Keeping Setup map and controls panels explicitly labeled as regions aligns accessibility intent with Playwright locator resilience.
 ---
