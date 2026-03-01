@@ -77,6 +77,7 @@ npm run dev --workspace=client
 - Keep Places field masks explicit with `X-Goog-FieldMask` headers to control SKU/cost and avoid over-fetching
 - Classify place websites by normalized hostname (supporting protocol-less URLs and subdomains) in `server/src/scraper/classifier.ts`, and persist `websiteType` from that classifier instead of hardcoded defaults
 - Project cards should consume backend-derived aggregate fields (`status`, `placesCount`, `scrapeRunsCount`, `lastScrapedAt`, `activeRunId`) from `/api/projects`; do not infer cross-run status in the client from bounds or ad-hoc heuristics
+- When ordering SQLite rows by timestamp fields like `created_at`, add a deterministic tie-breaker (`rowid DESC` or equivalent) so rapid same-second inserts keep stable UI ordering
 - In Setup, treat run selection as run-scoped state: when `activeRunId` changes, clear prior progress/tile snapshots before loading the new run so stale counters cannot leak across run switches
 - The Google Maps JavaScript API (embedded maps in the React UI) is a separate concern from scraping
 - The legacy MVP code is preserved in `legacy/` for reference — do not modify it

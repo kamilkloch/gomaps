@@ -551,8 +551,8 @@
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": -8,
-      "passes": false,
-      "notes": "Part 1 of 7 E2E story-board expansion. Extend client/e2e/tests/ with a new spec file (e.g., projects-edge-cases.spec.ts). Add data-testid attributes to components as needed."
+      "passes": true,
+      "notes": "Completed with `client/e2e/tests/projects-edge-cases.spec.ts` covering status aggregates, map preview/fallback, hover selection glow, newest-first ordering, rapid create/delete, and duplicate-name creation, plus targeted Projects test ids and deterministic `created_at` ordering tie-breaker in `/api/projects`."
     },
     {
       "id": "US-E2E-02",

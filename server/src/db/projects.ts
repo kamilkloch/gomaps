@@ -38,7 +38,7 @@ export const listProjects = (): Effect.Effect<ProjectSummary[], DbError, Db> =>
     Effect.try({
       try: () => {
         const projectRows = db
-          .prepare('SELECT * FROM projects ORDER BY created_at DESC')
+          .prepare('SELECT * FROM projects ORDER BY created_at DESC, rowid DESC')
           .all() as Record<string, unknown>[]
 
         const runRows = db

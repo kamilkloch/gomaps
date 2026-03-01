@@ -157,7 +157,9 @@ export function ProjectsPage() {
       ) : null}
 
       {selectedProject ? (
-        <p className="selected-project-copy">Selected: {selectedProject.name}</p>
+        <p className="selected-project-copy" data-testid="projects-selected-copy">
+          Selected: {selectedProject.name}
+        </p>
       ) : null}
     </main>
   )
@@ -198,7 +200,11 @@ export function ProjectsPage() {
             </span>
           </div>
 
-          <div className="project-map-preview" aria-label={`${project.name} map preview`}>
+          <div
+            className="project-map-preview"
+            aria-label={`${project.name} map preview`}
+            data-testid={`project-map-preview-${project.id}`}
+          >
             {hasMapsKey ? (
               <Map
                 defaultCenter={getCenter(bounds)}
@@ -208,7 +214,12 @@ export function ProjectsPage() {
                 style={{ width: '100%', height: '100%' }}
               />
             ) : (
-              <div className="project-map-fallback">Google Maps preview unavailable</div>
+              <div
+                className="project-map-fallback"
+                data-testid={`project-map-fallback-${project.id}`}
+              >
+                Google Maps preview unavailable
+              </div>
             )}
 
             {bounds ? (

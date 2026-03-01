@@ -29,6 +29,7 @@
 - **Playwright fixture seeding:** `POST /api/test/seed-fixtures` accepts optional `existingProjectId` to append runs/tiles/places onto an existing seeded project; use this to create mixed run histories for cross-view regressions.
 - **Playwright env loading:** Parse root `.env` in `client/playwright.config.ts` before web server startup so both `VITE_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` flow into client/server e2e processes consistently.
 - **Playwright waits on SSE pages:** Avoid `networkidle` waits on Setup-like pages with long-lived SSE requests; wait for deterministic UI locators/state transitions instead.
+- **SQLite timestamp ordering:** When listing rows by timestamp fields (`created_at`, etc.), add a deterministic tie-breaker (`rowid DESC`) so rapid same-second inserts keep stable ordering in UI tests and cards.
 
 ---
 
@@ -315,4 +316,16 @@ Thread: https://ampcode.com/threads/T-019caae3-5411-7058-a54a-d34a1476426f
   - Project-level status and summary counters should be derived server-side from run/place history so Projects and Setup always share one source of truth.
   - For run history UIs, clearing run-scoped state immediately on selection change prevents stale progress flashes while new snapshots load.
   - Extending the test-seeding backdoor with `existingProjectId` is a reliable way to recreate mixed run histories in deterministic e2e tests.
+---
+
+## 2026-03-01 22:05:23 CET - US-E2E-01
+Thread: https://ampcode.com/threads/T-019cab34-b545-7338-8db6-78f2357921f3
+- Added a new Playwright suite at `client/e2e/tests/projects-edge-cases.spec.ts` that covers Projects-page edge cases: status aggregate variants, map preview vs fallback behavior, hover selection/glow state, deterministic multi-create ordering, rapid create-delete, and duplicate-name creation.
+- Added targeted Projects test hooks (`projects-selected-copy`, per-card map preview/fallback test ids) to keep assertions aligned with strict `data-testid`-first locator strategy.
+- Hardened `/api/projects` ordering with `ORDER BY created_at DESC, rowid DESC` to remove same-second timestamp ambiguity during rapid project creation flows.
+- Files changed: `client/e2e/tests/projects-edge-cases.spec.ts`, `client/src/pages/ProjectsPage.tsx`, `server/src/db/projects.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For map-dependent UI tests, assert dual-mode behavior (`interactive` preview with `.gm-style` vs explicit fallback copy) instead of coupling the suite to API-key availability.
+  - UI ordering checks become deterministic when backend timestamp sorts include a secondary stable key (`rowid DESC`) for same-second inserts.
+  - Small, explicit `data-testid` anchors on dynamic card subregions (map shell, selected copy) prevent brittle CSS/text fallback selectors.
 ---
