@@ -43,6 +43,11 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Explorer | Row selection + detail panel sync | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | Favorite star toggle | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | Virtualized table scroll container | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | Map marker click -> table/detail sync (`data-selected=true` row + detail name) | `explorer-map-sync.spec.ts` → `map marker selection syncs table/detail and map click clears selection` |
+| Explorer | Map click deselect clears active row and returns detail placeholder | `explorer-map-sync.spec.ts` → `map marker selection syncs table/detail and map click clears selection` |
+| Explorer | Selection circle exists for selected place (interactive map mode) | `explorer-map-sync.spec.ts` → `map marker selection syncs table/detail and map click clears selection` |
+| Explorer | Cluster markers expose grouped counts and numeric labels when zoomed out (interactive map mode) | `explorer-map-sync.spec.ts` → `cluster debug snapshot reports grouped marker clusters with numeric labels` |
+| Explorer | Table quick-filter is table-only while global search filters both map markers and table; combined composition verified | `explorer-map-sync.spec.ts` → `table filter stays table-only while global search filters both map and table` |
 | Explorer | Detail panel full-content rendering (name/category/rating/address/phone/website/amenities/photos/opening hours/scraped timestamp) | `explorer-detail.spec.ts` → `detail panel renders full seeded content` |
 | Explorer | Website type table badge classes (`direct`/`ota`/`social`) | `explorer-detail.spec.ts` → `website badge classes and price formatting render for all expected variants` |
 | Explorer | Price-level formatting (`$`, `$$`, `$$$`, enum string, null) | `explorer-detail.spec.ts` → `website badge classes and price formatting render for all expected variants` |

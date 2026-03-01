@@ -172,3 +172,4 @@ Always execute interactions from a clean state. Ensure you are resetting the bro
 - Avoid `waitForLoadState('networkidle')` on pages that keep long-lived requests open (e.g., SSE progress streams in Setup); prefer waiting on stable UI locators/state changes.
 - Setup page map diagnostics can be forced in Playwright-only mode (`VITE_E2E_TEST_MODE=1`) via `?e2eMapDiagnostic=api-key-error|init-timeout|tiles-timeout`; tile-overlay style/status assertions can read the hidden `setup-tile-overlay-debug` JSON snapshot.
 - For Explorer map marker assertions in Playwright, prefer the hidden `explorer-marker-debug` JSON snapshot (enabled only in `VITE_E2E_TEST_MODE=1`) instead of brittle Google Maps internal DOM hooks.
+- For Explorer map interaction + clustering assertions in Playwright, use the E2E-only hooks exposed in test mode: `explorer-cluster-debug`, `explorer-selection-circle-debug`, and `window.__gomapsExplorerDebug` (marker-click/map-click/zoom actions).

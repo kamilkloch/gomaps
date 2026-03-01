@@ -31,6 +31,7 @@
 - **Playwright env loading:** Parse root `.env` in `client/playwright.config.ts` before web server startup so both `VITE_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` flow into client/server e2e processes consistently.
 - **Playwright waits on SSE pages:** Avoid `networkidle` waits on Setup-like pages with long-lived SSE requests; wait for deterministic UI locators/state transitions instead.
 - **Playwright map debug snapshots:** For map overlays/markers, expose Playwright-only hidden JSON snapshots (gated by `VITE_E2E_TEST_MODE`) and assert those snapshots instead of brittle `.gm-style` internals.
+- **Explorer map interaction E2E hooks:** For marker-click/map-click/zoom tests, expose a Playwright-only map controller (`window.__gomapsExplorerDebug`) plus hidden snapshots (`explorer-marker-debug`, `explorer-cluster-debug`, `explorer-selection-circle-debug`) instead of probing Google Maps DOM internals.
 - **SQLite timestamp ordering:** When listing rows by timestamp fields (`created_at`, etc.), add a deterministic tie-breaker (`rowid DESC`) so rapid same-second inserts keep stable ordering in UI tests and cards.
 - **Setup deep-link not-found handling:** For `/projects/:projectId/setup`, treat API `404` as a deterministic "Project not found." page state instead of generic load-error copy.
 - **Explorer keyboard row selection:** Make table rows focusable (`tabIndex={0}`) with Enter/Space selection handlers, and keep key map/table containers discoverable via named region labels for accessibility-first E2E locators.
@@ -383,4 +384,15 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - Route-level not-found handling should distinguish API 404 from transient transport failures so deep-link UX stays deterministic.
   - Keyboard parity for clickable table rows is simplest with `tabIndex={0}` plus Enter/Space handlers on the row node.
   - Named `region` landmarks on major UI containers make both accessibility tooling and strict-role Playwright assertions more reliable.
+---
+## 2026-03-01 23:42:01 CET - US-E2E-05
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Added `client/e2e/tests/explorer-map-sync.spec.ts` with story-board coverage for marker click -> table/detail sync, map-click deselect, selection-circle presence, marker clustering assertions, table-filter/map-marker isolation, and combined global-search + table-filter composition.
+- Extended Explorer map testability hooks in `client/src/pages/ExplorerPage.tsx` with Playwright-only cluster + selection-circle debug snapshots and an E2E-only map controller (`window.__gomapsExplorerDebug`) for deterministic marker/map/zoom interactions.
+- Updated `client/e2e/tests/coverage-checklist.md` and `AGENTS.md` to document the new Explorer map interaction coverage and reusable debug-hook pattern.
+- Files changed: `client/e2e/tests/explorer-map-sync.spec.ts`, `client/src/pages/ExplorerPage.tsx`, `client/e2e/tests/coverage-checklist.md`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For Google Maps marker/circle/cluster checks, keep assertions deterministic by exposing E2E-only JSON snapshots and map-action hooks rather than clicking brittle `.gm-style` internals.
+  - Cluster assertions are most stable when validating grouped-cluster counts plus numeric label payloads from a debug snapshot, instead of relying on rendered SVG/text nodes.
+  - Separate global search (map + table) and table quick-filter (table-only) expectations in one flow to guard composition regressions.
 ---

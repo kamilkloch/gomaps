@@ -635,7 +635,7 @@
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": -4,
-      "passes": false,
+      "passes": true,
       "notes": "Part 5 of 7 E2E story-board expansion. Add to a new spec file (e.g., explorer-map-sync.spec.ts). Map-interaction tests only run when VITE_GOOGLE_MAPS_API_KEY is set; skip gracefully otherwise."
     },
     {

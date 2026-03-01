@@ -1,5 +1,5 @@
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps'
-import { MarkerClusterer } from '@googlemaps/markerclusterer'
+import { MarkerClusterer, MarkerClustererEvents } from '@googlemaps/markerclusterer'
 import type { UIEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -31,6 +31,46 @@ interface MarkerDebugEntry {
   fillColor: string
 }
 
+interface ClusterDebugSnapshot {
+  totalClusters: number
+  groupedClusterCount: number
+  clusterLabels: string[]
+  maxClusterSize: number
+}
+
+interface SelectionCircleDebugSnapshot {
+  visible: boolean
+  placeId: string | null
+  center: { lat: number; lng: number } | null
+  radius: number | null
+}
+
+interface ExplorerE2EMapDebugController {
+  clickMarker: (placeId: string) => boolean
+  clickMap: () => boolean
+  setZoom: (zoom: number) => boolean
+}
+
+const EMPTY_CLUSTER_DEBUG_SNAPSHOT: ClusterDebugSnapshot = {
+  totalClusters: 0,
+  groupedClusterCount: 0,
+  clusterLabels: [],
+  maxClusterSize: 0,
+}
+
+const EMPTY_SELECTION_CIRCLE_DEBUG_SNAPSHOT: SelectionCircleDebugSnapshot = {
+  visible: false,
+  placeId: null,
+  center: null,
+  radius: null,
+}
+
+declare global {
+  interface Window {
+    __gomapsExplorerDebug?: ExplorerE2EMapDebugController
+  }
+}
+
 export function ExplorerPage() {
   const { projectId: routeProjectId } = useParams()
   const navigate = useNavigate()
@@ -44,6 +84,10 @@ export function ExplorerPage() {
   const [sortState, setSortState] = useState<SortState>({ key: 'rating', direction: 'desc' })
   const [favoritePlaceIds, setFavoritePlaceIds] = useState<Set<string>>(new Set())
   const [markerDebugEntries, setMarkerDebugEntries] = useState<MarkerDebugEntry[]>([])
+  const [clusterDebugSnapshot, setClusterDebugSnapshot] = useState<ClusterDebugSnapshot>(EMPTY_CLUSTER_DEBUG_SNAPSHOT)
+  const [selectionCircleDebugSnapshot, setSelectionCircleDebugSnapshot] = useState<SelectionCircleDebugSnapshot>(
+    EMPTY_SELECTION_CIRCLE_DEBUG_SNAPSHOT,
+  )
   const tableScrollRef = useRef<HTMLDivElement | null>(null)
   const [tableScrollTop, setTableScrollTop] = useState(0)
   const [tableViewportHeight, setTableViewportHeight] = useState(220)
@@ -346,6 +390,8 @@ export function ExplorerPage() {
                     selectedPlaceId={selectedPlaceId}
                     onSelectPlace={setSelectedPlaceId}
                     onMarkerDebugSnapshot={setMarkerDebugEntries}
+                    onClusterDebugSnapshot={IS_E2E_TEST_MODE ? setClusterDebugSnapshot : undefined}
+                    onSelectionCircleDebugSnapshot={IS_E2E_TEST_MODE ? setSelectionCircleDebugSnapshot : undefined}
                   />
                 </Map>
               </APIProvider>
@@ -353,7 +399,13 @@ export function ExplorerPage() {
               <div className="explorer-map-fallback" data-testid="explorer-map-fallback">Set `VITE_GOOGLE_MAPS_API_KEY` to view Explorer map.</div>
             )}
             {IS_E2E_TEST_MODE ? (
-              <pre hidden data-testid="explorer-marker-debug">{JSON.stringify(markerDebugEntries)}</pre>
+              <>
+                <pre hidden data-testid="explorer-marker-debug">{JSON.stringify(markerDebugEntries)}</pre>
+                <pre hidden data-testid="explorer-cluster-debug">{JSON.stringify(clusterDebugSnapshot)}</pre>
+                <pre hidden data-testid="explorer-selection-circle-debug">
+                  {JSON.stringify(selectionCircleDebugSnapshot)}
+                </pre>
+              </>
             ) : null}
           </div>
 
@@ -597,6 +649,8 @@ interface PlaceMarkerControllerProps {
   selectedPlaceId: string | null
   onSelectPlace: (placeId: string | null) => void
   onMarkerDebugSnapshot?: (entries: MarkerDebugEntry[]) => void
+  onClusterDebugSnapshot?: (snapshot: ClusterDebugSnapshot) => void
+  onSelectionCircleDebugSnapshot?: (snapshot: SelectionCircleDebugSnapshot) => void
 }
 
 function PlaceMarkerController({
@@ -604,6 +658,8 @@ function PlaceMarkerController({
   selectedPlaceId,
   onSelectPlace,
   onMarkerDebugSnapshot,
+  onClusterDebugSnapshot,
+  onSelectionCircleDebugSnapshot,
 }: PlaceMarkerControllerProps) {
   const map = useMap()
   const markersRef = useRef(new globalThis.Map<string, google.maps.Marker>())
@@ -611,7 +667,49 @@ function PlaceMarkerController({
   const selectionCircleRef = useRef<google.maps.Circle | null>(null)
   const onSelectRef = useRef(onSelectPlace)
   const onMarkerDebugSnapshotRef = useRef(onMarkerDebugSnapshot)
+  const onClusterDebugSnapshotRef = useRef(onClusterDebugSnapshot)
+  const onSelectionCircleDebugSnapshotRef = useRef(onSelectionCircleDebugSnapshot)
   const placesById = useMemo(() => new globalThis.Map(places.map((place) => [place.id, place])), [places])
+
+  const emitClusterDebugSnapshot = useCallback(() => {
+    const clusterer = clustererRef.current
+    if (!clusterer) {
+      onClusterDebugSnapshotRef.current?.(EMPTY_CLUSTER_DEBUG_SNAPSHOT)
+      return
+    }
+
+    const internal = clusterer as unknown as {
+      clusters?: Array<{ count?: number; marker?: { getLabel?: () => string | google.maps.MarkerLabel | null } }>
+    }
+    const clusters = internal.clusters ?? []
+    const groupedClusters = clusters.filter((cluster) => (cluster.count ?? 0) > 1)
+    const clusterLabels = groupedClusters.flatMap((cluster) => {
+      const label = cluster.marker?.getLabel?.()
+      if (!label) {
+        return []
+      }
+
+      if (typeof label === 'string') {
+        return [label]
+      }
+
+      return label.text ? [label.text] : []
+    })
+
+    onClusterDebugSnapshotRef.current?.({
+      totalClusters: clusters.length,
+      groupedClusterCount: groupedClusters.length,
+      clusterLabels,
+      maxClusterSize: groupedClusters.reduce(
+        (maxClusterSize, cluster) => Math.max(maxClusterSize, cluster.count ?? 0),
+        0,
+      ),
+    })
+  }, [])
+
+  const emitSelectionCircleDebugSnapshot = useCallback((snapshot: SelectionCircleDebugSnapshot) => {
+    onSelectionCircleDebugSnapshotRef.current?.(snapshot)
+  }, [])
 
   useEffect(() => {
     onSelectRef.current = onSelectPlace
@@ -620,6 +718,56 @@ function PlaceMarkerController({
   useEffect(() => {
     onMarkerDebugSnapshotRef.current = onMarkerDebugSnapshot
   }, [onMarkerDebugSnapshot])
+
+  useEffect(() => {
+    onClusterDebugSnapshotRef.current = onClusterDebugSnapshot
+  }, [onClusterDebugSnapshot])
+
+  useEffect(() => {
+    onSelectionCircleDebugSnapshotRef.current = onSelectionCircleDebugSnapshot
+  }, [onSelectionCircleDebugSnapshot])
+
+  useEffect(() => {
+    if (!IS_E2E_TEST_MODE) {
+      return
+    }
+
+    const debugController: ExplorerE2EMapDebugController = {
+      clickMarker: (placeId: string) => {
+        const marker = markersRef.current.get(placeId)
+        if (!marker) {
+          return false
+        }
+
+        google.maps.event.trigger(marker, 'click')
+        return true
+      },
+      clickMap: () => {
+        if (!map) {
+          return false
+        }
+
+        google.maps.event.trigger(map, 'click')
+        return true
+      },
+      setZoom: (zoom: number) => {
+        if (!map || !Number.isFinite(zoom)) {
+          return false
+        }
+
+        map.setZoom(zoom)
+        return true
+      },
+    }
+
+    window.__gomapsExplorerDebug = debugController
+
+    return () => {
+      if (window.__gomapsExplorerDebug === debugController) {
+        delete window.__gomapsExplorerDebug
+      }
+    }
+  }, [map])
 
   useEffect(() => {
     if (!map || clustererRef.current) {
@@ -651,18 +799,24 @@ function PlaceMarkerController({
       },
     })
     clustererRef.current = clusterer
+    emitClusterDebugSnapshot()
 
     const clickListener = map.addListener('click', () => {
       onSelectRef.current(null)
     })
+    const clusteringListener = clusterer.addListener(MarkerClustererEvents.CLUSTERING_END, () => {
+      emitClusterDebugSnapshot()
+    })
 
     return () => {
       clickListener.remove()
+      clusteringListener.remove()
       clusterer.clearMarkers()
       clusterer.setMap(null)
       clustererRef.current = null
+      onClusterDebugSnapshotRef.current?.(EMPTY_CLUSTER_DEBUG_SNAPSHOT)
     }
-  }, [map])
+  }, [emitClusterDebugSnapshot, map])
 
   useEffect(() => {
     if (!map || !clustererRef.current) {
@@ -718,8 +872,10 @@ function PlaceMarkerController({
 
     clustererRef.current.clearMarkers()
     clustererRef.current.addMarkers(Array.from(markersRef.current.values()))
+    clustererRef.current.render()
     onMarkerDebugSnapshotRef.current?.(markerDebugEntries)
-  }, [map, places, selectedPlaceId])
+    emitClusterDebugSnapshot()
+  }, [emitClusterDebugSnapshot, map, places, selectedPlaceId])
 
   useEffect(() => {
     if (!map) {
@@ -732,6 +888,7 @@ function PlaceMarkerController({
         selectionCircleRef.current.setMap(null)
         selectionCircleRef.current = null
       }
+      emitSelectionCircleDebugSnapshot(EMPTY_SELECTION_CIRCLE_DEBUG_SNAPSHOT)
       return
     }
 
@@ -751,6 +908,12 @@ function PlaceMarkerController({
     selectionCircleRef.current = circle
     circle.setCenter(target)
     circle.setRadius(150)
+    emitSelectionCircleDebugSnapshot({
+      visible: true,
+      placeId: selectedPlace.id,
+      center: target,
+      radius: 150,
+    })
 
     let phase = 0
     const pulseTimer = window.setInterval(() => {
@@ -764,7 +927,7 @@ function PlaceMarkerController({
     return () => {
       clearInterval(pulseTimer)
     }
-  }, [map, placesById, selectedPlaceId])
+  }, [emitSelectionCircleDebugSnapshot, map, placesById, selectedPlaceId])
 
   useEffect(() => () => {
     for (const marker of markersRef.current.values()) {
@@ -775,6 +938,8 @@ function PlaceMarkerController({
       selectionCircleRef.current.setMap(null)
       selectionCircleRef.current = null
     }
+    onClusterDebugSnapshotRef.current?.(EMPTY_CLUSTER_DEBUG_SNAPSHOT)
+    onSelectionCircleDebugSnapshotRef.current?.(EMPTY_SELECTION_CIRCLE_DEBUG_SNAPSHOT)
   }, [])
 
   return null
