@@ -2,6 +2,7 @@ import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
+  ApiRequestError,
   getProject,
   getScrapeStatus,
   listRunTiles,
@@ -54,6 +55,7 @@ export function SetupPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isStartingScrape, setIsStartingScrape] = useState(false)
   const [isTogglingRun, setIsTogglingRun] = useState(false)
+  const [isProjectMissing, setIsProjectMissing] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const hasAppliedInitialBounds = useRef(false)
 
@@ -82,6 +84,7 @@ export function SetupPage() {
 
   useEffect(() => {
     hasAppliedInitialBounds.current = false
+    setIsProjectMissing(false)
   }, [projectId])
 
   useEffect(() => {
@@ -106,6 +109,7 @@ export function SetupPage() {
       try {
         setIsLoading(true)
         setErrorMessage(null)
+        setIsProjectMissing(false)
         const loadedProject = await getProject(projectId)
         if (isCancelled) {
           return
@@ -114,8 +118,16 @@ export function SetupPage() {
         setProject(loadedProject)
         setSelectionBounds(parseBounds(loadedProject.bounds))
       }
-      catch {
+      catch (error) {
         if (!isCancelled) {
+          if (error instanceof ApiRequestError && error.status === 404) {
+            setProject(null)
+            setSelectionBounds(null)
+            setRuns([])
+            selectRun(null)
+            setIsProjectMissing(true)
+            return
+          }
           setErrorMessage('Unable to load project setup right now.')
         }
       }
@@ -202,7 +214,7 @@ export function SetupPage() {
   }, [map])
 
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId || !project?.id || isProjectMissing) {
       return
     }
 
@@ -233,7 +245,7 @@ export function SetupPage() {
     return () => {
       isCancelled = true
     }
-  }, [projectId, selectRun])
+  }, [isProjectMissing, project?.id, projectId, selectRun])
 
   useEffect(() => {
     if (!activeRunId) {
@@ -442,6 +454,10 @@ export function SetupPage() {
   }, [activeRunId, progress, refreshRuns])
 
   if (!projectId) {
+    return <main className="setup-page" data-testid="setup-page"><p className="setup-state">Project not found.</p></main>
+  }
+
+  if (isProjectMissing) {
     return <main className="setup-page" data-testid="setup-page"><p className="setup-state">Project not found.</p></main>
   }
 

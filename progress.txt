@@ -32,6 +32,8 @@
 - **Playwright waits on SSE pages:** Avoid `networkidle` waits on Setup-like pages with long-lived SSE requests; wait for deterministic UI locators/state transitions instead.
 - **Playwright map debug snapshots:** For map overlays/markers, expose Playwright-only hidden JSON snapshots (gated by `VITE_E2E_TEST_MODE`) and assert those snapshots instead of brittle `.gm-style` internals.
 - **SQLite timestamp ordering:** When listing rows by timestamp fields (`created_at`, etc.), add a deterministic tie-breaker (`rowid DESC`) so rapid same-second inserts keep stable ordering in UI tests and cards.
+- **Setup deep-link not-found handling:** For `/projects/:projectId/setup`, treat API `404` as a deterministic "Project not found." page state instead of generic load-error copy.
+- **Explorer keyboard row selection:** Make table rows focusable (`tabIndex={0}`) with Enter/Space selection handlers, and keep key map/table containers discoverable via named region labels for accessibility-first E2E locators.
 
 ---
 
@@ -370,4 +372,15 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - For Google Maps marker color assertions, a hidden marker snapshot emitted from the marker controller is more stable than probing private map internals.
   - Keep detail-panel assertions deterministic by exposing dedicated `data-testid` anchors for each content block instead of relying on composite paragraph text.
   - Price-level formatting checks are easiest to maintain when each row has a dedicated price-cell test id.
+---
+## 2026-03-01 23:31:54 CET - US-E2E-PRE-01
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Hardened Setup deep links so `/projects/nonexistent/setup` now resolves to a deterministic `Project not found.` state by handling API 404s explicitly instead of showing generic transient load copy.
+- Added keyboard accessibility for Explorer table rows (focusable rows with Enter/Space selection), including visible focus styling for keyboard navigation.
+- Added explicit accessibility hooks used by E2E locators: named region landmarks for Projects list and Explorer map/table panels.
+- Files changed: `client/src/pages/SetupPage.tsx`, `client/src/pages/ExplorerPage.tsx`, `client/src/pages/ProjectsPage.tsx`, `client/src/styles.css`, `AGENTS.md`, `progress.txt`, `prd.json`
+- **Learnings for future iterations:**
+  - Route-level not-found handling should distinguish API 404 from transient transport failures so deep-link UX stays deterministic.
+  - Keyboard parity for clickable table rows is simplest with `tabIndex={0}` plus Enter/Space handlers on the row node.
+  - Named `region` landmarks on major UI containers make both accessibility tooling and strict-role Playwright assertions more reliable.
 ---

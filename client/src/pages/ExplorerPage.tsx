@@ -326,7 +326,12 @@ export function ExplorerPage() {
 
       <section className="explorer-layout">
         <section className="explorer-main-grid">
-          <div className="explorer-map-panel" data-testid="explorer-map-panel">
+          <div
+            className="explorer-map-panel"
+            data-testid="explorer-map-panel"
+            role="region"
+            aria-label="Explorer map panel"
+          >
             {hasMapsKey ? (
               <APIProvider apiKey={API_KEY ?? ''}>
                 <Map
@@ -439,7 +444,12 @@ export function ExplorerPage() {
             )}
           </aside>
 
-          <section className="explorer-table-panel" data-testid="explorer-table-panel">
+          <section
+            className="explorer-table-panel"
+            data-testid="explorer-table-panel"
+            role="region"
+            aria-label="Explorer table panel"
+          >
             <div className="explorer-table-toolbar">
               <span data-testid="explorer-table-count">{isLoadingPlaces ? 'Loading places…' : `${sortedPlaces.length} places`}</span>
               <div className="explorer-table-filter-wrap">
@@ -467,7 +477,7 @@ export function ExplorerPage() {
               ref={tableScrollRef}
               onScroll={handleTableScroll}
             >
-              <table data-testid="explorer-table">
+              <table data-testid="explorer-table" aria-label="Explorer places table">
                 <thead>
                   <tr>
                     <th>
@@ -520,8 +530,16 @@ export function ExplorerPage() {
                       key={place.id}
                       data-testid={`explorer-row-${place.id}`}
                       data-selected={place.id === selectedPlaceId ? 'true' : 'false'}
+                      aria-selected={place.id === selectedPlaceId}
                       className={place.id === selectedPlaceId ? 'is-selected' : ''}
+                      tabIndex={0}
                       onClick={() => setSelectedPlaceId(place.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault()
+                          setSelectedPlaceId(place.id)
+                        }
+                      }}
                     >
                       <td>{place.name}</td>
                       <td>{place.category ?? '—'}</td>

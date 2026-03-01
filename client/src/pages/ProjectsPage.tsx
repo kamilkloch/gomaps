@@ -137,7 +137,12 @@ export function ProjectsPage() {
       {isLoading ? <p className="projects-loading">Loading projects…</p> : null}
 
       {!isLoading && !hasProjects ? (
-        <section className="projects-grid" aria-label="Projects list">
+        <section
+          className="projects-grid"
+          data-testid="projects-list-region"
+          role="region"
+          aria-label="Projects list"
+        >
           <button
             data-testid="projects-empty-create-button"
             className="empty-project-card"
@@ -151,7 +156,12 @@ export function ProjectsPage() {
       ) : null}
 
       {!isLoading && hasProjects ? (
-        <section className="projects-grid" aria-label="Projects list">
+        <section
+          className="projects-grid"
+          data-testid="projects-list-region"
+          role="region"
+          aria-label="Projects list"
+        >
           {hasMapsKey ? <APIProvider apiKey={MAPS_API_KEY ?? ''}>{renderCards()}</APIProvider> : renderCards()}
         </section>
       ) : null}
