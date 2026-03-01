@@ -43,6 +43,12 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Explorer | Row selection + detail panel sync | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | Favorite star toggle | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
 | Explorer | Virtualized table scroll container | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
+| Explorer | Detail panel full-content rendering (name/category/rating/address/phone/website/amenities/photos/opening hours/scraped timestamp) | `explorer-detail.spec.ts` → `detail panel renders full seeded content` |
+| Explorer | Website type table badge classes (`direct`/`ota`/`social`) | `explorer-detail.spec.ts` → `website badge classes and price formatting render for all expected variants` |
+| Explorer | Price-level formatting (`$`, `$$`, `$$$`, enum string, null) | `explorer-detail.spec.ts` → `website badge classes and price formatting render for all expected variants` |
+| Explorer | Marker fill-color mapping by rating bands in interactive map mode | `explorer-detail.spec.ts` → `marker colors are derived from place ratings in interactive map mode` |
+| Explorer | Empty project explorer state (`0 places`, no rows, placeholder detail panel) | `explorer-detail.spec.ts` → `empty project explorer renders zero-count state without rows` |
+| Explorer | Bare `/explorer` route with no projects (`No projects` selector state) | `explorer-detail.spec.ts` → `bare explorer route without projects stays stable with empty selector` |
 | Shortlists | Placeholder page route and content | `ui-components.spec.ts` → `navigation links reach shortlists and settings placeholders` |
 | Settings | Placeholder page route and content | `ui-components.spec.ts` → `navigation links reach shortlists and settings placeholders` |
 

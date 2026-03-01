@@ -739,6 +739,11 @@ a {
   padding: 1rem;
 }
 
+.explorer-detail-content {
+  display: grid;
+  gap: 0.4rem;
+}
+
 .explorer-detail-kicker {
   margin: 0;
   font-size: 0.74rem;
@@ -756,6 +761,51 @@ a {
   margin: 0.4rem 0;
   color: #b9cde9;
   line-height: 1.4;
+}
+
+.explorer-detail-link {
+  color: #8ec5ff;
+  text-decoration: none;
+}
+
+.explorer-detail-link:hover {
+  text-decoration: underline;
+}
+
+.explorer-detail-block p {
+  margin: 0.3rem 0;
+}
+
+.explorer-detail-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #d6e6ff;
+}
+
+.explorer-detail-list li {
+  margin: 0.15rem 0;
+}
+
+.explorer-detail-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.explorer-detail-photo-link {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.45rem;
+  border: 1px solid #446387;
+  background: rgba(24, 44, 70, 0.9);
+  color: #d4e6ff;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  text-decoration: none;
+}
+
+.explorer-detail-photo-link:hover {
+  border-color: #5f83ad;
 }
 
 .explorer-placeholder {

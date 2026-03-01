@@ -6,6 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getProject, listPlaces, listProjects, type Place, type Project } from '../lib/api'
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
+const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_MODE === '1'
 const FALLBACK_CENTER = { lat: 40, lng: 9 }
 const TABLE_ROW_HEIGHT = 44
 const TABLE_OVERSCAN = 10
@@ -24,6 +25,12 @@ interface SortState {
   direction: 'asc' | 'desc'
 }
 
+interface MarkerDebugEntry {
+  placeId: string
+  rating: number | null
+  fillColor: string
+}
+
 export function ExplorerPage() {
   const { projectId: routeProjectId } = useParams()
   const navigate = useNavigate()
@@ -36,6 +43,7 @@ export function ExplorerPage() {
   const [tableFilterText, setTableFilterText] = useState('')
   const [sortState, setSortState] = useState<SortState>({ key: 'rating', direction: 'desc' })
   const [favoritePlaceIds, setFavoritePlaceIds] = useState<Set<string>>(new Set())
+  const [markerDebugEntries, setMarkerDebugEntries] = useState<MarkerDebugEntry[]>([])
   const tableScrollRef = useRef<HTMLDivElement | null>(null)
   const [tableScrollTop, setTableScrollTop] = useState(0)
   const [tableViewportHeight, setTableViewportHeight] = useState(220)
@@ -205,6 +213,14 @@ export function ExplorerPage() {
     () => filteredPlaces.find((place) => place.id === selectedPlaceId) ?? null,
     [filteredPlaces, selectedPlaceId],
   )
+  const selectedPlacePhotoUrls = useMemo(
+    () => parseJsonArray(selectedPlace?.photoUrls),
+    [selectedPlace?.photoUrls],
+  )
+  const selectedPlaceAmenities = useMemo(
+    () => parseJsonArray(selectedPlace?.amenities),
+    [selectedPlace?.amenities],
+  )
 
   const defaultMapCenter = getProjectCenter(selectedProject?.bounds) ?? FALLBACK_CENTER
 
@@ -324,22 +340,100 @@ export function ExplorerPage() {
                     places={filteredPlaces}
                     selectedPlaceId={selectedPlaceId}
                     onSelectPlace={setSelectedPlaceId}
+                    onMarkerDebugSnapshot={setMarkerDebugEntries}
                   />
                 </Map>
               </APIProvider>
             ) : (
               <div className="explorer-map-fallback" data-testid="explorer-map-fallback">Set `VITE_GOOGLE_MAPS_API_KEY` to view Explorer map.</div>
             )}
+            {IS_E2E_TEST_MODE ? (
+              <pre hidden data-testid="explorer-marker-debug">{JSON.stringify(markerDebugEntries)}</pre>
+            ) : null}
           </div>
 
           <aside className="explorer-detail-panel" data-testid="explorer-detail-panel">
             {selectedPlace ? (
-              <>
+              <section className="explorer-detail-content">
                 <p className="explorer-detail-kicker">Selected Place</p>
                 <h2 data-testid="explorer-detail-name">{selectedPlace.name}</h2>
-                <p>{selectedPlace.category ?? 'Uncategorized'} · {selectedPlace.rating?.toFixed(1) ?? 'N/A'}★</p>
-                <p>{selectedPlace.address ?? 'No address available'}</p>
-              </>
+                <p data-testid="explorer-detail-category">
+                  Category: {selectedPlace.category ?? 'Uncategorized'}
+                </p>
+                <p data-testid="explorer-detail-rating">
+                  Rating: {selectedPlace.rating?.toFixed(1) ?? 'N/A'}★ · {selectedPlace.reviewCount ?? 0} reviews
+                </p>
+                <p data-testid="explorer-detail-address">
+                  Address: {selectedPlace.address ?? 'No address available'}
+                </p>
+                <p data-testid="explorer-detail-phone">
+                  Phone:{' '}
+                  {selectedPlace.phone ? (
+                    <a href={`tel:${selectedPlace.phone}`} className="explorer-detail-link">{selectedPlace.phone}</a>
+                  ) : '—'}
+                </p>
+                <p data-testid="explorer-detail-price">
+                  Price: {formatPriceLevel(selectedPlace.priceLevel)}
+                </p>
+                <p data-testid="explorer-detail-website">
+                  Website:{' '}
+                  {selectedPlace.website ? (
+                    <a href={selectedPlace.website} target="_blank" rel="noreferrer" className="explorer-detail-link">
+                      {selectedPlace.website}
+                    </a>
+                  ) : '—'}
+                </p>
+                <p data-testid="explorer-detail-website-type">
+                  <span
+                    data-testid="explorer-detail-website-badge"
+                    className={`explorer-website-badge explorer-website-${selectedPlace.websiteType}`}
+                  >
+                    {websiteLabel(selectedPlace.websiteType)}
+                  </span>
+                </p>
+
+                <div data-testid="explorer-detail-amenities" className="explorer-detail-block">
+                  <p>Amenities:</p>
+                  {selectedPlaceAmenities.length > 0 ? (
+                    <ul className="explorer-detail-list">
+                      {selectedPlaceAmenities.map((amenity) => (
+                        <li key={amenity}>{amenity}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>—</p>
+                  )}
+                </div>
+
+                <div data-testid="explorer-detail-photos" className="explorer-detail-block">
+                  <p>Photos:</p>
+                  {selectedPlacePhotoUrls.length > 0 ? (
+                    <div className="explorer-detail-photos">
+                      {selectedPlacePhotoUrls.map((photoUrl, index) => (
+                        <a
+                          key={photoUrl}
+                          data-testid={`explorer-detail-photo-${index}`}
+                          href={photoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="explorer-detail-photo-link"
+                        >
+                          Photo {index + 1}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>—</p>
+                  )}
+                </div>
+
+                <p data-testid="explorer-detail-opening-hours">
+                  Opening hours: {selectedPlace.openingHours ?? '—'}
+                </p>
+                <p data-testid="explorer-detail-scraped-at">
+                  Scraped at: {selectedPlace.scrapedAt}
+                </p>
+              </section>
             ) : (
               <p className="explorer-placeholder">Select a marker to inspect place details.</p>
             )}
@@ -433,9 +527,12 @@ export function ExplorerPage() {
                       <td>{place.category ?? '—'}</td>
                       <td>{place.rating?.toFixed(1) ?? '—'}</td>
                       <td>{place.reviewCount ?? '—'}</td>
-                      <td>{formatPriceLevel(place.priceLevel)}</td>
+                      <td data-testid={`explorer-price-${place.id}`}>{formatPriceLevel(place.priceLevel)}</td>
                       <td>
-                        <span className={`explorer-website-badge explorer-website-${place.websiteType}`}>
+                        <span
+                          data-testid={`explorer-website-badge-${place.id}`}
+                          className={`explorer-website-badge explorer-website-${place.websiteType}`}
+                        >
                           {websiteLabel(place.websiteType)}
                         </span>
                       </td>
@@ -481,19 +578,30 @@ interface PlaceMarkerControllerProps {
   places: Place[]
   selectedPlaceId: string | null
   onSelectPlace: (placeId: string | null) => void
+  onMarkerDebugSnapshot?: (entries: MarkerDebugEntry[]) => void
 }
 
-function PlaceMarkerController({ places, selectedPlaceId, onSelectPlace }: PlaceMarkerControllerProps) {
+function PlaceMarkerController({
+  places,
+  selectedPlaceId,
+  onSelectPlace,
+  onMarkerDebugSnapshot,
+}: PlaceMarkerControllerProps) {
   const map = useMap()
   const markersRef = useRef(new globalThis.Map<string, google.maps.Marker>())
   const clustererRef = useRef<MarkerClusterer | null>(null)
   const selectionCircleRef = useRef<google.maps.Circle | null>(null)
   const onSelectRef = useRef(onSelectPlace)
+  const onMarkerDebugSnapshotRef = useRef(onMarkerDebugSnapshot)
   const placesById = useMemo(() => new globalThis.Map(places.map((place) => [place.id, place])), [places])
 
   useEffect(() => {
     onSelectRef.current = onSelectPlace
   }, [onSelectPlace])
+
+  useEffect(() => {
+    onMarkerDebugSnapshotRef.current = onMarkerDebugSnapshot
+  }, [onMarkerDebugSnapshot])
 
   useEffect(() => {
     if (!map || clustererRef.current) {
@@ -544,6 +652,7 @@ function PlaceMarkerController({ places, selectedPlaceId, onSelectPlace }: Place
     }
 
     const nextIds = new Set(places.map((place) => place.id))
+    const markerDebugEntries: MarkerDebugEntry[] = []
 
     for (const [placeId, marker] of markersRef.current.entries()) {
       if (nextIds.has(placeId)) {
@@ -555,12 +664,18 @@ function PlaceMarkerController({ places, selectedPlaceId, onSelectPlace }: Place
     }
 
     for (const place of places) {
+      const fillColor = ratingColor(place.rating)
       const icon = markerIcon(place.rating, place.id === selectedPlaceId)
       const existing = markersRef.current.get(place.id)
       if (existing) {
         existing.setPosition({ lat: place.lat, lng: place.lng })
         existing.setIcon(icon)
         existing.setZIndex(place.id === selectedPlaceId ? 1050 : 1000)
+        markerDebugEntries.push({
+          placeId: place.id,
+          rating: place.rating,
+          fillColor,
+        })
         continue
       }
 
@@ -576,10 +691,16 @@ function PlaceMarkerController({ places, selectedPlaceId, onSelectPlace }: Place
       })
 
       markersRef.current.set(place.id, marker)
+      markerDebugEntries.push({
+        placeId: place.id,
+        rating: place.rating,
+        fillColor,
+      })
     }
 
     clustererRef.current.clearMarkers()
     clustererRef.current.addMarkers(Array.from(markersRef.current.values()))
+    onMarkerDebugSnapshotRef.current?.(markerDebugEntries)
   }, [map, places, selectedPlaceId])
 
   useEffect(() => {
@@ -726,6 +847,24 @@ const formatPriceLevel = (priceLevel: string | null): string => {
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
+}
+
+const parseJsonArray = (value: string | null | undefined): string[] => {
+  if (!value) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+  }
+  catch {
+    return []
+  }
 }
 
 const sortIndicator = (sortState: SortState, key: SortKey): string => {

@@ -30,6 +30,7 @@
 - **Playwright fixture seeding:** `POST /api/test/seed-fixtures` accepts optional `existingProjectId` to append runs/tiles/places onto an existing seeded project; use this to create mixed run histories for cross-view regressions.
 - **Playwright env loading:** Parse root `.env` in `client/playwright.config.ts` before web server startup so both `VITE_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` flow into client/server e2e processes consistently.
 - **Playwright waits on SSE pages:** Avoid `networkidle` waits on Setup-like pages with long-lived SSE requests; wait for deterministic UI locators/state transitions instead.
+- **Playwright map debug snapshots:** For map overlays/markers, expose Playwright-only hidden JSON snapshots (gated by `VITE_E2E_TEST_MODE`) and assert those snapshots instead of brittle `.gm-style` internals.
 - **SQLite timestamp ordering:** When listing rows by timestamp fields (`created_at`, etc.), add a deterministic tie-breaker (`rowid DESC`) so rapid same-second inserts keep stable ordering in UI tests and cards.
 
 ---
@@ -358,4 +359,15 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - For Setup pause/resume and SSE assertions, stateful route mocks should model both `/api/scrape/:runId` snapshots and `/api/scrape/:runId/progress` event payloads so label/counter transitions are deterministic.
   - Keep map-diagnostic branch tests deterministic by exposing explicit e2e-only hooks rather than relying on flaky third-party script timing.
   - A hidden JSON snapshot tied to overlay style helpers is an effective compromise for validating Google Maps rectangle color/state mapping without brittle internal DOM assertions.
+---
+## 2026-03-01 23:07:05 CET - US-E2E-04
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Added `client/e2e/tests/explorer-detail.spec.ts` with dedicated story-board coverage for Explorer detail-panel content, website badge classes, price-level formatting variants, marker-color mapping, and empty Explorer states.
+- Extended `client/src/pages/ExplorerPage.tsx` with detail-panel test hooks/fields (phone, website, amenities, photos, opening hours, scraped timestamp), row-level test ids for website/price cells, and Playwright-only marker debug output (`explorer-marker-debug`) in `VITE_E2E_TEST_MODE`.
+- Updated Explorer detail styling and expanded `client/e2e/tests/coverage-checklist.md` mappings for US-E2E-04 interactions.
+- Files changed: `client/e2e/tests/explorer-detail.spec.ts`, `client/src/pages/ExplorerPage.tsx`, `client/src/styles.css`, `client/e2e/tests/coverage-checklist.md`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For Google Maps marker color assertions, a hidden marker snapshot emitted from the marker controller is more stable than probing private map internals.
+  - Keep detail-panel assertions deterministic by exposing dedicated `data-testid` anchors for each content block instead of relying on composite paragraph text.
+  - Price-level formatting checks are easiest to maintain when each row has a dedicated price-cell test id.
 ---

@@ -603,8 +603,8 @@
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": -5,
-      "passes": false,
-      "notes": "Part 4 of 7 E2E story-board expansion. Add to a new spec file (e.g., explorer-detail.spec.ts). Detail panel tests may require extending the detail panel component with additional data-testid attributes."
+      "passes": true,
+      "notes": "Completed with `client/e2e/tests/explorer-detail.spec.ts` covering full detail-panel content assertions, website badge class variants, price-level formatting cases, interactive marker color mapping via `explorer-marker-debug`, empty-project explorer state, and bare `/explorer` empty-project handling. Added Explorer detail test ids and checklist mappings."
     },
     {
       "id": "US-E2E-05",
