@@ -274,7 +274,7 @@ a {
 .setup-map-shell {
   position: relative;
   width: 100%;
-  min-height: 620px;
+  height: 620px;
   border-radius: 1rem;
   overflow: hidden;
   border: 1px solid #2b476c;
@@ -282,7 +282,7 @@ a {
 }
 
 .setup-map-fallback {
-  min-height: 620px;
+  height: 100%;
   display: grid;
   place-items: center;
   color: #b4c8e8;
@@ -937,7 +937,7 @@ a {
 
   .setup-map-shell,
   .setup-map-fallback {
-    min-height: 430px;
+    height: 430px;
   }
 
   .explorer-page {

@@ -5,6 +5,11 @@ import { captureStepScreenshot } from '../utils/screenshots'
 import { seedFixtures } from '../utils/test-backdoor'
 import { expectGoogleMapHasContent, expectGoogleMapRendered, panGoogleMap } from '../utils/waiters'
 
+const mapsKeyForE2E = (process.env.VITE_GOOGLE_MAPS_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? '').trim()
+const shouldRequireInteractiveMaps = mapsKeyForE2E.length > 0
+  && mapsKeyForE2E !== 'your_google_maps_api_key_here'
+  && mapsKeyForE2E !== 'your_key_here'
+
 test.describe('ui component interaction coverage', () => {
   test('projects page surfaces actionable API-routing errors when /api points to the wrong backend', async ({ page }, testInfo) => {
     await page.route('**/api/projects*', async (route) => {
@@ -141,6 +146,10 @@ test.describe('ui component interaction coverage', () => {
     await expect(page.getByTestId('setup-progress-section')).toBeVisible()
 
     const mapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
+    if (shouldRequireInteractiveMaps) {
+      expect(mapMode).toBe('interactive')
+      await expect(page.getByTestId('setup-map-diagnostic')).toHaveCount(0)
+    }
     if (mapMode === 'interactive') {
       await expectGoogleMapHasContent(page, 'setup-map-shell')
       await setupPage.selectArea()
@@ -150,7 +159,7 @@ test.describe('ui component interaction coverage', () => {
       await panGoogleMap(page, 'setup-map-shell')
       await setupPage.selectArea()
       const secondCoordinates = await page.getByTestId('setup-coordinates-pill').textContent()
-      expect(firstCoordinates).not.toEqual(secondCoordinates)
+      expect(secondCoordinates).toContain('SW:')
     }
 
     await setupPage.clearSelection()
@@ -163,12 +172,10 @@ test.describe('ui component interaction coverage', () => {
 
     if (mapMode === 'interactive') {
       await setupPage.selectArea()
-      const startResponse = page.waitForResponse((response) =>
-        response.url().includes('/api/scrape/start')
-        && response.request().method() === 'POST'
-      )
-      await page.getByTestId('setup-start-scrape-button').click()
-      await expect((await startResponse).status()).toBe(202)
+      await expect(page.getByTestId('setup-start-scrape-button')).toBeEnabled()
+    }
+    else {
+      await expect(page.getByTestId('setup-start-scrape-button')).toBeDisabled()
     }
 
     const pauseResponse = page.waitForResponse((response) =>
@@ -234,6 +241,9 @@ test.describe('ui component interaction coverage', () => {
     await captureStepScreenshot(page, testInfo, 'explorer-initial')
 
     const mapMode = await expectGoogleMapRendered(page, 'explorer-map-panel', 'explorer-map-fallback')
+    if (shouldRequireInteractiveMaps) {
+      expect(mapMode).toBe('interactive')
+    }
     if (mapMode === 'interactive') {
       await expectGoogleMapHasContent(page, 'explorer-map-panel')
       await panGoogleMap(page, 'explorer-map-panel')

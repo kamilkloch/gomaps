@@ -8,6 +8,10 @@ import { seedFixtures } from '../utils/test-backdoor'
 import { expectGoogleMapHasContent, expectGoogleMapRendered, panGoogleMap } from '../utils/waiters'
 
 const E2E_SERVER_BASE_URL = process.env.E2E_SERVER_BASE_URL ?? 'http://127.0.0.1:3100'
+const mapsKeyForE2E = (process.env.VITE_GOOGLE_MAPS_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? '').trim()
+const shouldRequireInteractiveMaps = mapsKeyForE2E.length > 0
+  && mapsKeyForE2E !== 'your_google_maps_api_key_here'
+  && mapsKeyForE2E !== 'your_key_here'
 
 test.describe('core app flows (integrated backend + UI)', () => {
   test('project CRUD, setup navigation, and bounds persistence', async ({ page, request }, testInfo) => {
@@ -31,6 +35,10 @@ test.describe('core app flows (integrated backend + UI)', () => {
 
     await expect(await setupPage.root()).toBeVisible()
     const setupMapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
+    if (shouldRequireInteractiveMaps) {
+      expect(setupMapMode).toBe('interactive')
+      await expect(page.getByTestId('setup-map-diagnostic')).toHaveCount(0)
+    }
     if (setupMapMode === 'interactive') {
       await expectGoogleMapHasContent(page, 'setup-map-shell')
       await panGoogleMap(page, 'setup-map-shell')
@@ -105,6 +113,10 @@ test.describe('core app flows (integrated backend + UI)', () => {
     await captureStepScreenshot(page, testInfo, 'setup-seeded-progress')
 
     const setupMapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
+    if (shouldRequireInteractiveMaps) {
+      expect(setupMapMode).toBe('interactive')
+      await expect(page.getByTestId('setup-map-diagnostic')).toHaveCount(0)
+    }
     if (setupMapMode === 'interactive') {
       await expectGoogleMapHasContent(page, 'setup-map-shell')
       await panGoogleMap(page, 'setup-map-shell')
@@ -171,6 +183,9 @@ test.describe('core app flows (integrated backend + UI)', () => {
     await captureStepScreenshot(page, testInfo, 'explorer-initial')
 
     const explorerMapMode = await expectGoogleMapRendered(page, 'explorer-map-panel', 'explorer-map-fallback')
+    if (shouldRequireInteractiveMaps) {
+      expect(explorerMapMode).toBe('interactive')
+    }
     if (explorerMapMode === 'interactive') {
       await expectGoogleMapHasContent(page, 'explorer-map-panel')
       await panGoogleMap(page, 'explorer-map-panel')
