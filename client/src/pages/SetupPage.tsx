@@ -422,7 +422,7 @@ export function SetupPage() {
   return (
     <main className="setup-page" data-testid="setup-page">
       <header className="setup-header">
-        <p className="setup-breadcrumbs">
+        <p className="setup-breadcrumbs" data-testid="setup-breadcrumbs">
           <span>Projects</span>
           <span>/</span>
           <span>{project?.name ?? 'Project'}</span>

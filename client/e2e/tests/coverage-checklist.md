@@ -19,6 +19,12 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Setup | `Start Scrape` action | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | Run list selection context + `Pause` control | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | Run-scoped progress panel updates deterministically when switching historical/active runs | `app-flows.spec.ts` → `projects and setup stay consistent for mixed run history and explicit run switching` |
+| Setup | Estimate badge shows `~N tiles · Est. M min` with area and fallback copy after clear | `setup-validation.spec.ts` → `estimate badge updates for selected area and resets after clear` |
+| Setup | Empty query validation blocks scrape start and prevents `/api/scrape/start` call | `setup-validation.spec.ts` → `empty query blocks scrape start and shows validation without firing start request` |
+| Setup | Start button disabled when no bounds are selected | `setup-validation.spec.ts` → `start scrape button stays disabled when no bounds are selected` |
+| Setup | Breadcrumb chrome renders `Projects / {name} / Setup` | `setup-validation.spec.ts` → `breadcrumbs show Projects / project name / Setup` |
+| Setup | Previous Runs list is capped to 6 entries | `setup-validation.spec.ts` → `previous runs section renders at most 6 run entries even when more exist` |
+| Setup | Bounds persistence round-trip across navigation (map select area -> Projects -> Setup restore) | `setup-validation.spec.ts` → `selected bounds persist across Projects -> Setup navigation round-trip` |
 | Setup + Explorer | Real scrape launched from Setup UI and reflected in Explorer table count | `live-scrape.spec.ts` → `setup UI launches live scrape and explorer reflects persisted results` |
 | Setup + Backend | Legacy SQLite schema (`places.google_url`) auto-migration before real scrape writes | `live-scrape.spec.ts` → `migrates legacy places schema and persists scraped places`; `server/tests/db.test.ts` migration case |
 | Explorer | Project selector dropdown | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |

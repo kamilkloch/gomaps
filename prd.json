@@ -568,8 +568,8 @@
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": -7,
-      "passes": false,
-      "notes": "Part 2 of 7 E2E story-board expansion. Add to a new spec file (e.g., setup-validation.spec.ts)."
+      "passes": true,
+      "notes": "Completed with `client/e2e/tests/setup-validation.spec.ts` covering estimate badge + fallback, empty-query guard without firing `/api/scrape/start`, disabled start without bounds, breadcrumb chrome, runs-list cap at 6, and map-driven bounds persistence round-trip. Added `setup-breadcrumbs` test id and checklist mappings."
     },
     {
       "id": "US-E2E-03",

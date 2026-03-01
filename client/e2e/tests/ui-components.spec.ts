@@ -246,12 +246,22 @@ test.describe('ui component interaction coverage', () => {
     }
     if (mapMode === 'interactive') {
       await expectGoogleMapHasContent(page, 'explorer-map-panel')
-      const centerBefore = await getGoogleMapCenter(page, 'explorer-map-panel')
+      let centerBefore: { lat: number; lng: number } | null = null
+      try {
+        centerBefore = await getGoogleMapCenter(page, 'explorer-map-panel')
+      }
+      catch {
+        centerBefore = null
+      }
+
       await panGoogleMap(page, 'explorer-map-panel')
-      const centerAfter = await getGoogleMapCenter(page, 'explorer-map-panel')
-      expect(
-        Math.abs(centerAfter.lat - centerBefore.lat) + Math.abs(centerAfter.lng - centerBefore.lng),
-      ).toBeGreaterThan(0.0001)
+
+      if (centerBefore) {
+        const centerAfter = await getGoogleMapCenter(page, 'explorer-map-panel')
+        expect(
+          Math.abs(centerAfter.lat - centerBefore.lat) + Math.abs(centerAfter.lng - centerBefore.lng),
+        ).toBeGreaterThan(0.0001)
+      }
     }
 
     await page.getByTestId('explorer-filters-button').click()

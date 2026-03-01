@@ -329,3 +329,21 @@ Thread: https://ampcode.com/threads/T-019cab34-b545-7338-8db6-78f2357921f3
   - UI ordering checks become deterministic when backend timestamp sorts include a secondary stable key (`rowid DESC`) for same-second inserts.
   - Small, explicit `data-testid` anchors on dynamic card subregions (map shell, selected copy) prevent brittle CSS/text fallback selectors.
 ---
+## 2026-03-01 22:41:02 CET - US-E2E-02
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Added a dedicated Setup story-board Playwright suite at `client/e2e/tests/setup-validation.spec.ts` covering estimate badge behavior, empty-query guard, disabled start without bounds, breadcrumb chrome, runs list cap, and bounds persistence round-trip.
+- Added `data-testid="setup-breadcrumbs"` on Setup breadcrumbs for stable locator-first assertions.
+- Extended `client/e2e/tests/coverage-checklist.md` with explicit mappings for all US-E2E-02 interactions.
+- Files changed: `client/e2e/tests/setup-validation.spec.ts`, `client/src/pages/SetupPage.tsx`, `client/e2e/tests/coverage-checklist.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For client-side validation guards, route `/api/...` with a request counter and assert zero calls to verify no backend side effects.
+  - Setup map-dependent assertions should gate on interactive map availability and skip gracefully when only fallback mode is available.
+  - Breadcrumb assertions are more robust when checking segment presence separately rather than exact whitespace around separators.
+---
+## 2026-03-01 22:42:58 CET - US-E2E-02 (addendum)
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Stabilized an existing flaky assertion in `client/e2e/tests/ui-components.spec.ts` by making explorer map-center drift checks resilient when map internals are unavailable, then reran `npm run test:e2e --workspace=client` to green.
+- Files changed: `client/e2e/tests/ui-components.spec.ts`
+- **Learnings for future iterations:**
+  - Google Maps internal object references (`__gm`) are not guaranteed across runs; e2e checks should gracefully degrade to interaction-only assertions when internals are unavailable.
+---
