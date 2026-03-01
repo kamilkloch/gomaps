@@ -516,6 +516,26 @@
       "priority": 1,
       "passes": true,
       "notes": "Coverage expanded in client/e2e/tests/app-flows.spec.ts (project CRUD, setup progress, explorer sorting/filter/selection) and checklist maintained in client/e2e/tests/coverage-checklist.md. Playwright now loads root .env in config so map-capable runs use VITE_GOOGLE_MAPS_API_KEY consistently."
+    },
+    {
+      "id": "US-028",
+      "title": "Fix project/run status consistency and harden cross-view progress truth",
+      "description": "Resolve data consistency bugs between Projects and Setup views so project status badges, project summary metadata, and active run progress always reflect the same authoritative backend state. Specifically address the observed mismatch where a project card shows Complete while Setup still has active/incomplete runs, project summary incorrectly shows Places: 0 / Scrape runs: 0 / Last scraped: never despite existing runs, and Setup progress remains stuck at 77% from a previous run while a different selected run is active. Define deterministic status derivation rules and ensure run-scoped progress is never polluted by another run's counters.",
+      "acceptanceCriteria": [
+        "Projects page status badge derives from authoritative run state (Running if any run for project is running; Complete only when latest relevant run is completed and no run is active; Failed/Paused reflected correctly)",
+        "Project card summary metrics (Places, Scrape runs, Last scraped) are sourced from persisted project/run/place data and match backend values for non-empty projects",
+        "Setup page progress panel is strictly bound to the selected/active run ID and never displays counters or percentage from another run",
+        "Switching between historical runs in Previous Runs updates progress/tile counters deterministically and immediately",
+        "When a new run starts, progress initializes from that run's counters and cannot inherit stale percentage/time from prior runs",
+        "Server API contract is explicit about project aggregate fields and run status precedence to prevent client-side guesswork",
+        "Add regression tests at API level for project aggregate summary and status derivation (including mixed completed/failed/running run history)",
+        "Add Playwright end-to-end regressions that recreate the Sardinia mismatch scenario and assert consistency between Projects card, Setup Previous Runs, and Setup Progress panel",
+        "Extend the UI interaction coverage checklist to include cross-view consistency assertions for status badges, summary metrics, and run-scoped progress",
+        "Run and pass: npm run typecheck --workspace=server, npm run typecheck --workspace=client, npm test --workspace=server, npm run test:e2e"
+      ],
+      "priority": -1,
+      "passes": false,
+      "notes": "Highest-priority hotfix story requested after field report with Sardinia 2025 inconsistencies. Testing must be exhaustive across Projects and Setup states, including rapid run switching, pause/resume, completed+failed history mixes, and stale UI reload scenarios."
     }
   ]
 }
