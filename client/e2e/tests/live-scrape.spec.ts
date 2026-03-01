@@ -22,6 +22,10 @@ interface ApiScrapeProgress {
   elapsedMs: number
 }
 
+interface ApiPlace {
+  id: string
+}
+
 test.describe('live scrape smoke (Google Places API)', () => {
   test.skip(!isLiveScrapeEnabled, 'Set E2E_LIVE_SCRAPE=1 to run live scrape tests.')
 
@@ -64,6 +68,18 @@ test.describe('live scrape smoke (Google Places API)', () => {
     expect(finalProgress.status).toBe('completed')
     expect(finalProgress.tilesTotal).toBeGreaterThan(0)
     expect(finalProgress.tilesCompleted).toBe(finalProgress.tilesTotal)
+
+    if (finalProgress.placesFound > 0) {
+      expect(finalProgress.placesUnique).toBeGreaterThan(0)
+
+      const projectPlacesResponse = await request.get(
+        `${E2E_SERVER_BASE_URL}/api/places?projectId=${createdProject.id}`
+      )
+      expect(projectPlacesResponse.ok()).toBeTruthy()
+      const projectPlaces = await projectPlacesResponse.json() as ApiPlace[]
+      expect(projectPlaces.length).toBeGreaterThan(0)
+      expect(projectPlaces.length).toBe(finalProgress.placesUnique)
+    }
 
     const tilesResponse = await request.get(`${E2E_SERVER_BASE_URL}/api/scrape/${scrapeRunId}/tiles`)
     expect(tilesResponse.ok()).toBeTruthy()

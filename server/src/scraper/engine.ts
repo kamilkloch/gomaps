@@ -144,7 +144,14 @@ const processTileQueue = (
       yield* updateTile(tile.id, { resultCount: searchResult.resultCount })
 
       if (shouldSubdivide(searchResult.resultCount)) {
-        yield* subdivideTileInRun(tile.id)
+        const childTiles = yield* subdivideTileInRun(tile.id)
+
+        // If the tile is already at minimum size, subdivision returns no children.
+        // Persist the current results so dense leaf tiles are not dropped.
+        if (childTiles.length === 0) {
+          yield* persistTilePlaces(scrapeRunId, searchResult.places, delayMs)
+        }
+
         yield* notifyProgress(scrapeRunId, startedAt, onProgress)
         continue
       }

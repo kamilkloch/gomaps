@@ -193,6 +193,63 @@ describe('scraper engine', () => {
     expect(result.linkCount).toBe(2)
     expect(result.tileCount).toBe(1)
   })
+
+  it('persists places when overflowing tiles cannot subdivide further', async () => {
+    const denseTilePlaces = Array.from({ length: 60 }, (_value, index) =>
+      parsedPlace(`dense-${index}`)
+    )
+
+    textSearchMock.mockReturnValue(
+      Effect.succeed({
+        places: denseTilePlaces,
+        nextPageToken: null,
+      })
+    )
+    getPlaceDetailsMock.mockImplementation((placeId: string) =>
+      Effect.succeed({
+        place: parsedPlace(placeId).place,
+        reviews: [],
+      })
+    )
+
+    const result = await runtime.runPromise(
+      Effect.gen(function* () {
+        const project = yield* createProject('Dense leaf tile', null)
+        const run = yield* createScrapeRun(project.id, 'hotel')
+
+        yield* startScrape({
+          scrapeRunId: run.id,
+          query: run.query,
+          bounds: {
+            sw: { lat: 40.0, lng: 8.0 },
+            ne: { lat: 40.01, lng: 8.01 },
+          },
+          delayMs: 0,
+        })
+
+        const updatedRun = yield* getScrapeRun(run.id)
+        const places = yield* listPlaces(project.id)
+        const links = yield* listPlaceScrapeRuns(run.id)
+
+        return {
+          updatedRun,
+          placeCount: places.length,
+          linkCount: links.length,
+        }
+      })
+    )
+
+    expect(textSearchMock).toHaveBeenCalledTimes(1)
+    expect(getPlaceDetailsMock).toHaveBeenCalledTimes(60)
+    expect(result.updatedRun.status).toBe('completed')
+    expect(result.updatedRun.tilesTotal).toBe(1)
+    expect(result.updatedRun.tilesCompleted).toBe(1)
+    expect(result.updatedRun.tilesSubdivided).toBe(0)
+    expect(result.updatedRun.placesFound).toBe(60)
+    expect(result.updatedRun.placesUnique).toBe(60)
+    expect(result.placeCount).toBe(60)
+    expect(result.linkCount).toBe(60)
+  })
 })
 
 const parsedPlace = (id: string) => ({
