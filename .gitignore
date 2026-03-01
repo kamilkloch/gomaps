@@ -9,3 +9,4 @@ client/e2e/test-results
 *.tsbuildinfo
 coverage
 server/coverage
+naxos.html
