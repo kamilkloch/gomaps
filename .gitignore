@@ -7,3 +7,5 @@ client/e2e/test-results
 .DS_Store
 .env
 *.tsbuildinfo
+coverage
+server/coverage

@@ -10,6 +10,7 @@
   "scripts": {
     "typecheck": "npm run typecheck --workspace=server && npm run typecheck --workspace=client",
     "build": "npm run build --workspace=server && npm run build --workspace=client",
-    "test": "npm test --workspace=server"
+    "test": "npm test --workspace=server && npm test --workspace=client",
+    "test:coverage": "npm run test:coverage --workspace=server && npm run test:coverage --workspace=client"
   }
 }
