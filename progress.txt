@@ -420,3 +420,14 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - Keep resilience scenarios in their own E2E spec so failure-mode regressions stay isolated from happy-path suites.
   - For sort regressions, pair indicator assertions (`↑`/`↓`) with row-order snapshots to verify both visual affordance and data behavior.
 ---
+## 2026-03-02 00:08:30 CET - US-015
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Reworked the Explorer detail panel to match story requirements: richer header with category + rating stars/review count, website-type badge labeling (`Book Direct` for direct), contact rows (website/address/phone/price), amenity chips, thumbnail photo gallery, opening-hours accordion, scraped-at metadata, and three full-width action buttons (Google Maps / Booking / Airbnb)
+- Added place-review data flow end-to-end: new server endpoint `GET /api/places/:placeId/reviews`, new client API helper `listPlaceReviews`, and per-selected-place review loading/caching in Explorer with loading/error/empty states and star-rated review snippets
+- Added integration coverage for the new reviews endpoint in `server/tests/projects.test.ts`
+- Files changed: `server/src/routes/places.ts`, `server/tests/projects.test.ts`, `client/src/lib/api.ts`, `client/src/pages/ExplorerPage.tsx`, `client/src/styles.css`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For panel-rich UI stories, keep existing `data-testid` anchors stable while upgrading markup/styles to avoid regressing the established Playwright harness.
+  - A tiny per-place review cache in client state (`Record<placeId, Review[]>`) avoids repeated API calls during table/map reselection without adding new global state machinery.
+  - Keep external-action URL construction in pure helper functions (query label builder + provider URL builders) so future stories can reuse link behavior in other views.
+---

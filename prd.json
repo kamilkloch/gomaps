@@ -309,7 +309,7 @@
         "npm run typecheck --workspace=client passes"
       ],
       "priority": 30,
-      "passes": false,
+      "passes": true,
       "notes": "Reference mockup: docs/mockups/03-explorer-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {

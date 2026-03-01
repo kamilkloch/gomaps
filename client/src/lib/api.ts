@@ -78,6 +78,14 @@ export interface Place {
   scrapedAt: string
 }
 
+export interface PlaceReview {
+  id: string
+  placeId: string
+  rating: number
+  text: string
+  relativeDate: string | null
+}
+
 const API_BASE = '/api'
 
 const API_ROUTING_HINT =
@@ -172,6 +180,9 @@ export const listPlaces = async (projectId?: string): Promise<Place[]> =>
       ? `/places?projectId=${encodeURIComponent(projectId)}`
       : '/places'
   )
+
+export const listPlaceReviews = async (placeId: string): Promise<PlaceReview[]> =>
+  requestJson<PlaceReview[]>(`/places/${encodeURIComponent(placeId)}/reviews`)
 
 export const startScrape = async (
   projectId: string,

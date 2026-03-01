@@ -3,13 +3,22 @@ import { MarkerClusterer, MarkerClustererEvents } from '@googlemaps/markercluste
 import type { UIEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getProject, listPlaces, listProjects, type Place, type Project } from '../lib/api'
+import {
+  getProject,
+  listPlaceReviews,
+  listPlaces,
+  listProjects,
+  type Place,
+  type PlaceReview,
+  type Project,
+} from '../lib/api'
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_MODE === '1'
 const FALLBACK_CENTER = { lat: 40, lng: 9 }
 const TABLE_ROW_HEIGHT = 44
 const TABLE_OVERSCAN = 10
+const REVIEW_SNIPPET_LENGTH = 220
 
 type SortKey =
   | 'name'
@@ -83,6 +92,10 @@ export function ExplorerPage() {
   const [tableFilterText, setTableFilterText] = useState('')
   const [sortState, setSortState] = useState<SortState>({ key: 'rating', direction: 'desc' })
   const [favoritePlaceIds, setFavoritePlaceIds] = useState<Set<string>>(new Set())
+  const [reviewsByPlaceId, setReviewsByPlaceId] = useState<Record<string, PlaceReview[]>>({})
+  const [isLoadingSelectedReviews, setIsLoadingSelectedReviews] = useState(false)
+  const [selectedReviewsError, setSelectedReviewsError] = useState<string | null>(null)
+  const [isOpeningHoursExpanded, setIsOpeningHoursExpanded] = useState(true)
   const [markerDebugEntries, setMarkerDebugEntries] = useState<MarkerDebugEntry[]>([])
   const [clusterDebugSnapshot, setClusterDebugSnapshot] = useState<ClusterDebugSnapshot>(EMPTY_CLUSTER_DEBUG_SNAPSHOT)
   const [selectionCircleDebugSnapshot, setSelectionCircleDebugSnapshot] = useState<SelectionCircleDebugSnapshot>(
@@ -147,6 +160,9 @@ export function ExplorerPage() {
     if (!selectedProjectId) {
       setSelectedProject(null)
       setPlaces([])
+      setReviewsByPlaceId({})
+      setSelectedReviewsError(null)
+      setIsLoadingSelectedReviews(false)
       return
     }
 
@@ -167,6 +183,9 @@ export function ExplorerPage() {
 
         setSelectedProject(project)
         setPlaces(projectPlaces)
+        setReviewsByPlaceId({})
+        setSelectedReviewsError(null)
+        setIsLoadingSelectedReviews(false)
         setSelectedPlaceId((current) =>
           current && projectPlaces.some((place) => place.id === current)
             ? current
@@ -265,6 +284,23 @@ export function ExplorerPage() {
     () => parseJsonArray(selectedPlace?.amenities),
     [selectedPlace?.amenities],
   )
+  const selectedPlaceReviews = useMemo(() => {
+    if (!selectedPlace) {
+      return []
+    }
+
+    return reviewsByPlaceId[selectedPlace.id] ?? []
+  }, [reviewsByPlaceId, selectedPlace])
+  const selectedPlaceSearchLabel = useMemo(() => buildPlaceSearchLabel(selectedPlace), [selectedPlace])
+  const selectedPlaceBookingUrl = useMemo(
+    () => buildBookingSearchUrl(selectedPlaceSearchLabel),
+    [selectedPlaceSearchLabel],
+  )
+  const selectedPlaceAirbnbUrl = useMemo(
+    () => buildAirbnbSearchUrl(selectedPlaceSearchLabel),
+    [selectedPlaceSearchLabel],
+  )
+  const selectedPlaceGoogleMapsUrl = selectedPlace?.googleMapsUri ?? null
 
   const defaultMapCenter = getProjectCenter(selectedProject?.bounds) ?? FALLBACK_CENTER
 
@@ -330,6 +366,59 @@ export function ExplorerPage() {
     setTableScrollTop(0)
     tableScrollRef.current?.scrollTo({ top: 0 })
   }, [selectedProjectId, searchText, tableFilterText, sortState])
+
+  useEffect(() => {
+    setIsOpeningHoursExpanded(true)
+  }, [selectedPlaceId])
+
+  useEffect(() => {
+    const placeId = selectedPlace?.id
+    if (!placeId) {
+      setIsLoadingSelectedReviews(false)
+      setSelectedReviewsError(null)
+      return
+    }
+
+    if (Object.prototype.hasOwnProperty.call(reviewsByPlaceId, placeId)) {
+      setIsLoadingSelectedReviews(false)
+      setSelectedReviewsError(null)
+      return
+    }
+
+    let isCancelled = false
+    setIsLoadingSelectedReviews(true)
+    setSelectedReviewsError(null)
+
+    const loadReviews = async () => {
+      try {
+        const reviews = await listPlaceReviews(placeId)
+        if (isCancelled) {
+          return
+        }
+
+        setReviewsByPlaceId((current) => ({
+          ...current,
+          [placeId]: reviews,
+        }))
+      }
+      catch {
+        if (!isCancelled) {
+          setSelectedReviewsError('Unable to load reviews right now.')
+        }
+      }
+      finally {
+        if (!isCancelled) {
+          setIsLoadingSelectedReviews(false)
+        }
+      }
+    }
+
+    void loadReviews()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [reviewsByPlaceId, selectedPlace])
 
   return (
     <main className="explorer-page" data-testid="explorer-page">
@@ -413,46 +502,61 @@ export function ExplorerPage() {
             {selectedPlace ? (
               <section className="explorer-detail-content">
                 <p className="explorer-detail-kicker">Selected Place</p>
-                <h2 data-testid="explorer-detail-name">{selectedPlace.name}</h2>
-                <p data-testid="explorer-detail-category">
-                  Category: {selectedPlace.category ?? 'Uncategorized'}
-                </p>
-                <p data-testid="explorer-detail-rating">
-                  Rating: {selectedPlace.rating?.toFixed(1) ?? 'N/A'}★ · {selectedPlace.reviewCount ?? 0} reviews
-                </p>
-                <p data-testid="explorer-detail-address">
-                  Address: {selectedPlace.address ?? 'No address available'}
-                </p>
-                <p data-testid="explorer-detail-phone">
-                  Phone:{' '}
-                  {selectedPlace.phone ? (
-                    <a href={`tel:${selectedPlace.phone}`} className="explorer-detail-link">{selectedPlace.phone}</a>
-                  ) : '—'}
-                </p>
-                <p data-testid="explorer-detail-price">
-                  Price: {formatPriceLevel(selectedPlace.priceLevel)}
-                </p>
-                <p data-testid="explorer-detail-website">
-                  Website:{' '}
-                  {selectedPlace.website ? (
-                    <a href={selectedPlace.website} target="_blank" rel="noreferrer" className="explorer-detail-link">
-                      {selectedPlace.website}
-                    </a>
-                  ) : '—'}
-                </p>
-                <p data-testid="explorer-detail-website-type">
+                <div className="explorer-detail-header-row">
+                  <div>
+                    <h2 data-testid="explorer-detail-name">{selectedPlace.name}</h2>
+                    <p data-testid="explorer-detail-category" className="explorer-detail-category-text">
+                      {selectedPlace.category ?? 'Uncategorized'}
+                    </p>
+                  </div>
                   <span
                     data-testid="explorer-detail-website-badge"
                     className={`explorer-website-badge explorer-website-${selectedPlace.websiteType}`}
                   >
-                    {websiteLabel(selectedPlace.websiteType)}
+                    {detailWebsiteLabel(selectedPlace.websiteType)}
                   </span>
+                </div>
+
+                <p data-testid="explorer-detail-rating" className="explorer-detail-rating-row">
+                  <span className="explorer-detail-rating-stars">{renderRatingStars(selectedPlace.rating)}</span>
+                  <span className="explorer-detail-rating-value">{selectedPlace.rating?.toFixed(1) ?? 'N/A'}</span>
+                  <span className="explorer-detail-rating-count">{selectedPlace.reviewCount ?? 0} reviews</span>
                 </p>
 
-                <div data-testid="explorer-detail-amenities" className="explorer-detail-block">
-                  <p>Amenities:</p>
+                <section className="explorer-detail-section">
+                  <h3>Contact</h3>
+                  <p data-testid="explorer-detail-website" className="explorer-detail-contact-row">
+                    <span className="explorer-detail-icon">🌐</span>
+                    {selectedPlace.website ? (
+                      <a href={selectedPlace.website} target="_blank" rel="noreferrer" className="explorer-detail-link">
+                        {selectedPlace.website}
+                      </a>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </p>
+                  <p data-testid="explorer-detail-address" className="explorer-detail-contact-row">
+                    <span className="explorer-detail-icon">📍</span>
+                    <span>{selectedPlace.address ?? 'No address available'}</span>
+                  </p>
+                  <p data-testid="explorer-detail-phone" className="explorer-detail-contact-row">
+                    <span className="explorer-detail-icon">📞</span>
+                    {selectedPlace.phone ? (
+                      <a href={toPhoneHref(selectedPlace.phone)} className="explorer-detail-link">{selectedPlace.phone}</a>
+                    ) : (
+                      <span>—</span>
+                    )}
+                  </p>
+                  <p data-testid="explorer-detail-price" className="explorer-detail-contact-row">
+                    <span className="explorer-detail-icon">💲</span>
+                    <span>{formatPriceLevel(selectedPlace.priceLevel)}</span>
+                  </p>
+                </section>
+
+                <div data-testid="explorer-detail-amenities" className="explorer-detail-section">
+                  <h3>Amenities</h3>
                   {selectedPlaceAmenities.length > 0 ? (
-                    <ul className="explorer-detail-list">
+                    <ul className="explorer-detail-amenity-chips">
                       {selectedPlaceAmenities.map((amenity) => (
                         <li key={amenity}>{amenity}</li>
                       ))}
@@ -462,10 +566,10 @@ export function ExplorerPage() {
                   )}
                 </div>
 
-                <div data-testid="explorer-detail-photos" className="explorer-detail-block">
-                  <p>Photos:</p>
+                <div data-testid="explorer-detail-photos" className="explorer-detail-section">
+                  <h3>Photos</h3>
                   {selectedPlacePhotoUrls.length > 0 ? (
-                    <div className="explorer-detail-photos">
+                    <div className="explorer-detail-photo-strip">
                       {selectedPlacePhotoUrls.map((photoUrl, index) => (
                         <a
                           key={photoUrl}
@@ -475,7 +579,7 @@ export function ExplorerPage() {
                           rel="noreferrer"
                           className="explorer-detail-photo-link"
                         >
-                          Photo {index + 1}
+                          <img src={photoUrl} alt={`${selectedPlace.name} photo ${index + 1}`} loading="lazy" />
                         </a>
                       ))}
                     </div>
@@ -484,12 +588,79 @@ export function ExplorerPage() {
                   )}
                 </div>
 
-                <p data-testid="explorer-detail-opening-hours">
-                  Opening hours: {selectedPlace.openingHours ?? '—'}
+                <div data-testid="explorer-detail-opening-hours" className="explorer-detail-accordion">
+                  <button
+                    type="button"
+                    className="explorer-detail-accordion-toggle"
+                    onClick={() => setIsOpeningHoursExpanded((current) => !current)}
+                  >
+                    Opening hours
+                    <span aria-hidden="true">{isOpeningHoursExpanded ? '▾' : '▸'}</span>
+                  </button>
+                  {isOpeningHoursExpanded ? (
+                    <p>{selectedPlace.openingHours ?? 'No opening hours available.'}</p>
+                  ) : null}
+                </div>
+
+                <p data-testid="explorer-detail-scraped-at" className="explorer-detail-scraped-at">
+                  Scraped at: {formatScrapedAt(selectedPlace.scrapedAt)}
                 </p>
-                <p data-testid="explorer-detail-scraped-at">
-                  Scraped at: {selectedPlace.scrapedAt}
-                </p>
+
+                <div data-testid="explorer-detail-reviews" className="explorer-detail-section">
+                  <h3>Reviews</h3>
+                  {isLoadingSelectedReviews ? (
+                    <p>Loading reviews…</p>
+                  ) : selectedReviewsError ? (
+                    <p>{selectedReviewsError}</p>
+                  ) : selectedPlaceReviews.length > 0 ? (
+                    <ul className="explorer-detail-review-list">
+                      {selectedPlaceReviews.map((review) => (
+                        <li key={review.id} className="explorer-detail-review-item">
+                          <div className="explorer-detail-review-meta">
+                            <span className="explorer-detail-review-stars">{renderRatingStars(review.rating)}</span>
+                            <span className="explorer-detail-review-rating">{review.rating.toFixed(1)}</span>
+                            {review.relativeDate ? (
+                              <span className="explorer-detail-review-date">{review.relativeDate}</span>
+                            ) : null}
+                          </div>
+                          <p>{truncateReviewText(review.text)}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No reviews available.</p>
+                  )}
+                </div>
+
+                <div className="explorer-detail-actions">
+                  <a
+                    data-testid="explorer-detail-action-open-google-maps"
+                    href={selectedPlaceGoogleMapsUrl ?? '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="explorer-detail-action-button"
+                  >
+                    Open in Google Maps
+                  </a>
+                  <a
+                    data-testid="explorer-detail-action-search-booking"
+                    href={selectedPlaceBookingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="explorer-detail-action-button"
+                  >
+                    Search on Booking.com
+                  </a>
+                  <a
+                    data-testid="explorer-detail-action-search-airbnb"
+                    href={selectedPlaceAirbnbUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="explorer-detail-action-button"
+                  >
+                    Search on Airbnb
+                  </a>
+                </div>
               </section>
             ) : (
               <p className="explorer-placeholder">Select a marker to inspect place details.</p>
@@ -1009,6 +1180,64 @@ const websiteLabel = (websiteType: Place['websiteType']): string => {
 
   return 'Unknown'
 }
+
+const detailWebsiteLabel = (websiteType: Place['websiteType']): string => {
+  if (websiteType === 'direct') {
+    return 'Book Direct'
+  }
+
+  return websiteLabel(websiteType)
+}
+
+const renderRatingStars = (rating: number | null): string => {
+  if (rating === null || Number.isNaN(rating)) {
+    return '☆☆☆☆☆'
+  }
+
+  const clamped = Math.min(5, Math.max(0, Math.round(rating)))
+  return `${'★'.repeat(clamped)}${'☆'.repeat(5 - clamped)}`
+}
+
+const toPhoneHref = (phoneRaw: string): string => {
+  const normalized = phoneRaw.replace(/\s+/g, '')
+  return `tel:${normalized}`
+}
+
+const truncateReviewText = (text: string): string => {
+  const trimmed = text.trim()
+  if (trimmed.length <= REVIEW_SNIPPET_LENGTH) {
+    return trimmed
+  }
+
+  return `${trimmed.slice(0, REVIEW_SNIPPET_LENGTH - 1)}…`
+}
+
+const formatScrapedAt = (scrapedAtRaw: string): string => {
+  const timestamp = Date.parse(scrapedAtRaw)
+  if (!Number.isFinite(timestamp)) {
+    return scrapedAtRaw
+  }
+
+  return new Date(timestamp).toLocaleString()
+}
+
+const buildPlaceSearchLabel = (place: Place | null): string => {
+  if (!place) {
+    return ''
+  }
+
+  const chunks = [place.name, place.address ?? '']
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+
+  return chunks.join(', ')
+}
+
+const buildBookingSearchUrl = (searchLabel: string): string =>
+  `https://www.booking.com/searchresults.html?ss=${encodeURIComponent(searchLabel)}`
+
+const buildAirbnbSearchUrl = (searchLabel: string): string =>
+  `https://www.airbnb.com/s/${encodeURIComponent(searchLabel)}/homes`
 
 const formatPriceLevel = (priceLevel: string | null): string => {
   if (!priceLevel) {

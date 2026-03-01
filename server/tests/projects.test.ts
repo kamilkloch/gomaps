@@ -14,7 +14,7 @@ const dbPath = join(tmpdir(), `gomaps-test-${randomUUID()}.db`)
 process.env.DB_PATH = dbPath
 
 const { getScrapeRun, updateScrapeRun, closeDatabase } = await import('../src/db/index.js')
-const { createPlace, createScrapeRun, linkPlaceToScrapeRun } = await import('../src/db/index.js')
+const { createPlace, createReview, createScrapeRun, linkPlaceToScrapeRun } = await import('../src/db/index.js')
 const { truncateAllTables } = await import('../src/db/index.js')
 const { appRuntime } = await import('../src/runtime.js')
 const {
@@ -433,6 +433,33 @@ describe('placeholder routers', () => {
     const res = await request(app).get('/api/places')
     expect(res.status).toBe(200)
     expect(res.body).toEqual([])
+  })
+
+  it('GET /api/places/:placeId/reviews returns place reviews', async () => {
+    const placeId = 'placeholder-reviews-place'
+    await appRuntime.runPromise(
+      Effect.gen(function* () {
+        yield* createPlace({
+          id: placeId,
+          googleMapsUri: 'https://maps.google.com/?cid=placeholder-reviews-place',
+          name: 'Placeholder Reviews Place',
+          lat: 40.12,
+          lng: 9.14,
+        })
+        yield* createReview(placeId, 5, 'Excellent stay with sea view', '2 months ago')
+      })
+    )
+
+    const res = await request(app).get(`/api/places/${placeId}/reviews`)
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0]).toMatchObject({
+      placeId,
+      rating: 5,
+      text: 'Excellent stay with sea view',
+      relativeDate: '2 months ago',
+    })
   })
 
   it('GET /api/shortlists returns empty array', async () => {
