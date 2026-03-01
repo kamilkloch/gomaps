@@ -1,0 +1,47 @@
+name: Playwright Coverage
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/playwright-coverage.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'client/**'
+      - 'server/**'
+  workflow_dispatch:
+
+jobs:
+  playwright-coverage:
+    name: Playwright E2E Coverage (non-gating)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright coverage
+        run: npm run test:e2e:coverage --workspace=client
+
+      - name: Upload Playwright coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e-lcov
+          path: |
+            client/e2e/coverage/lcov.info
+            client/e2e/coverage/lcov-report
+          if-no-files-found: warn

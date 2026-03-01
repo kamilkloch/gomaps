@@ -65,6 +65,9 @@ npm run test:e2e --workspace=client
 # Run client E2E tests headed with slow motion
 PW_SLOW_MO=25 npm run test:e2e --workspace=client -- --headed
 
+# Run client E2E with separate Playwright LCOV output (non-gating job target)
+npm run test:e2e:coverage --workspace=client
+
 # Production build
 npm run build --workspace=server
 npm run build --workspace=client

@@ -11,3 +11,4 @@ coverage
 server/coverage
 naxos.html
 .idea
+client/e2e/coverage

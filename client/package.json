@@ -9,7 +9,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:coverage": "node ./e2e/utils/run-playwright-coverage.mjs"
   },
   "dependencies": {
     "@googlemaps/markerclusterer": "^2.6.2",
