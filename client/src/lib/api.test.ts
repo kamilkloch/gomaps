@@ -1,6 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ApiRequestError,
+  getProject,
+  getScrapeStatus,
+  listPlaceReviews,
+  listPlaces,
+  listRunTiles,
+  listScrapeRuns,
+  pauseScrape,
+  resumeScrape,
+  startScrape,
+  updateProject,
   createProject,
   deleteProject,
   getErrorMessage,
@@ -71,6 +81,125 @@ describe('api helpers', () => {
     await expect(deleteProject('p1')).resolves.toBeUndefined()
   })
 
+  it('gets a project by id', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ id: 'p-42', name: 'Rome' }), { status: 200 }))
+
+    const result = await getProject('p-42')
+
+    expect(result).toEqual({ id: 'p-42', name: 'Rome' })
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/projects/p-42',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+  })
+
+  it('updates a project with PUT JSON body', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: 'p1', name: 'Updated', bounds: 'bbox' }), { status: 200 }),
+    )
+
+    const result = await updateProject('p1', { name: 'Updated', bounds: 'bbox' })
+
+    expect(result).toEqual({ id: 'p1', name: 'Updated', bounds: 'bbox' })
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/projects/p1',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ name: 'Updated', bounds: 'bbox' }),
+      }),
+    )
+  })
+
+  it('lists scrape runs with encoded project query', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify([{ id: 'run-1' }]), { status: 200 }))
+
+    const result = await listScrapeRuns('project/id with spaces')
+
+    expect(result).toEqual([{ id: 'run-1' }])
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/scrape?projectId=project%2Fid%20with%20spaces',
+      expect.any(Object),
+    )
+  })
+
+  it('gets scrape status for a run', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ scrapeRunId: 'run-9', status: 'running' }), { status: 200 }),
+    )
+
+    const result = await getScrapeStatus('run-9')
+    expect(result).toEqual({ scrapeRunId: 'run-9', status: 'running' })
+    expect(mockFetch).toHaveBeenCalledWith('/api/scrape/run-9', expect.any(Object))
+  })
+
+  it('lists tiles for a run', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify([{ id: 'tile-1' }]), { status: 200 }))
+
+    const result = await listRunTiles('run-2')
+    expect(result).toEqual([{ id: 'tile-1' }])
+    expect(mockFetch).toHaveBeenCalledWith('/api/scrape/run-2/tiles', expect.any(Object))
+  })
+
+  it('lists places with and without a project filter', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify([{ id: 'place-1' }]), { status: 200 }))
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify([{ id: 'place-2' }]), { status: 200 }))
+
+    const unfiltered = await listPlaces()
+    const filtered = await listPlaces('project-1')
+
+    expect(unfiltered).toEqual([{ id: 'place-1' }])
+    expect(filtered).toEqual([{ id: 'place-2' }])
+    expect(mockFetch).toHaveBeenNthCalledWith(1, '/api/places', expect.any(Object))
+    expect(mockFetch).toHaveBeenNthCalledWith(2, '/api/places?projectId=project-1', expect.any(Object))
+  })
+
+  it('lists place reviews using encoded place id', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify([{ id: 'r-1' }]), { status: 200 }))
+
+    const result = await listPlaceReviews('ChIJ abc/123')
+    expect(result).toEqual([{ id: 'r-1' }])
+    expect(mockFetch).toHaveBeenCalledWith('/api/places/ChIJ%20abc%2F123/reviews', expect.any(Object))
+  })
+
+  it('starts scrape with project and query payload', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ scrapeRunId: 'run-7' }), { status: 200 }))
+
+    const result = await startScrape('project-7', 'hotel')
+    expect(result).toEqual({ scrapeRunId: 'run-7' })
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/scrape/start',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ projectId: 'project-7', query: 'hotel' }),
+      }),
+    )
+  })
+
+  it('pauses and resumes scrape runs', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ status: 'pausing' }), { status: 200 }))
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ status: 'running' }), { status: 200 }))
+
+    const paused = await pauseScrape('run-10')
+    const resumed = await resumeScrape('run-10')
+
+    expect(paused).toEqual({ status: 'pausing' })
+    expect(resumed).toEqual({ status: 'running' })
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      '/api/scrape/run-10/pause',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/scrape/run-10/resume',
+      expect.objectContaining({ method: 'POST' }),
+    )
+  })
+
   it('throws ApiRequestError with response message on non-2xx', async () => {
     mockFetch.mockResolvedValueOnce(new Response('project missing', { status: 404 }))
 
@@ -88,6 +217,16 @@ describe('api helpers', () => {
       name: 'ApiRequestError',
       status: 404,
       message: expect.stringContaining('GoMaps API is not reachable at /api'),
+    })
+  })
+
+  it('throws generic status message when error body is empty', async () => {
+    mockFetch.mockResolvedValueOnce(new Response('   ', { status: 500 }))
+
+    await expect(listProjects()).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      status: 500,
+      message: 'Request failed with status 500',
     })
   })
 
