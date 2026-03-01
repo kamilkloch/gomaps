@@ -536,6 +536,133 @@
       "priority": -1,
       "passes": true,
       "notes": "Completed with backend-derived /api/projects aggregates (status + places/runs/lastScraped + activeRunId), Setup run-scoped progress reset on run switch, API regression coverage in server/tests/projects.test.ts, and Playwright Sardinia consistency regression in client/e2e/tests/app-flows.spec.ts."
+    },
+    {
+      "id": "US-E2E-01",
+      "title": "E2E story-boards: Projects Page edge cases",
+      "description": "Add Playwright e2e tests in client/e2e/tests/ covering untested Projects Page scenarios. Use seeded fixtures, strict locator hierarchy, no hardcoded sleeps, screenshots at key points, console-error monitoring.",
+      "acceptanceCriteria": [
+        "Project card aggregate fields: seed projects with each status variant (draft/running/paused/failed/complete), verify status badge text and CSS class, placesCount, scrapeRunsCount, lastScrapedAt render correctly for each",
+        "Project card map preview: verify mini Google Maps preview renders when API key is present, or fallback text when absent",
+        "Project card hover selection: hover a card, verify is-selected class applied and 'Selected: {name}' copy updates",
+        "Multiple projects ordering: create 3 projects, verify list order matches creation order",
+        "Rapid create-delete cycle: create a project and immediately delete it, verify no race-condition errors or leftover cards",
+        "Create with duplicate name: create two projects with the same name, verify both appear in the list (or verify error if the server rejects duplicates)",
+        "All tests pass: npm run test:e2e succeeds"
+      ],
+      "priority": -8,
+      "passes": false,
+      "notes": "Part 1 of 7 E2E story-board expansion. Extend client/e2e/tests/ with a new spec file (e.g., projects-edge-cases.spec.ts). Add data-testid attributes to components as needed."
+    },
+    {
+      "id": "US-E2E-02",
+      "title": "E2E story-boards: Setup Page validation, estimates, and chrome",
+      "description": "Add Playwright e2e tests covering Setup Page UI elements that are not yet exercised: estimate badge, empty-query guard, breadcrumbs, runs list cap, and bounds persistence round-trip.",
+      "acceptanceCriteria": [
+        "Estimate badge: select area, verify setup-estimate-badge shows '~N tiles · Est. M min'; clear area, verify fallback text 'Select an area to estimate tiles and timing'",
+        "Start scrape with empty query: clear the query input, click Start Scrape, verify error message appears ('Enter a query…') and no /api/scrape/start request fires",
+        "Start scrape disabled without area: with no bounds selected, verify setup-start-scrape-button is disabled",
+        "Breadcrumbs: verify breadcrumb text renders 'Projects / {project name} / Setup' with the correct seeded project name",
+        "Runs list capped at 6: seed 8 runs for one project, verify only 6 are rendered in setup-runs-section",
+        "Bounds persistence round-trip: select area on map → navigate to Projects → navigate back to Setup → verify coordinates pill and rectangle are restored from persisted bounds",
+        "All tests pass: npm run test:e2e succeeds"
+      ],
+      "priority": -7,
+      "passes": false,
+      "notes": "Part 2 of 7 E2E story-board expansion. Add to a new spec file (e.g., setup-validation.spec.ts)."
+    },
+    {
+      "id": "US-E2E-03",
+      "title": "E2E story-boards: Setup Page run status, progress, and SSE",
+      "description": "Add Playwright e2e tests covering Setup Page run status badges, progress bar rendering, elapsed/ETA display, pause/resume label toggling, tile overlay colors, SSE progress subscription, and map diagnostic messages.",
+      "acceptanceCriteria": [
+        "Run status badges: seed runs with each status (pending/running/paused/completed/failed), verify each run button shows correct status text and CSS class (setup-run-status-{status})",
+        "Progress bar: seed a running run at ~50%, verify setup-progress-fill has is-running class and width style approximately 50%",
+        "Elapsed + ETA: seed a running run with non-zero elapsedMs and partial completion, verify 'Time: Xm Ys · Est. remaining …' renders in setup-progress-stats",
+        "Pause → Resume label toggle: click pause button, verify label changes to 'Pausing…' then 'Resume'; click again, verify 'Resuming…' then 'Pause'",
+        "Tile overlay colors (interactive map only): seed tiles with completed/running/pending/subdivided statuses, verify green/yellow/gray rectangles render on map",
+        "SSE progress subscription: mock /api/scrape/:runId/progress SSE endpoint, push a progress event, verify setup-progress-section updates without page reload",
+        "Map diagnostic messages: test the 3 diagnostic branches (API key error via onError, map init timeout, tile load timeout) by mocking/controlling map load timing",
+        "All tests pass: npm run test:e2e succeeds"
+      ],
+      "priority": -6,
+      "passes": false,
+      "notes": "Part 3 of 7 E2E story-board expansion. Add to a new spec file (e.g., setup-progress.spec.ts). Some tests may need page.route() mocking for SSE and map error scenarios."
+    },
+    {
+      "id": "US-E2E-04",
+      "title": "E2E story-boards: Explorer detail panel, badges, and formatting",
+      "description": "Add Playwright e2e tests covering Explorer Page detail panel content, website type badge CSS classes, price level formatting, marker color by rating, and empty/edge states.",
+      "acceptanceCriteria": [
+        "Detail panel full content: seed a place with all fields (name, category, rating, address, phone, website, websiteType, amenities, photoUrls, openingHours), verify every field renders in explorer-detail-panel",
+        "Website type badge colors: seed 3 places with websiteType direct/ota/social, verify CSS classes explorer-website-direct, explorer-website-ota, explorer-website-social are applied in the table",
+        "Price level formatting: seed places with priceLevel values '$', '$$', '$$$', 'PRICE_LEVEL_INEXPENSIVE', null — verify formatted display in table cells (dollar signs or 'Inexpensive' or '—')",
+        "Marker color by rating (interactive map only): seed places with ratings <3.5, 3.5–4.2, >4.2, verify marker icon fillColor matches red/yellow/green",
+        "Empty project explorer: navigate to explorer for a project with 0 places, verify '0 places' count and empty table body",
+        "Explorer without projects: navigate to /explorer with no projects seeded, verify 'No projects' in dropdown and graceful empty state (no crash)",
+        "All tests pass: npm run test:e2e succeeds"
+      ],
+      "priority": -5,
+      "passes": false,
+      "notes": "Part 4 of 7 E2E story-board expansion. Add to a new spec file (e.g., explorer-detail.spec.ts). Detail panel tests may require extending the detail panel component with additional data-testid attributes."
+    },
+    {
+      "id": "US-E2E-05",
+      "title": "E2E story-boards: Explorer map interaction and table-map sync",
+      "description": "Add Playwright e2e tests covering Explorer map-marker click → table/detail sync, map-click deselect, selection circle, marker clustering, table-filter vs map-marker isolation, and combined search + table filter composition.",
+      "acceptanceCriteria": [
+        "Map marker click → table + detail sync (interactive map): click a map marker, verify the corresponding table row gets data-selected='true' and detail panel shows that place's name",
+        "Map click deselects: with a place selected, click empty map area, verify selection clears (no row selected, detail panel shows placeholder)",
+        "Selection circle pulse: select a place, verify a google.maps.Circle is added at the place's coordinates (check via map instance query or visual assertion)",
+        "Marker clustering: seed 200+ places, set map zoom to low level, verify clusterer renders cluster markers with numeric count labels",
+        "Table filter does not affect map markers: apply table-filter-input, verify map still shows all globally-searched places (table filter is table-only, global search affects both)",
+        "Combined search + table filter: apply global search to narrow to ~10 places, then apply table filter within those, verify both compose correctly and explorer-table-count reflects the intersection",
+        "All tests pass: npm run test:e2e succeeds"
+      ],
+      "priority": -4,
+      "passes": false,
+      "notes": "Part 5 of 7 E2E story-board expansion. Add to a new spec file (e.g., explorer-map-sync.spec.ts). Map-interaction tests only run when VITE_GOOGLE_MAPS_API_KEY is set; skip gracefully otherwise."
+    },
+    {
+      "id": "US-E2E-06",
+      "title": "E2E story-boards: Navigation, routing, and accessibility",
+      "description": "Add Playwright e2e tests covering navigation edge cases, deep links, redirects, browser back/forward, keyboard-only navigation, and accessibility landmarks.",
+      "acceptanceCriteria": [
+        "Bare /setup redirects to /projects",
+        "Bare /explorer without projectId: navigates to explorer page, auto-selects first project if any exist",
+        "Deep link to setup with invalid projectId: navigate to /projects/nonexistent/setup, verify 'Project not found.' message",
+        "Deep link to explorer with projectId: navigate directly to /projects/{id}/explorer, verify project is selected in dropdown and places load",
+        "Nav active link highlight: navigate between pages, verify active NavLink has font-weight 700 and color #1a73e8",
+        "Browser back/forward: navigate Projects → Setup → Explorer, press back twice, verify correct pages render at each step",
+        "Avatar badge: verify nav-avatar renders with 'U' label",
+        "Explorer table keyboard row navigation: Tab to table rows, verify focus is visible; Enter to select a row, verify detail panel opens",
+        "Screen reader landmarks: verify role='main' on page containers, role='button' on project cards, aria-label on key containers (projects list, map panels)",
+        "All tests pass: npm run test:e2e succeeds"
+      ],
+      "priority": -3,
+      "passes": false,
+      "notes": "Part 6 of 7 E2E story-board expansion. Add to a new spec file (e.g., navigation-a11y.spec.ts)."
+    },
+    {
+      "id": "US-E2E-07",
+      "title": "E2E story-boards: Error handling, data isolation, and resilience",
+      "description": "Add Playwright e2e tests covering API failure scenarios, cross-project data isolation, concurrent runs, and cascading delete verification.",
+      "acceptanceCriteria": [
+        "API down during project load: mock /api/projects as 500, verify projects-error message renders, UI does not crash",
+        "API down during explorer data load: mock /api/places as 500, verify explorer-error message renders",
+        "API down during scrape start: mock /api/scrape/start as 500, verify setup-error message appears and start button re-enables",
+        "API timeout during bounds save: mock slow PUT /api/projects/:id response, verify 'Saving bounds…' copy appears",
+        "Multi-project place isolation: seed 2 projects with different places, switch between them in explorer, verify table only shows the active project's places (count assertion)",
+        "Concurrent scrape runs on same project: seed 2 running runs for one project, verify setup UI shows both in runs list and switching between them updates progress correctly",
+        "Cascading delete: seed a project with runs/tiles/places, delete the project via API, verify GET /api/projects returns empty and GET /api/places?projectId returns empty",
+        "Favorite toggle off: star a place then un-star it, verify aria-pressed returns to 'false' and icon changes back to ☆",
+        "Sort stability: sort by rating on a dataset with ties, verify tied items are sorted alphabetically by name as tiebreaker",
+        "Sort direction toggle: click same column header twice, verify indicator changes ↑ → ↓ and row order reverses",
+        "All tests pass: npm run test:e2e succeeds"
+      ],
+      "priority": -2,
+      "passes": false,
+      "notes": "Part 7 of 7 E2E story-board expansion. Add to a new spec file (e.g., error-resilience.spec.ts). Use page.route() mocking for API failure scenarios."
     }
   ]
 }
