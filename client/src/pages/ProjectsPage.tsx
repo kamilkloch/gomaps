@@ -6,7 +6,7 @@ import {
   deleteProject,
   getErrorMessage,
   listProjects,
-  type Project,
+  type ProjectSummary,
 } from '../lib/api'
 
 interface Bounds {
@@ -18,7 +18,7 @@ const MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefi
 
 export function ProjectsPage() {
   const navigate = useNavigate()
-  const [projects, setProjects] = useState<Project[]>([])
+  const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
@@ -80,7 +80,7 @@ export function ProjectsPage() {
     }
   }
 
-  async function handleDeleteProject(project: Project) {
+  async function handleDeleteProject(project: ProjectSummary) {
     const shouldDelete = window.confirm(`Delete project "${project.name}"?`)
     if (!shouldDelete) {
       return
@@ -165,7 +165,7 @@ export function ProjectsPage() {
   function renderCards() {
     return projects.map((project) => {
       const bounds = parseBounds(project.bounds)
-      const status = bounds ? 'Complete' : 'Draft'
+      const statusCopy = toProjectStatusLabel(project.status)
       const isSelected = selectedProjectId === project.id
 
       return (
@@ -190,8 +190,11 @@ export function ProjectsPage() {
         >
           <div className="project-card-header">
             <h2 data-testid={`project-name-${project.id}`}>{project.name}</h2>
-            <span className={`project-status project-status-${status.toLowerCase()}`}>
-              {status}
+            <span
+              className={`project-status project-status-${project.status}`}
+              data-testid={`project-status-${project.id}`}
+            >
+              {statusCopy}
             </span>
           </div>
 
@@ -217,9 +220,11 @@ export function ProjectsPage() {
           </div>
 
           <footer className="project-card-footer">
-            <span>Places: 0</span>
-            <span>Scrape runs: 0</span>
-            <span>Last scraped: never</span>
+            <span data-testid={`project-places-${project.id}`}>Places: {project.placesCount}</span>
+            <span data-testid={`project-runs-${project.id}`}>Scrape runs: {project.scrapeRunsCount}</span>
+            <span data-testid={`project-last-scraped-${project.id}`}>
+              Last scraped: {formatLastScraped(project.lastScrapedAt)}
+            </span>
           </footer>
 
           <button
@@ -237,6 +242,39 @@ export function ProjectsPage() {
       )
     })
   }
+}
+
+const toProjectStatusLabel = (status: ProjectSummary['status']): string => {
+  if (status === 'complete') {
+    return 'Complete'
+  }
+
+  if (status === 'running') {
+    return 'Running'
+  }
+
+  if (status === 'paused') {
+    return 'Paused'
+  }
+
+  if (status === 'failed') {
+    return 'Failed'
+  }
+
+  return 'Draft'
+}
+
+const formatLastScraped = (lastScrapedAt: string | null): string => {
+  if (!lastScrapedAt) {
+    return 'never'
+  }
+
+  const parsedDate = new Date(lastScrapedAt)
+  if (Number.isNaN(parsedDate.getTime())) {
+    return 'never'
+  }
+
+  return parsedDate.toLocaleString()
 }
 
 const getCenter = (bounds: Bounds | null) => {

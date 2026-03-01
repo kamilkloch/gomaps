@@ -2,6 +2,7 @@ export { createDatabase, closeDatabase } from './schema.js'
 export { Db, DbLive } from './Db.js'
 export type {
   Project,
+  ProjectSummary,
   ScrapeRun,
   Tile,
   Place,

@@ -534,8 +534,8 @@
         "Run and pass: npm run typecheck --workspace=server, npm run typecheck --workspace=client, npm test --workspace=server, npm run test:e2e"
       ],
       "priority": -1,
-      "passes": false,
-      "notes": "Highest-priority hotfix story requested after field report with Sardinia 2025 inconsistencies. Testing must be exhaustive across Projects and Setup states, including rapid run switching, pause/resume, completed+failed history mixes, and stale UI reload scenarios."
+      "passes": true,
+      "notes": "Completed with backend-derived /api/projects aggregates (status + places/runs/lastScraped + activeRunId), Setup run-scoped progress reset on run switch, API regression coverage in server/tests/projects.test.ts, and Playwright Sardinia consistency regression in client/e2e/tests/app-flows.spec.ts."
     }
   ]
 }

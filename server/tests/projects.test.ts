@@ -14,6 +14,8 @@ const dbPath = join(tmpdir(), `gomaps-test-${randomUUID()}.db`)
 process.env.DB_PATH = dbPath
 
 const { getScrapeRun, updateScrapeRun, closeDatabase } = await import('../src/db/index.js')
+const { createPlace, createScrapeRun, linkPlaceToScrapeRun } = await import('../src/db/index.js')
+const { truncateAllTables } = await import('../src/db/index.js')
 const { appRuntime } = await import('../src/runtime.js')
 const {
   resetScrapeRouteStateForTests,
@@ -113,6 +115,159 @@ describe('project CRUD API', () => {
   it('DELETE /api/projects/:id returns 404 for unknown id', async () => {
     const res = await request(app).delete(`/api/projects/${randomUUID()}`)
     expect(res.status).toBe(404)
+  })
+})
+
+describe('project list summaries', () => {
+  it('derives status precedence and aggregate metrics from persisted run/place data', async () => {
+    const [draftProject, completedProject, failedProject, pausedProject, runningProject] = await Promise.all([
+      request(app).post('/api/projects').send({ name: 'Draft Project' }),
+      request(app).post('/api/projects').send({ name: 'Completed Project' }),
+      request(app).post('/api/projects').send({ name: 'Failed Project' }),
+      request(app).post('/api/projects').send({ name: 'Paused Project' }),
+      request(app).post('/api/projects').send({ name: 'Running Project' }),
+    ])
+
+    expect(draftProject.status).toBe(201)
+    expect(completedProject.status).toBe(201)
+    expect(failedProject.status).toBe(201)
+    expect(pausedProject.status).toBe(201)
+    expect(runningProject.status).toBe(201)
+
+    const completedRunId = await appRuntime.runPromise(
+      Effect.gen(function* () {
+        const completedRun = yield* createScrapeRun(completedProject.body.id as string, 'completed query')
+        yield* updateScrapeRun(completedRun.id, {
+          status: 'completed',
+          tilesTotal: 3,
+          tilesCompleted: 3,
+          placesFound: 1,
+          placesUnique: 1,
+          startedAt: '2026-01-01T00:00:00.000Z',
+          completedAt: '2026-01-01T00:10:00.000Z',
+        })
+
+        yield* createPlace({
+          id: 'summary-place-1',
+          googleMapsUri: 'https://maps.google.com/?cid=summary-1',
+          name: 'Summary Place 1',
+          lat: 40.1,
+          lng: 9.1,
+        })
+        yield* linkPlaceToScrapeRun('summary-place-1', completedRun.id)
+
+        return completedRun.id
+      })
+    )
+
+    const failedRunId = await appRuntime.runPromise(
+      Effect.gen(function* () {
+        const olderCompletedRun = yield* createScrapeRun(failedProject.body.id as string, 'older completed query')
+        yield* updateScrapeRun(olderCompletedRun.id, {
+          status: 'completed',
+          startedAt: '2026-01-01T01:00:00.000Z',
+          completedAt: '2026-01-01T01:05:00.000Z',
+        })
+
+        const failedRun = yield* createScrapeRun(failedProject.body.id as string, 'failed query')
+        yield* updateScrapeRun(failedRun.id, {
+          status: 'failed',
+          startedAt: '2026-01-01T02:00:00.000Z',
+          completedAt: '2026-01-01T02:07:00.000Z',
+        })
+
+        return failedRun.id
+      })
+    )
+
+    const pausedRunId = await appRuntime.runPromise(
+      Effect.gen(function* () {
+        const pausedRun = yield* createScrapeRun(pausedProject.body.id as string, 'paused query')
+        yield* updateScrapeRun(pausedRun.id, {
+          status: 'paused',
+          startedAt: '2026-01-01T03:00:00.000Z',
+          completedAt: null,
+        })
+
+        return pausedRun.id
+      })
+    )
+
+    const runningRunId = await appRuntime.runPromise(
+      Effect.gen(function* () {
+        const olderCompletedRun = yield* createScrapeRun(runningProject.body.id as string, 'older completed query')
+        yield* updateScrapeRun(olderCompletedRun.id, {
+          status: 'completed',
+          startedAt: '2026-01-01T04:00:00.000Z',
+          completedAt: '2026-01-01T04:06:00.000Z',
+        })
+
+        const runningRun = yield* createScrapeRun(runningProject.body.id as string, 'running query')
+        yield* updateScrapeRun(runningRun.id, {
+          status: 'running',
+          startedAt: '2026-01-01T05:00:00.000Z',
+          completedAt: null,
+        })
+
+        yield* createPlace({
+          id: 'summary-place-2',
+          googleMapsUri: 'https://maps.google.com/?cid=summary-2',
+          name: 'Summary Place 2',
+          lat: 40.2,
+          lng: 9.2,
+        })
+        yield* linkPlaceToScrapeRun('summary-place-2', runningRun.id)
+
+        return runningRun.id
+      })
+    )
+
+    const listResponse = await request(app).get('/api/projects')
+    expect(listResponse.status).toBe(200)
+
+    const projectsByName = new Map(
+      (listResponse.body as Array<Record<string, unknown>>).map((project) => [project.name as string, project])
+    )
+
+    const draftSummary = projectsByName.get('Draft Project')
+    expect(draftSummary).toBeDefined()
+    expect(draftSummary?.status).toBe('draft')
+    expect(draftSummary?.scrapeRunsCount).toBe(0)
+    expect(draftSummary?.placesCount).toBe(0)
+    expect(draftSummary?.lastScrapedAt).toBeNull()
+    expect(draftSummary?.activeRunId).toBeNull()
+
+    const completedSummary = projectsByName.get('Completed Project')
+    expect(completedSummary).toBeDefined()
+    expect(completedSummary?.status).toBe('complete')
+    expect(completedSummary?.activeRunId).toBeNull()
+    expect(completedSummary?.scrapeRunsCount).toBe(1)
+    expect(completedSummary?.placesCount).toBe(1)
+    expect(completedSummary?.lastScrapedAt).not.toBeNull()
+
+    const failedSummary = projectsByName.get('Failed Project')
+    expect(failedSummary).toBeDefined()
+    expect(failedSummary?.status).toBe('failed')
+    expect(failedSummary?.activeRunId).toBeNull()
+    expect(failedSummary?.scrapeRunsCount).toBe(2)
+    expect(failedSummary?.placesCount).toBe(0)
+
+    const pausedSummary = projectsByName.get('Paused Project')
+    expect(pausedSummary).toBeDefined()
+    expect(pausedSummary?.status).toBe('paused')
+    expect(pausedSummary?.activeRunId).toBe(pausedRunId)
+    expect(pausedSummary?.scrapeRunsCount).toBe(1)
+
+    const runningSummary = projectsByName.get('Running Project')
+    expect(runningSummary).toBeDefined()
+    expect(runningSummary?.status).toBe('running')
+    expect(runningSummary?.activeRunId).toBe(runningRunId)
+    expect(runningSummary?.scrapeRunsCount).toBe(2)
+    expect(runningSummary?.placesCount).toBe(1)
+    expect(runningSummary?.lastScrapedAt).not.toBeNull()
+
+    expect(completedRunId).toBeTruthy()
+    expect(failedRunId).toBeTruthy()
   })
 })
 
@@ -264,6 +419,10 @@ describe('scrape API', () => {
 })
 
 describe('placeholder routers', () => {
+  beforeEach(async () => {
+    await appRuntime.runPromise(truncateAllTables())
+  })
+
   it('GET /api/scrape returns empty array', async () => {
     const res = await request(app).get('/api/scrape')
     expect(res.status).toBe(200)

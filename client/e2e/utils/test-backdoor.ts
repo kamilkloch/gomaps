@@ -1,6 +1,7 @@
 import type { APIRequestContext } from '@playwright/test'
 
 interface SeedFixturesPayload {
+  existingProjectId?: string
   project: {
     name: string
     bounds: string

@@ -5,6 +5,7 @@ import {
   createProject,
   createScrapeRun,
   createTile,
+  getProject,
   linkPlaceToScrapeRun,
   truncateAllTables,
   updateScrapeRun,
@@ -21,6 +22,7 @@ const TileStatusSchema = Schema.Literal('pending', 'running', 'completed', 'subd
 const WebsiteTypeSchema = Schema.Literal('direct', 'ota', 'social', 'unknown')
 
 const SeedRequestSchema = Schema.Struct({
+  existingProjectId: Schema.optional(Schema.String),
   project: Schema.Struct({
     name: Schema.String,
     bounds: Schema.String,
@@ -99,7 +101,9 @@ testSupportRouter.post('/seed-fixtures', async (req, res) => {
       const tiles = body.tiles ?? []
       const shouldCreateRun = Boolean(body.scrapeRun) || places.length > 0 || tiles.length > 0
 
-      const project = yield* createProject(body.project.name, body.project.bounds)
+      const project = body.existingProjectId
+        ? yield* getProject(body.existingProjectId)
+        : yield* createProject(body.project.name, body.project.bounds)
 
       let scrapeRunId: string | null = null
       if (shouldCreateRun) {

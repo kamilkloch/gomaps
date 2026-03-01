@@ -50,6 +50,12 @@ export function SetupPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const hasAppliedInitialBounds = useRef(false)
 
+  const selectRun = useCallback((runId: string | null) => {
+    setActiveRunId(runId)
+    setProgress(null)
+    setRunTiles([])
+  }, [])
+
   const trimmedMapsKey = API_KEY?.trim() ?? ''
   const hasMapsKey = trimmedMapsKey.length > 0 && !MAPS_KEY_PLACEHOLDERS.has(trimmedMapsKey)
 
@@ -170,7 +176,7 @@ export function SetupPage() {
         const preferredRun = scrapeRuns.find((run) => run.status === 'running' || run.status === 'paused')
           ?? scrapeRuns[0]
           ?? null
-        setActiveRunId(preferredRun?.id ?? null)
+        selectRun(preferredRun?.id ?? null)
       }
       catch {
         if (!isCancelled) {
@@ -184,7 +190,7 @@ export function SetupPage() {
     return () => {
       isCancelled = true
     }
-  }, [projectId])
+  }, [projectId, selectRun])
 
   useEffect(() => {
     if (!activeRunId) {
@@ -192,6 +198,9 @@ export function SetupPage() {
       setRunTiles([])
       return
     }
+
+    setProgress(null)
+    setRunTiles([])
 
     let isCancelled = false
 
@@ -319,22 +328,26 @@ export function SetupPage() {
     void persistBounds(null)
   }, [persistBounds])
 
-  const refreshRuns = useCallback(async () => {
+  const refreshRuns = useCallback(async (preferredRunId?: string) => {
     if (!projectId) {
       return
     }
 
     const scrapeRuns = await listScrapeRuns(projectId)
     setRuns(scrapeRuns)
-    if (activeRunId && scrapeRuns.some((run) => run.id === activeRunId)) {
+    const selectedRunId = preferredRunId ?? activeRunId
+    if (selectedRunId && scrapeRuns.some((run) => run.id === selectedRunId)) {
+      if (selectedRunId !== activeRunId) {
+        selectRun(selectedRunId)
+      }
       return
     }
 
     const preferredRun = scrapeRuns.find((run) => run.status === 'running' || run.status === 'paused')
       ?? scrapeRuns[0]
       ?? null
-    setActiveRunId(preferredRun?.id ?? null)
-  }, [activeRunId, projectId])
+    selectRun(preferredRun?.id ?? null)
+  }, [activeRunId, projectId, selectRun])
 
   const handleStartScrape = useCallback(async () => {
     if (!projectId || !selectionBounds) {
@@ -351,8 +364,7 @@ export function SetupPage() {
       setIsStartingScrape(true)
       setErrorMessage(null)
       const started = await startScrape(projectId, trimmedQuery)
-      setActiveRunId(started.scrapeRunId)
-      await refreshRuns()
+      await refreshRuns(started.scrapeRunId)
     }
     catch {
       setErrorMessage('Unable to start scrape. Please try again.')
@@ -535,7 +547,7 @@ export function SetupPage() {
                       data-testid={`setup-run-${run.id}`}
                       type="button"
                       className={`setup-run-item ${activeRunId === run.id ? 'is-active' : ''}`}
-                      onClick={() => setActiveRunId(run.id)}
+                      onClick={() => selectRun(run.id)}
                     >
                       <span className="setup-run-title">{run.query}</span>
                       <span className={`setup-run-status setup-run-status-${run.status}`}>{run.status}</span>

@@ -136,6 +136,21 @@ a {
   color: #8ef0c8;
 }
 
+.project-status-running {
+  background: #5d4b1e;
+  color: #f8dc92;
+}
+
+.project-status-paused {
+  background: #2f3d59;
+  color: #bdd3ff;
+}
+
+.project-status-failed {
+  background: #622432;
+  color: #ffb6c0;
+}
+
 .project-status-draft {
   background: #33435d;
   color: #d5dfef;

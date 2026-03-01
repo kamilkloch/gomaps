@@ -5,6 +5,14 @@ export interface Project {
   createdAt: string
 }
 
+export interface ProjectSummary extends Project {
+  status: 'draft' | 'running' | 'paused' | 'failed' | 'complete'
+  activeRunId: string | null
+  scrapeRunsCount: number
+  placesCount: number
+  lastScrapedAt: string | null
+}
+
 interface CreateProjectInput {
   name: string
   bounds?: string
@@ -127,7 +135,7 @@ const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return response.json() as Promise<T>
 }
 
-export const listProjects = async (): Promise<Project[]> => requestJson<Project[]>('/projects')
+export const listProjects = async (): Promise<ProjectSummary[]> => requestJson<ProjectSummary[]>('/projects')
 
 export const getProject = async (projectId: string): Promise<Project> =>
   requestJson<Project>(`/projects/${projectId}`)

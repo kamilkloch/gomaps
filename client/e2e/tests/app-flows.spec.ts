@@ -127,6 +127,88 @@ test.describe('core app flows (integrated backend + UI)', () => {
     await expect(page.getByTestId('setup-progress-section')).toContainText('Places: 4 (4 unique)')
   })
 
+  test('projects and setup stay consistent for mixed run history and explicit run switching', async ({ page, request }, testInfo) => {
+    const completedSeed = await seedFixtures(request, {
+      project: {
+        name: 'Sardinia 2025',
+        bounds: JSON.stringify({
+          sw: { lat: 39.8, lng: 8.5 },
+          ne: { lat: 40.9, lng: 9.8 },
+        }),
+      },
+      scrapeRun: {
+        query: 'sardinia completed run',
+        status: 'completed',
+        tilesTotal: 31,
+        tilesCompleted: 31,
+        tilesSubdivided: 7,
+        placesFound: 312,
+        placesUnique: 240,
+      },
+      places: [
+        {
+          id: 'sardinia-place-1',
+          googleMapsUri: 'https://maps.google.com/?cid=sardinia-1',
+          name: 'Sardinia Place 1',
+          lat: 40.2,
+          lng: 9.1,
+        },
+      ],
+    })
+
+    const runningSeed = await seedFixtures(request, {
+      existingProjectId: completedSeed.projectId,
+      project: {
+        name: 'Sardinia 2025',
+        bounds: JSON.stringify({
+          sw: { lat: 39.8, lng: 8.5 },
+          ne: { lat: 40.9, lng: 9.8 },
+        }),
+      },
+      scrapeRun: {
+        query: 'sardinia active run',
+        status: 'running',
+        tilesTotal: 13,
+        tilesCompleted: 10,
+        tilesSubdivided: 2,
+        placesFound: 77,
+        placesUnique: 64,
+      },
+      places: [
+        {
+          id: 'sardinia-place-2',
+          googleMapsUri: 'https://maps.google.com/?cid=sardinia-2',
+          name: 'Sardinia Place 2',
+          lat: 40.3,
+          lng: 9.2,
+        },
+      ],
+    })
+
+    await page.goto('/projects')
+    await expect(page.getByTestId(`project-status-${completedSeed.projectId}`)).toHaveText('Running')
+    await expect(page.getByTestId(`project-places-${completedSeed.projectId}`)).toContainText('Places: 2')
+    await expect(page.getByTestId(`project-runs-${completedSeed.projectId}`)).toContainText('Scrape runs: 2')
+    await captureStepScreenshot(page, testInfo, 'projects-sardinia-summary-consistent')
+
+    await page.getByTestId(`project-card-${completedSeed.projectId}`).click()
+    await expect(page).toHaveURL(new RegExp(`/projects/${completedSeed.projectId}/setup$`))
+
+    await expect(page.getByTestId('setup-runs-section')).toContainText('sardinia completed run')
+    await expect(page.getByTestId('setup-runs-section')).toContainText('sardinia active run')
+    await expect(page.getByTestId('setup-progress-section')).toContainText('Tiles: 10/13 (2 subdivided)')
+    await expect(page.getByTestId('setup-progress-section')).toContainText('Places: 77 (64 unique)')
+
+    await page.getByTestId(`setup-run-${completedSeed.scrapeRunId}`).click()
+    await expect(page.getByTestId('setup-progress-section')).toContainText('Tiles: 31/31 (7 subdivided)')
+    await expect(page.getByTestId('setup-progress-section')).toContainText('Places: 312 (240 unique)')
+
+    await page.getByTestId(`setup-run-${runningSeed.scrapeRunId}`).click()
+    await expect(page.getByTestId('setup-progress-section')).toContainText('Tiles: 10/13 (2 subdivided)')
+    await expect(page.getByTestId('setup-progress-section')).toContainText('Places: 77 (64 unique)')
+    await captureStepScreenshot(page, testInfo, 'setup-run-switch-consistent')
+  })
+
   test('explorer map, table filtering, and detail-panel selection', async ({ page, request }, testInfo) => {
     const seeded = await seedFixtures(request, {
       project: {

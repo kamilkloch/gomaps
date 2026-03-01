@@ -5,6 +5,14 @@ export interface Project {
   createdAt: string
 }
 
+export interface ProjectSummary extends Project {
+  status: 'draft' | 'running' | 'paused' | 'failed' | 'complete'
+  activeRunId: string | null
+  scrapeRunsCount: number
+  placesCount: number
+  lastScrapedAt: string | null
+}
+
 export interface ScrapeRun {
   id: string
   projectId: string

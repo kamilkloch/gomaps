@@ -26,6 +26,7 @@
 - **Effect Schema array mutability:** Values decoded through `Schema.decodeUnknown` can infer readonly arrays; clone (`[...value]`) before passing arrays into mutable DB input types (`CreatePlaceInput`) to satisfy strict TypeScript checks.
 - **Playwright harness layout:** Keep reusable e2e primitives in `client/e2e/{fixtures,utils,pages,tests}`; centralize strict locator fallback (`data-testid` → role → text), network/visibility wait helpers, screenshot helper, and console/page-error fail-fast logic inside shared fixtures/utilities.
 - **Playwright API stubbing:** For deterministic UI flows, install a single stateful `page.route('**/api/**', ...)` handler per test and mutate in-memory project/run/place fixtures so create/delete/start/pause/search behaviors can be verified without depending on external APIs.
+- **Playwright fixture seeding:** `POST /api/test/seed-fixtures` accepts optional `existingProjectId` to append runs/tiles/places onto an existing seeded project; use this to create mixed run histories for cross-view regressions.
 - **Playwright env loading:** Parse root `.env` in `client/playwright.config.ts` before web server startup so both `VITE_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` flow into client/server e2e processes consistently.
 - **Playwright waits on SSE pages:** Avoid `networkidle` waits on Setup-like pages with long-lived SSE requests; wait for deterministic UI locators/state transitions instead.
 
@@ -300,4 +301,18 @@ Thread: https://ampcode.com/threads/T-019ca53c-ac4a-768f-b6e3-1ab3626e8013
   - Setup e2e flows must not rely on network-idle semantics when SSE is active; this creates false timeouts even when UI is healthy.
   - For virtualized tables, target rows through the visible viewport (or scroll-first + assert) rather than assuming specific IDs are always mounted.
   - Keep route placeholders test-addressable with explicit `data-testid` anchors so navigation coverage stays stable as pages evolve.
+---
+
+## 2026-03-01 20:45:16 CET - US-028
+Thread: https://ampcode.com/threads/T-019caae3-5411-7058-a54a-d34a1476426f
+- Implemented authoritative project summaries in `/api/projects` by deriving `status`, `activeRunId`, `scrapeRunsCount`, `placesCount`, and `lastScrapedAt` from persisted scrape-run/place tables with deterministic status precedence.
+- Updated Projects UI to consume backend summaries directly (status badges + footer metrics) instead of inferring status from bounds or hardcoded counters.
+- Hardened Setup run switching by treating selection as run-scoped state: clearing old progress/tile snapshots immediately on run change and pinning refreshes to the intended run ID.
+- Added API regression coverage in `server/tests/projects.test.ts` for mixed run histories (running/paused/failed/completed/draft) and aggregate metric correctness.
+- Added Playwright Sardinia mismatch regression in `client/e2e/tests/app-flows.spec.ts` plus checklist coverage updates for cross-view consistency assertions.
+- Files changed: `server/src/db/types.ts`, `server/src/db/projects.ts`, `server/src/db/index.ts`, `server/src/routes/test-support.ts`, `server/tests/projects.test.ts`, `client/src/lib/api.ts`, `client/src/pages/ProjectsPage.tsx`, `client/src/pages/SetupPage.tsx`, `client/src/styles.css`, `client/e2e/utils/test-backdoor.ts`, `client/e2e/tests/app-flows.spec.ts`, `client/e2e/tests/coverage-checklist.md`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Project-level status and summary counters should be derived server-side from run/place history so Projects and Setup always share one source of truth.
+  - For run history UIs, clearing run-scoped state immediately on selection change prevents stale progress flashes while new snapshots load.
+  - Extending the test-seeding backdoor with `existingProjectId` is a reliable way to recreate mixed run histories in deterministic e2e tests.
 ---

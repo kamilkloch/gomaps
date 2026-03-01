@@ -11,12 +11,14 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Projects | Project card activation (keyboard Enter + Space) | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
 | Projects | Delete action with dialog cancel + confirm | `ui-components.spec.ts` → `projects page supports mouse + keyboard create/open/delete flows` |
 | Projects | Actionable API misrouting error banner on load + create failure (`Cannot /api/projects`) | `ui-components.spec.ts` → `projects page surfaces actionable API-routing errors when /api points to the wrong backend` |
+| Projects + Setup | Cross-view consistency: project status badge + summary metrics match Setup runs/progress for mixed completed/running history | `app-flows.spec.ts` → `projects and setup stay consistent for mixed run history and explicit run switching` |
 | Setup | Map render + tile/canvas content assertion + drag pan (interactive mode) | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls`; `app-flows.spec.ts` setup scenarios |
 | Setup | `Select Area` + coordinate pill updates | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | `Clear` selection + status copy | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | Query input keyboard editing | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | `Start Scrape` action | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | Run list selection context + `Pause` control | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Setup | Run-scoped progress panel updates deterministically when switching historical/active runs | `app-flows.spec.ts` → `projects and setup stay consistent for mixed run history and explicit run switching` |
 | Setup + Explorer | Real scrape launched from Setup UI and reflected in Explorer table count | `live-scrape.spec.ts` → `setup UI launches live scrape and explorer reflects persisted results` |
 | Setup + Backend | Legacy SQLite schema (`places.google_url`) auto-migration before real scrape writes | `live-scrape.spec.ts` → `migrates legacy places schema and persists scraped places`; `server/tests/db.test.ts` migration case |
 | Explorer | Project selector dropdown | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |
