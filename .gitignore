@@ -10,3 +10,4 @@ client/e2e/test-results
 coverage
 server/coverage
 naxos.html
+.idea

@@ -308,9 +308,9 @@
         "Three full-width blue action buttons: 'Open in Google Maps', 'Search on Booking.com', 'Search on Airbnb'",
         "npm run typecheck --workspace=client passes"
       ],
-      "priority": 16,
+      "priority": 30,
       "passes": false,
-      "notes": "Reference mockup: docs/mockups/03-explorer-page.png"
+      "notes": "Reference mockup: docs/mockups/03-explorer-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {
       "id": "US-016",
@@ -324,9 +324,9 @@
         "Deselecting (clicking empty area) closes detail panel",
         "npm run typecheck --workspace=client passes"
       ],
-      "priority": 17,
+      "priority": 31,
       "passes": false,
-      "notes": ""
+      "notes": "Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {
       "id": "US-017",
@@ -341,9 +341,9 @@
         "Clearing search restores all results",
         "npm run typecheck --workspace=client passes"
       ],
-      "priority": 18,
+      "priority": 32,
       "passes": false,
-      "notes": ""
+      "notes": "Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {
       "id": "US-018",
@@ -360,9 +360,9 @@
         "Filter state persisted in URL query parameters",
         "npm run typecheck --workspace=client passes"
       ],
-      "priority": 19,
+      "priority": 33,
       "passes": false,
-      "notes": "Reference mockup: docs/mockups/03-explorer-page.png"
+      "notes": "Reference mockup: docs/mockups/03-explorer-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {
       "id": "US-019",
@@ -378,9 +378,9 @@
         "Both filters integrate with existing filter system (AND logic)",
         "npm run typecheck --workspace=client passes"
       ],
-      "priority": 20,
+      "priority": 34,
       "passes": false,
-      "notes": ""
+      "notes": "Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {
       "id": "US-020",
@@ -400,9 +400,9 @@
         "npm run typecheck --workspace=client passes",
         "npm run typecheck --workspace=server passes"
       ],
-      "priority": 21,
+      "priority": 35,
       "passes": false,
-      "notes": "Reference mockup: docs/mockups/04-shortlists-page.png"
+      "notes": "Reference mockup: docs/mockups/04-shortlists-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {
       "id": "US-021",
@@ -417,9 +417,9 @@
         "'Export CSV' downloads shortlist as CSV with all place fields plus user notes",
         "npm run typecheck --workspace=client passes"
       ],
-      "priority": 22,
+      "priority": 36,
       "passes": false,
-      "notes": "Reference mockup: docs/mockups/04-shortlists-page.png"
+      "notes": "Reference mockup: docs/mockups/04-shortlists-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {
       "id": "US-022",
@@ -434,9 +434,9 @@
         "Progress shown via SSE (places refreshed / total)",
         "npm run typecheck --workspace=server passes"
       ],
-      "priority": 23,
+      "priority": 37,
       "passes": false,
-      "notes": "Uses Place Details API instead of re-visiting browser pages."
+      "notes": "Uses Place Details API instead of re-visiting browser pages. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {
       "id": "US-023",
@@ -451,9 +451,9 @@
         "Buttons only shown when place has a name and location",
         "npm run typecheck --workspace=client passes"
       ],
-      "priority": 24,
+      "priority": 38,
       "passes": false,
-      "notes": "Reference mockup: docs/mockups/03-explorer-page.png"
+      "notes": "Reference mockup: docs/mockups/03-explorer-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {
       "id": "US-024",
@@ -467,9 +467,24 @@
         "Stale filter integrates with existing filter system",
         "npm run typecheck --workspace=client passes"
       ],
-      "priority": 25,
+      "priority": 39,
       "passes": false,
-      "notes": ""
+      "notes": "Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
+    },
+    {
+      "id": "US-E2E-PRE-01",
+      "title": "Prerequisites for navigation/accessibility E2E hardening",
+      "description": "Implement minimal Explorer/Setup hardening so the outstanding navigation and accessibility end-to-end stories can be executed deterministically.",
+      "acceptanceCriteria": [
+        "Deep link to setup with invalid projectId (`/projects/nonexistent/setup`) renders a deterministic 'Project not found.' state instead of a generic transient load error",
+        "Explorer table rows support keyboard navigation (focus + Enter/Space selection) so row selection is not mouse-only",
+        "Explicit accessibility hooks are present for key containers used by E2E assertions (landmarks/aria labels on projects list and explorer map/table panels)",
+        "npm run typecheck --workspace=client passes",
+        "npm run test:e2e --workspace=client succeeds"
+      ],
+      "priority": -9,
+      "passes": false,
+      "notes": "Execute before US-E2E-05/06/07."
     },
     {
       "id": "US-026",
