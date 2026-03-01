@@ -23,11 +23,18 @@ interface Bounds {
 }
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
+const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_MODE === '1'
 const FALLBACK_CENTER = { lat: 40, lng: 9 }
 const MAPS_KEY_PLACEHOLDERS = new Set([
   'your_google_maps_api_key_here',
   'your_key_here',
 ])
+const MAP_LOAD_ERROR_COPY =
+  'Unable to load Google Maps. Check that your API key is valid and allows Maps JavaScript API for localhost.'
+const MAP_INIT_TIMEOUT_COPY =
+  'Map did not initialize. Verify `VITE_GOOGLE_MAPS_API_KEY`, ensure Maps JavaScript API is enabled, and allow `http://localhost:5173/*` in key referrer restrictions.'
+const MAP_TILES_TIMEOUT_COPY =
+  'Google Maps initialized but tiles did not render. Check network/ad-blockers and key referrer restrictions for map tile requests.'
 
 export function SetupPage() {
   const { projectId } = useParams()
@@ -56,12 +63,36 @@ export function SetupPage() {
     setRunTiles([])
   }, [])
 
+  const forcedMapDiagnostic = getForcedMapDiagnostic()
+  const forceMapLoadError = forcedMapDiagnostic === 'api-key-error'
+  const forceMapInitTimeout = forcedMapDiagnostic === 'init-timeout'
+  const forceMapTilesTimeout = forcedMapDiagnostic === 'tiles-timeout'
   const trimmedMapsKey = API_KEY?.trim() ?? ''
   const hasMapsKey = trimmedMapsKey.length > 0 && !MAPS_KEY_PLACEHOLDERS.has(trimmedMapsKey)
+  const tileOverlayDebugSnapshot = runTiles.map((tile) => {
+    const style = tileStyle(tile.status)
+    return {
+      id: tile.id,
+      status: tile.status,
+      visible: tile.status !== 'subdivided',
+      fillColor: style.fillColor ?? null,
+      strokeColor: style.strokeColor ?? null,
+    }
+  })
 
   useEffect(() => {
     hasAppliedInitialBounds.current = false
   }, [projectId])
+
+  useEffect(() => {
+    if (!forcedMapDiagnostic) {
+      return
+    }
+
+    setMapLoadErrorMessage(forceMapLoadError ? MAP_LOAD_ERROR_COPY : null)
+    setDidMapInitTimeout(forceMapInitTimeout)
+    setDidMapTilesTimeout(forceMapTilesTimeout)
+  }, [forceMapInitTimeout, forceMapLoadError, forceMapTilesTimeout, forcedMapDiagnostic])
 
   useEffect(() => {
     if (!projectId) {
@@ -112,6 +143,10 @@ export function SetupPage() {
   }, [map, selectionBounds])
 
   useEffect(() => {
+    if (forceMapInitTimeout) {
+      return
+    }
+
     if (!hasMapsKey || map) {
       setDidMapInitTimeout(false)
       return
@@ -124,9 +159,13 @@ export function SetupPage() {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [hasMapsKey, map])
+  }, [forceMapInitTimeout, hasMapsKey, map])
 
   useEffect(() => {
+    if (forceMapTilesTimeout) {
+      return
+    }
+
     if (!hasMapsKey || !map) {
       setDidMapTilesTimeout(false)
       return
@@ -144,13 +183,17 @@ export function SetupPage() {
     return () => {
       window.clearTimeout(timer)
     }
-  }, [hasMapTilesLoaded, hasMapsKey, map])
+  }, [forceMapTilesTimeout, hasMapTilesLoaded, hasMapsKey, map])
 
   useEffect(() => {
+    if (forceMapLoadError) {
+      return
+    }
+
     if (!hasMapsKey || map) {
       setMapLoadErrorMessage(null)
     }
-  }, [hasMapsKey, map])
+  }, [forceMapLoadError, hasMapsKey, map])
 
   useEffect(() => {
     if (!map) {
@@ -443,7 +486,7 @@ export function SetupPage() {
               <APIProvider
                 apiKey={trimmedMapsKey}
                 onError={() => {
-                  setMapLoadErrorMessage('Unable to load Google Maps. Check that your API key is valid and allows Maps JavaScript API for localhost.')
+                  setMapLoadErrorMessage(MAP_LOAD_ERROR_COPY)
                 }}
               >
                 <Map
@@ -473,9 +516,15 @@ export function SetupPage() {
               <p className="setup-map-diagnostic" data-testid="setup-map-diagnostic">
                 {mapLoadErrorMessage
                   ?? (didMapTilesTimeout
-                    ? 'Google Maps initialized but tiles did not render. Check network/ad-blockers and key referrer restrictions for map tile requests.'
-                    : 'Map did not initialize. Verify `VITE_GOOGLE_MAPS_API_KEY`, ensure Maps JavaScript API is enabled, and allow `http://localhost:5173/*` in key referrer restrictions.')}
+                    ? MAP_TILES_TIMEOUT_COPY
+                    : MAP_INIT_TIMEOUT_COPY)}
               </p>
+            ) : null}
+
+            {IS_E2E_TEST_MODE ? (
+              <pre hidden data-testid="setup-tile-overlay-debug">
+                {JSON.stringify(tileOverlayDebugSnapshot)}
+              </pre>
             ) : null}
           </div>
 
@@ -933,4 +982,17 @@ const tileStyle = (status: ScrapeTile['status']): Omit<google.maps.RectangleOpti
     fillOpacity: 0.16,
     zIndex: 1,
   }
+}
+
+const getForcedMapDiagnostic = (): 'api-key-error' | 'init-timeout' | 'tiles-timeout' | null => {
+  if (!IS_E2E_TEST_MODE || typeof window === 'undefined') {
+    return null
+  }
+
+  const value = new URLSearchParams(window.location.search).get('e2eMapDiagnostic')
+  if (value === 'api-key-error' || value === 'init-timeout' || value === 'tiles-timeout') {
+    return value
+  }
+
+  return null
 }

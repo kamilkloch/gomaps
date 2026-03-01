@@ -586,8 +586,8 @@
         "All tests pass: npm run test:e2e succeeds"
       ],
       "priority": -6,
-      "passes": false,
-      "notes": "Part 3 of 7 E2E story-board expansion. Add to a new spec file (e.g., setup-progress.spec.ts). Some tests may need page.route() mocking for SSE and map error scenarios."
+      "passes": true,
+      "notes": "Completed with `client/e2e/tests/setup-progress.spec.ts` covering run status badge classes, 50% running progress + ETA, pause/resume label transitions via stateful route mocks, SSE-driven progress updates, interactive tile-overlay color/state assertions, and the three map diagnostic branches. Added Playwright-only Setup hooks (`VITE_E2E_TEST_MODE`, `e2eMapDiagnostic` query param, `setup-tile-overlay-debug`) plus checklist mappings."
     },
     {
       "id": "US-E2E-04",

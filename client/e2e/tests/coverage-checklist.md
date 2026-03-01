@@ -25,6 +25,13 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Setup | Breadcrumb chrome renders `Projects / {name} / Setup` | `setup-validation.spec.ts` → `breadcrumbs show Projects / project name / Setup` |
 | Setup | Previous Runs list is capped to 6 entries | `setup-validation.spec.ts` → `previous runs section renders at most 6 run entries even when more exist` |
 | Setup | Bounds persistence round-trip across navigation (map select area -> Projects -> Setup restore) | `setup-validation.spec.ts` → `selected bounds persist across Projects -> Setup navigation round-trip` |
+| Setup | Run status badge variants show matching status text + `setup-run-status-*` class for pending/running/paused/completed/failed | `setup-progress.spec.ts` → `run status badges render every status with matching class` |
+| Setup | Running progress bar shows animated stripe class and ~50% width at halfway progress | `setup-progress.spec.ts` → `running progress bar shows animated 50% fill with elapsed and ETA stats` |
+| Setup | Progress stats render elapsed + ETA (`Time: … · Est. remaining …`) from run telemetry | `setup-progress.spec.ts` → `running progress bar shows animated 50% fill with elapsed and ETA stats` |
+| Setup | Pause/resume control transitions through in-flight and settled labels (`Pausing…`/`Resume`, `Resuming…`/`Pause`) | `setup-progress.spec.ts` → `pause/resume control toggles Pausing… -> Resume and Resuming… -> Pause` |
+| Setup | SSE subscription updates progress counters in-place without route/navigation refresh | `setup-progress.spec.ts` → `SSE progress stream updates setup progress without navigation refresh` |
+| Setup | Tile overlay state/color mapping (completed/running/pending/subdivided) is validated for interactive map mode | `setup-progress.spec.ts` → `tile overlay status colors are exposed for interactive map rendering` |
+| Setup | Map diagnostic copy branches: API key error, map init timeout, tile load timeout | `setup-progress.spec.ts` → `map diagnostic copy covers API key error, init timeout, and tile timeout scenarios` |
 | Setup + Explorer | Real scrape launched from Setup UI and reflected in Explorer table count | `live-scrape.spec.ts` → `setup UI launches live scrape and explorer reflects persisted results` |
 | Setup + Backend | Legacy SQLite schema (`places.google_url`) auto-migration before real scrape writes | `live-scrape.spec.ts` → `migrates legacy places schema and persists scraped places`; `server/tests/db.test.ts` migration case |
 | Explorer | Project selector dropdown | `ui-components.spec.ts` → `explorer exercises search, sort, filters, row selection, favorites, and virtualization` |

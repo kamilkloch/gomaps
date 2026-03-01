@@ -26,6 +26,7 @@
 - **Effect Schema array mutability:** Values decoded through `Schema.decodeUnknown` can infer readonly arrays; clone (`[...value]`) before passing arrays into mutable DB input types (`CreatePlaceInput`) to satisfy strict TypeScript checks.
 - **Playwright harness layout:** Keep reusable e2e primitives in `client/e2e/{fixtures,utils,pages,tests}`; centralize strict locator fallback (`data-testid` → role → text), network/visibility wait helpers, screenshot helper, and console/page-error fail-fast logic inside shared fixtures/utilities.
 - **Playwright API stubbing:** For deterministic UI flows, install a single stateful `page.route('**/api/**', ...)` handler per test and mutate in-memory project/run/place fixtures so create/delete/start/pause/search behaviors can be verified without depending on external APIs.
+- **Playwright route matching:** For nested endpoint mocks (e.g., `/api/scrape/:runId/...`), use glob patterns like `**/api/scrape**` (not `**/api/scrape*`) and read methods via `route.request().method()` to avoid silently missing subpath requests.
 - **Playwright fixture seeding:** `POST /api/test/seed-fixtures` accepts optional `existingProjectId` to append runs/tiles/places onto an existing seeded project; use this to create mixed run histories for cross-view regressions.
 - **Playwright env loading:** Parse root `.env` in `client/playwright.config.ts` before web server startup so both `VITE_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` flow into client/server e2e processes consistently.
 - **Playwright waits on SSE pages:** Avoid `networkidle` waits on Setup-like pages with long-lived SSE requests; wait for deterministic UI locators/state transitions instead.
@@ -346,4 +347,15 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
 - Files changed: `client/e2e/tests/ui-components.spec.ts`
 - **Learnings for future iterations:**
   - Google Maps internal object references (`__gm`) are not guaranteed across runs; e2e checks should gracefully degrade to interaction-only assertions when internals are unavailable.
+---
+## 2026-03-01 22:54:22 CET - US-E2E-03
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Added a dedicated Setup progress story-board suite at `client/e2e/tests/setup-progress.spec.ts` covering run-status badge classes, running progress width/animation, elapsed+ETA copy, pause/resume label transitions, SSE progress updates, interactive tile-overlay color/state checks, and map diagnostic copy branches.
+- Added Playwright-only Setup test hooks in `client/src/pages/SetupPage.tsx` for deterministic map-diagnostic scenarios (`?e2eMapDiagnostic=...`) and tile-overlay debug snapshots (`setup-tile-overlay-debug`) gated by `VITE_E2E_TEST_MODE`.
+- Enabled client e2e test mode in `client/playwright.config.ts` and expanded `client/e2e/tests/coverage-checklist.md` with explicit US-E2E-03 interaction mappings.
+- Files changed: `client/e2e/tests/setup-progress.spec.ts`, `client/src/pages/SetupPage.tsx`, `client/playwright.config.ts`, `client/e2e/tests/coverage-checklist.md`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For Setup pause/resume and SSE assertions, stateful route mocks should model both `/api/scrape/:runId` snapshots and `/api/scrape/:runId/progress` event payloads so label/counter transitions are deterministic.
+  - Keep map-diagnostic branch tests deterministic by exposing explicit e2e-only hooks rather than relying on flaky third-party script timing.
+  - A hidden JSON snapshot tied to overlay style helpers is an effective compromise for validating Google Maps rectangle color/state mapping without brittle internal DOM assertions.
 ---

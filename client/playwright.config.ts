@@ -68,6 +68,7 @@ export default defineConfig({
         ...process.env,
         VITE_API_PROXY_TARGET: e2eServerBaseUrl,
         VITE_GOOGLE_MAPS_API_KEY: e2eMapsKey,
+        VITE_E2E_TEST_MODE: '1',
       },
       reuseExistingServer: false,
       timeout: 120_000,
