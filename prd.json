@@ -342,7 +342,7 @@
         "npm run typecheck --workspace=client passes"
       ],
       "priority": 32,
-      "passes": false,
+      "passes": true,
       "notes": "Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
     },
     {

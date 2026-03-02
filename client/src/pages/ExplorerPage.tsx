@@ -1,5 +1,6 @@
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps'
 import { MarkerClusterer, MarkerClustererEvents } from '@googlemaps/markerclusterer'
+import Fuse from 'fuse.js'
 import type { UIEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -54,6 +55,15 @@ interface SelectionCircleDebugSnapshot {
   radius: number | null
 }
 
+interface SearchablePlaceEntry {
+  place: Place
+  name: string
+  address: string
+  category: string
+  amenities: string[]
+  reviews: string
+}
+
 interface ExplorerE2EMapDebugController {
   clickMarker: (placeId: string) => boolean
   clickMap: () => boolean
@@ -88,7 +98,8 @@ export function ExplorerPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [places, setPlaces] = useState<Place[]>([])
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
-  const [searchText, setSearchText] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearchText, setDebouncedSearchText] = useState('')
   const [tableFilterText, setTableFilterText] = useState('')
   const [sortState, setSortState] = useState<SortState>({ key: 'rating', direction: 'desc' })
   const [favoritePlaceIds, setFavoritePlaceIds] = useState<Set<string>>(new Set())
@@ -160,6 +171,8 @@ export function ExplorerPage() {
     if (!selectedProjectId) {
       setSelectedProject(null)
       setPlaces([])
+      setSearchInput('')
+      setDebouncedSearchText('')
       setReviewsByPlaceId({})
       setSelectedReviewsError(null)
       setIsLoadingSelectedReviews(false)
@@ -210,19 +223,104 @@ export function ExplorerPage() {
     }
   }, [selectedProjectId])
 
+  useEffect(() => {
+    const debounceTimer = window.setTimeout(() => {
+      setDebouncedSearchText(searchInput)
+    }, 300)
+
+    return () => {
+      clearTimeout(debounceTimer)
+    }
+  }, [searchInput])
+
+  useEffect(() => {
+    const trimmedSearch = debouncedSearchText.trim()
+    if (trimmedSearch.length === 0 || places.length === 0) {
+      return
+    }
+
+    const missingPlaceIds = places
+      .map((place) => place.id)
+      .filter((placeId) => !Object.prototype.hasOwnProperty.call(reviewsByPlaceId, placeId))
+
+    if (missingPlaceIds.length === 0) {
+      return
+    }
+
+    let isCancelled = false
+
+    const preloadReviewsForSearch = async () => {
+      const loadedEntries = await Promise.all(
+        missingPlaceIds.map(async (placeId) => {
+          try {
+            const reviews = await listPlaceReviews(placeId)
+            return [placeId, reviews] as const
+          }
+          catch {
+            return [placeId, [] as PlaceReview[]] as const
+          }
+        }),
+      )
+
+      if (isCancelled) {
+        return
+      }
+
+      setReviewsByPlaceId((current) => {
+        const next = { ...current }
+        for (const [placeId, placeReviews] of loadedEntries) {
+          if (!Object.prototype.hasOwnProperty.call(next, placeId)) {
+            next[placeId] = placeReviews
+          }
+        }
+        return next
+      })
+    }
+
+    void preloadReviewsForSearch()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [debouncedSearchText, places, reviewsByPlaceId])
+
+  const searchablePlaceEntries = useMemo<SearchablePlaceEntry[]>(
+    () =>
+      places.map((place) => ({
+        place,
+        name: place.name,
+        address: place.address ?? '',
+        category: place.category ?? '',
+        amenities: parseJsonArray(place.amenities),
+        reviews: (reviewsByPlaceId[place.id] ?? []).map((review) => review.text).join(' '),
+      })),
+    [places, reviewsByPlaceId],
+  )
+
+  const placeSearchFuse = useMemo(
+    () =>
+      new Fuse(searchablePlaceEntries, {
+        threshold: 0.35,
+        ignoreLocation: true,
+        keys: [
+          { name: 'name', weight: 0.4 },
+          { name: 'address', weight: 0.2 },
+          { name: 'category', weight: 0.15 },
+          { name: 'amenities', weight: 0.15 },
+          { name: 'reviews', weight: 0.1 },
+        ],
+      }),
+    [searchablePlaceEntries],
+  )
+
   const filteredPlaces = useMemo(() => {
-    const trimmedSearch = searchText.trim().toLowerCase()
+    const trimmedSearch = debouncedSearchText.trim()
     if (!trimmedSearch) {
       return places
     }
 
-    return places.filter((place) =>
-      [place.name, place.address ?? '', place.category ?? '']
-        .join(' ')
-        .toLowerCase()
-        .includes(trimmedSearch)
-    )
-  }, [places, searchText])
+    return placeSearchFuse.search(trimmedSearch).map((result) => result.item.place)
+  }, [debouncedSearchText, placeSearchFuse, places])
 
   const tableFilteredPlaces = useMemo(() => {
     const trimmedFilter = tableFilterText.trim().toLowerCase()
@@ -365,7 +463,7 @@ export function ExplorerPage() {
   useEffect(() => {
     setTableScrollTop(0)
     tableScrollRef.current?.scrollTo({ top: 0 })
-  }, [selectedProjectId, searchText, tableFilterText, sortState])
+  }, [selectedProjectId, debouncedSearchText, tableFilterText, sortState])
 
   useEffect(() => {
     if (!selectedPlaceId) {
@@ -480,8 +578,8 @@ export function ExplorerPage() {
             data-testid="explorer-search-input"
             type="search"
             placeholder="Search places"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
           />
         </div>
 
