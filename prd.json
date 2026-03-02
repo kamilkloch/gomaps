@@ -1,6 +1,6 @@
 {
   "project": "GoMaps",
-  "branchName": "ralph/gomaps-v1",
+  "branchName": "master",
   "description": "Google Maps accommodation discovery tool using Google Places API (New) for data fetching, with interactive Explorer UI — see SPEC.md for full specification, DEVELOPMENT.md for implementation guide",
   "userStories": [
     {
