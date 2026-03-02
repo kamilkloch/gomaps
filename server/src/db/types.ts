@@ -40,6 +40,7 @@ export interface Tile {
 export interface Place {
   id: string
   googleMapsUri: string
+  googleMapsPhotosUri: string | null
   name: string
   category: string | null
   rating: number | null

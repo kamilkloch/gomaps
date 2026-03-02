@@ -18,6 +18,7 @@ const TEXT_SEARCH_FIELD_MASK = [
   'places.primaryTypeDisplayName',
   'places.priceLevel',
   'places.googleMapsUri',
+  'places.googleMapsLinks.photosUri',
   'places.reviews',
   'places.photos',
   'places.regularOpeningHours',
@@ -36,6 +37,7 @@ const PLACE_DETAILS_FIELD_MASK = [
   'primaryTypeDisplayName',
   'priceLevel',
   'googleMapsUri',
+  'googleMapsLinks.photosUri',
   'reviews',
   'photos',
   'regularOpeningHours',
@@ -183,6 +185,7 @@ const parsePlace = (place: PlaceResult, apiKey: string): ParsedPlace => {
     place: {
       id: placeId,
       googleMapsUri: place.googleMapsUri ?? '',
+      googleMapsPhotosUri: place.googleMapsLinks?.photosUri ?? null,
       name: place.displayName?.text ?? 'Unknown',
       category: place.primaryTypeDisplayName?.text ?? null,
       rating: place.rating ?? null,
@@ -279,6 +282,9 @@ interface PlaceResult {
   }
   priceLevel?: string
   googleMapsUri?: string
+  googleMapsLinks?: {
+    photosUri?: string
+  }
   reviews?: PlaceReview[]
   photos?: {
     name?: string

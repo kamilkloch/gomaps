@@ -34,6 +34,7 @@ describe('places-api', () => {
               primaryTypeDisplayName: { text: 'Hotel' },
               priceLevel: 'PRICE_LEVEL_MODERATE',
               googleMapsUri: 'https://maps.google.com/?cid=123',
+              googleMapsLinks: { photosUri: 'https://maps.google.com/photos?cid=123' },
               regularOpeningHours: { weekdayDescriptions: ['Monday: Open 24 hours'] },
               photos: [{ name: 'places/ChIJ_TEXT_SEARCH_1/photos/photo-1' }],
               reviews: [
@@ -67,6 +68,7 @@ describe('places-api', () => {
     expect(init.method).toBe('POST')
     expect((init.headers as Record<string, string>)['X-Goog-Api-Key']).toBe('test-api-key')
     expect((init.headers as Record<string, string>)['X-Goog-FieldMask']).toContain('places.googleMapsUri')
+    expect((init.headers as Record<string, string>)['X-Goog-FieldMask']).toContain('places.googleMapsLinks.photosUri')
     expect((init.headers as Record<string, string>)['X-Goog-FieldMask']).toContain('places.reviews')
 
     const body = JSON.parse(String(init.body)) as Record<string, unknown>
@@ -85,6 +87,7 @@ describe('places-api', () => {
     expect(result.places).toHaveLength(1)
     expect(result.places[0].placeId).toBe('ChIJ_TEXT_SEARCH_1')
     expect(result.places[0].place.googleMapsUri).toBe('https://maps.google.com/?cid=123')
+    expect(result.places[0].place.googleMapsPhotosUri).toBe('https://maps.google.com/photos?cid=123')
     expect(result.places[0].place.priceLevel).toBe('$$')
     expect(result.places[0].place.websiteType).toBe('direct')
     expect(result.places[0].place.photoUrls).toEqual([
@@ -113,6 +116,7 @@ describe('places-api', () => {
           websiteUri: 'https://villa-aurora.example',
           primaryTypeDisplayName: { text: 'Vacation rental' },
           googleMapsUri: 'https://maps.google.com/?cid=456',
+          googleMapsLinks: { photosUri: 'https://maps.google.com/photos?cid=456' },
           reviews: [
             {
               rating: 4,
@@ -133,9 +137,11 @@ describe('places-api', () => {
     expect(init.method).toBe('GET')
     expect((init.headers as Record<string, string>)['X-Goog-Api-Key']).toBe('test-api-key')
     expect((init.headers as Record<string, string>)['X-Goog-FieldMask']).toContain('googleMapsUri')
+    expect((init.headers as Record<string, string>)['X-Goog-FieldMask']).toContain('googleMapsLinks.photosUri')
 
     expect(result.place.id).toBe('ChIJ_DETAILS_1')
     expect(result.place.googleMapsUri).toBe('https://maps.google.com/?cid=456')
+    expect(result.place.googleMapsPhotosUri).toBe('https://maps.google.com/photos?cid=456')
     expect(result.place.name).toBe('Villa Aurora')
     expect(result.place.category).toBe('Vacation rental')
     expect(result.place.lat).toBe(39.21)

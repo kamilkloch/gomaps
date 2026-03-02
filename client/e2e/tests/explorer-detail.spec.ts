@@ -20,6 +20,7 @@ test.describe('explorer detail panel and formatting story-boards', () => {
         {
           id: 'detail-rich-place',
           googleMapsUri: 'https://maps.google.com/?cid=detail-rich-place',
+          googleMapsPhotosUri: 'https://maps.google.com/?cid=detail-rich-place&view=photos',
           name: 'Villa Sunset Retreat',
           category: 'Vacation rental',
           rating: 4.8,
@@ -62,6 +63,10 @@ test.describe('explorer detail panel and formatting story-boards', () => {
     await expect(page.getByTestId('explorer-detail-photos').getByTestId('explorer-detail-photo-1')).toHaveAttribute(
       'href',
       'https://example.com/photo-b.jpg',
+    )
+    await expect(page.getByTestId('explorer-detail-action-view-photos-google-maps')).toHaveAttribute(
+      'href',
+      'https://maps.google.com/?cid=detail-rich-place&view=photos',
     )
     await expect(page.getByTestId('explorer-detail-opening-hours')).toContainText('Mon-Sun 08:00-22:00')
     await expect(page.getByTestId('explorer-detail-scraped-at')).toContainText('Scraped at:')

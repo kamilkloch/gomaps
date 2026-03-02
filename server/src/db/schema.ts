@@ -6,6 +6,7 @@ const PLACES_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS places (
   id TEXT PRIMARY KEY,
   google_maps_uri TEXT NOT NULL UNIQUE,
+  google_maps_photos_uri TEXT,
   name TEXT NOT NULL,
   category TEXT,
   rating REAL,
@@ -105,6 +106,7 @@ export function createDatabase(dbPath: string): Database.Database {
   db.pragma('foreign_keys = ON')
   db.exec(SCHEMA_SQL)
   migrateLegacyPlacesTable(db)
+  migratePlacesPhotosUriColumn(db)
   return db
 }
 
@@ -135,6 +137,7 @@ const migrateLegacyPlacesTable = (db: Database.Database): void => {
       INSERT INTO places (
         id,
         google_maps_uri,
+        google_maps_photos_uri,
         name,
         category,
         rating,
@@ -154,6 +157,7 @@ const migrateLegacyPlacesTable = (db: Database.Database): void => {
       SELECT
         id,
         google_url,
+        NULL,
         name,
         category,
         rating,
@@ -211,6 +215,18 @@ const migrateLegacyPlacesTable = (db: Database.Database): void => {
     db.pragma('foreign_keys = ON')
     throw error
   }
+}
+
+const migratePlacesPhotosUriColumn = (db: Database.Database): void => {
+  const tableInfo = db
+    .prepare('PRAGMA table_info(places)')
+    .all() as Array<{ name: string }>
+  const columnNames = new Set(tableInfo.map((column) => column.name))
+  if (columnNames.has('google_maps_photos_uri')) {
+    return
+  }
+
+  db.exec('ALTER TABLE places ADD COLUMN google_maps_photos_uri TEXT')
 }
 
 const DEFAULT_DB_PATH = process.env.DB_PATH ?? 'data/gomaps.db'

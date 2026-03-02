@@ -450,6 +450,7 @@ export function ExplorerPage() {
     [selectedPlaceSearchLabel],
   )
   const selectedPlaceGoogleMapsUrl = selectedPlace?.googleMapsUri ?? null
+  const selectedPlaceGoogleMapsPhotosUrl = selectedPlace?.googleMapsPhotosUri ?? selectedPlaceGoogleMapsUrl
 
   const defaultMapCenter = getProjectCenter(selectedProject?.bounds) ?? FALLBACK_CENTER
 
@@ -818,6 +819,15 @@ export function ExplorerPage() {
                     className="explorer-detail-action-button"
                   >
                     Open in Google Maps
+                  </a>
+                  <a
+                    data-testid="explorer-detail-action-view-photos-google-maps"
+                    href={selectedPlaceGoogleMapsPhotosUrl ?? '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="explorer-detail-action-button"
+                  >
+                    View photos on Google Maps
                   </a>
                   <a
                     data-testid="explorer-detail-action-search-booking"

@@ -53,6 +53,7 @@ const SeedRequestSchema = Schema.Struct({
       Schema.Struct({
         id: Schema.String,
         googleMapsUri: Schema.String,
+        googleMapsPhotosUri: Schema.optional(Schema.String),
         name: Schema.String,
         lat: Schema.Number,
         lng: Schema.Number,
