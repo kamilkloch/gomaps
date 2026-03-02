@@ -20,6 +20,7 @@ const FALLBACK_CENTER = { lat: 40, lng: 9 }
 const TABLE_ROW_HEIGHT = 44
 const TABLE_OVERSCAN = 10
 const REVIEW_SNIPPET_LENGTH = 220
+const REVIEW_PRELOAD_BATCH_SIZE = 12
 
 type SortKey =
   | 'name'
@@ -118,8 +119,52 @@ export function ExplorerPage() {
   const [isLoadingProjects, setIsLoadingProjects] = useState(true)
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const reviewsByPlaceIdRef = useRef(reviewsByPlaceId)
+  const reviewRequestPromisesRef = useRef(new globalThis.Map<string, Promise<PlaceReview[]>>())
 
   const hasMapsKey = Boolean(API_KEY)
+
+  useEffect(() => {
+    reviewsByPlaceIdRef.current = reviewsByPlaceId
+  }, [reviewsByPlaceId])
+
+  const hasCachedReviews = useCallback(
+    (placeId: string): boolean => Object.prototype.hasOwnProperty.call(reviewsByPlaceIdRef.current, placeId),
+    [],
+  )
+
+  const loadReviewsForPlace = useCallback(async (placeId: string): Promise<PlaceReview[]> => {
+    const cachedReviews = reviewsByPlaceIdRef.current[placeId]
+    if (cachedReviews) {
+      return cachedReviews
+    }
+
+    const inFlightRequest = reviewRequestPromisesRef.current.get(placeId)
+    if (inFlightRequest) {
+      return inFlightRequest
+    }
+
+    const requestPromise = listPlaceReviews(placeId)
+      .then((reviews) => {
+        setReviewsByPlaceId((current) => {
+          if (Object.prototype.hasOwnProperty.call(current, placeId)) {
+            return current
+          }
+
+          return {
+            ...current,
+            [placeId]: reviews,
+          }
+        })
+        return reviews
+      })
+      .finally(() => {
+        reviewRequestPromisesRef.current.delete(placeId)
+      })
+
+    reviewRequestPromisesRef.current.set(placeId, requestPromise)
+    return requestPromise
+  }, [])
 
   useEffect(() => {
     let isCancelled = false
@@ -134,11 +179,11 @@ export function ExplorerPage() {
         }
 
         setProjects(loadedProjects)
-        const nextProjectId = routeProjectId
-          ?? selectedProjectId
+        setSelectedProjectId((currentProjectId) =>
+          routeProjectId
+          ?? currentProjectId
           ?? loadedProjects[0]?.id
-          ?? null
-        setSelectedProjectId(nextProjectId)
+          ?? null)
       }
       catch {
         if (!isCancelled) {
@@ -157,7 +202,7 @@ export function ExplorerPage() {
     return () => {
       isCancelled = true
     }
-  }, [routeProjectId, selectedProjectId])
+  }, [routeProjectId])
 
   useEffect(() => {
     if (!routeProjectId) {
@@ -241,7 +286,7 @@ export function ExplorerPage() {
 
     const missingPlaceIds = places
       .map((place) => place.id)
-      .filter((placeId) => !Object.prototype.hasOwnProperty.call(reviewsByPlaceId, placeId))
+      .filter((placeId) => !hasCachedReviews(placeId))
 
     if (missingPlaceIds.length === 0) {
       return
@@ -250,31 +295,37 @@ export function ExplorerPage() {
     let isCancelled = false
 
     const preloadReviewsForSearch = async () => {
-      const loadedEntries = await Promise.all(
-        missingPlaceIds.map(async (placeId) => {
-          try {
-            const reviews = await listPlaceReviews(placeId)
-            return [placeId, reviews] as const
-          }
-          catch {
-            return [placeId, [] as PlaceReview[]] as const
-          }
-        }),
-      )
+      for (let offset = 0; offset < missingPlaceIds.length; offset += REVIEW_PRELOAD_BATCH_SIZE) {
+        const batch = missingPlaceIds.slice(offset, offset + REVIEW_PRELOAD_BATCH_SIZE)
 
-      if (isCancelled) {
-        return
-      }
+        await Promise.all(
+          batch.map(async (placeId) => {
+            try {
+              await loadReviewsForPlace(placeId)
+            }
+            catch {
+              if (isCancelled) {
+                return
+              }
 
-      setReviewsByPlaceId((current) => {
-        const next = { ...current }
-        for (const [placeId, placeReviews] of loadedEntries) {
-          if (!Object.prototype.hasOwnProperty.call(next, placeId)) {
-            next[placeId] = placeReviews
-          }
+              setReviewsByPlaceId((current) => {
+                if (Object.prototype.hasOwnProperty.call(current, placeId)) {
+                  return current
+                }
+
+                return {
+                  ...current,
+                  [placeId]: [],
+                }
+              })
+            }
+          }),
+        )
+
+        if (isCancelled) {
+          return
         }
-        return next
-      })
+      }
     }
 
     void preloadReviewsForSearch()
@@ -282,7 +333,7 @@ export function ExplorerPage() {
     return () => {
       isCancelled = true
     }
-  }, [debouncedSearchText, places, reviewsByPlaceId])
+  }, [debouncedSearchText, hasCachedReviews, loadReviewsForPlace, places])
 
   const searchablePlaceEntries = useMemo<SearchablePlaceEntry[]>(
     () =>
@@ -458,7 +509,7 @@ export function ExplorerPage() {
     return () => {
       resizeObserver.disconnect()
     }
-  }, [sortedPlaces.length])
+  }, [])
 
   useEffect(() => {
     setTableScrollTop(0)
@@ -513,7 +564,7 @@ export function ExplorerPage() {
       return
     }
 
-    if (Object.prototype.hasOwnProperty.call(reviewsByPlaceId, placeId)) {
+    if (hasCachedReviews(placeId)) {
       setIsLoadingSelectedReviews(false)
       setSelectedReviewsError(null)
       return
@@ -525,15 +576,7 @@ export function ExplorerPage() {
 
     const loadReviews = async () => {
       try {
-        const reviews = await listPlaceReviews(placeId)
-        if (isCancelled) {
-          return
-        }
-
-        setReviewsByPlaceId((current) => ({
-          ...current,
-          [placeId]: reviews,
-        }))
+        await loadReviewsForPlace(placeId)
       }
       catch {
         if (!isCancelled) {
@@ -552,7 +595,7 @@ export function ExplorerPage() {
     return () => {
       isCancelled = true
     }
-  }, [reviewsByPlaceId, selectedPlace])
+  }, [hasCachedReviews, loadReviewsForPlace, selectedPlace])
 
   return (
     <main className="explorer-page" data-testid="explorer-page">
