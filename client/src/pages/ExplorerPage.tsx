@@ -3,7 +3,7 @@ import { MarkerClusterer, MarkerClustererEvents } from '@googlemaps/markercluste
 import Fuse from 'fuse.js'
 import type { UIEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   getProject,
   listPlaceReviews,
@@ -21,6 +21,21 @@ const TABLE_ROW_HEIGHT = 44
 const TABLE_OVERSCAN = 10
 const REVIEW_SNIPPET_LENGTH = 220
 const REVIEW_PRELOAD_BATCH_SIZE = 12
+const RATING_FILTER_MIN = 1
+const RATING_FILTER_MAX = 5
+const FILTER_PARAM_RATING_MIN = 'ratingMin'
+const FILTER_PARAM_RATING_MAX = 'ratingMax'
+const FILTER_PARAM_CATEGORIES = 'categories'
+const FILTER_PARAM_WEBSITE = 'website'
+
+const EXPLORER_CATEGORY_OPTIONS = [
+  { id: 'hotel', label: 'Hotel' },
+  { id: 'vacation-rental', label: 'Vacation Rental' },
+  { id: 'bed-breakfast', label: 'B&B' },
+  { id: 'apartment', label: 'Apartment' },
+] as const
+
+const FILTER_WEBSITE_OPTIONS = ['all', 'direct', 'ota', 'unknown'] as const
 
 type SortKey =
   | 'name'
@@ -71,6 +86,16 @@ interface ExplorerE2EMapDebugController {
   setZoom: (zoom: number) => boolean
 }
 
+type ExplorerCategoryFilter = (typeof EXPLORER_CATEGORY_OPTIONS)[number]['id']
+type ExplorerWebsiteFilter = (typeof FILTER_WEBSITE_OPTIONS)[number]
+
+interface ExplorerFilterState {
+  ratingMin: number
+  ratingMax: number
+  categories: ExplorerCategoryFilter[]
+  website: ExplorerWebsiteFilter
+}
+
 const EMPTY_CLUSTER_DEBUG_SNAPSHOT: ClusterDebugSnapshot = {
   totalClusters: 0,
   groupedClusterCount: 0,
@@ -94,6 +119,7 @@ declare global {
 export function ExplorerPage() {
   const { projectId: routeProjectId } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(routeProjectId ?? null)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
@@ -113,6 +139,8 @@ export function ExplorerPage() {
   const [selectionCircleDebugSnapshot, setSelectionCircleDebugSnapshot] = useState<SelectionCircleDebugSnapshot>(
     EMPTY_SELECTION_CIRCLE_DEBUG_SNAPSHOT,
   )
+  const [isFilterSidebarOpen, setIsFilterSidebarOpen] = useState(true)
+  const [filters, setFilters] = useState<ExplorerFilterState>(() => parseExplorerFiltersFromSearchParams(searchParams))
   const tableScrollRef = useRef<HTMLDivElement | null>(null)
   const [tableScrollTop, setTableScrollTop] = useState(0)
   const [tableViewportHeight, setTableViewportHeight] = useState(220)
@@ -123,6 +151,21 @@ export function ExplorerPage() {
   const reviewRequestPromisesRef = useRef(new globalThis.Map<string, Promise<PlaceReview[]>>())
 
   const hasMapsKey = Boolean(API_KEY)
+  const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters])
+
+  useEffect(() => {
+    const nextFilters = parseExplorerFiltersFromSearchParams(searchParams)
+    setFilters((current) => (areFilterStatesEqual(current, nextFilters) ? current : nextFilters))
+  }, [searchParams])
+
+  useEffect(() => {
+    const nextSearchParams = buildExplorerFilterSearchParams(searchParams, filters)
+    if (nextSearchParams.toString() === searchParams.toString()) {
+      return
+    }
+
+    setSearchParams(nextSearchParams, { replace: true })
+  }, [filters, searchParams, setSearchParams])
 
   useEffect(() => {
     reviewsByPlaceIdRef.current = reviewsByPlaceId
@@ -366,12 +409,12 @@ export function ExplorerPage() {
 
   const filteredPlaces = useMemo(() => {
     const trimmedSearch = debouncedSearchText.trim()
-    if (!trimmedSearch) {
-      return places
-    }
+    const searchMatchedPlaces = !trimmedSearch
+      ? places
+      : placeSearchFuse.search(trimmedSearch).map((result) => result.item.place)
 
-    return placeSearchFuse.search(trimmedSearch).map((result) => result.item.place)
-  }, [debouncedSearchText, placeSearchFuse, places])
+    return searchMatchedPlaces.filter((place) => placeMatchesExplorerFilters(place, filters))
+  }, [debouncedSearchText, filters, placeSearchFuse, places])
 
   const tableFilteredPlaces = useMemo(() => {
     const trimmedFilter = tableFilterText.trim().toLowerCase()
@@ -453,11 +496,50 @@ export function ExplorerPage() {
   const selectedPlaceGoogleMapsPhotosUrl = selectedPlace?.googleMapsPhotosUri ?? selectedPlaceGoogleMapsUrl
 
   const defaultMapCenter = getProjectCenter(selectedProject?.bounds) ?? FALLBACK_CENTER
+  const searchSuffix = searchParams.toString().length > 0 ? `?${searchParams.toString()}` : ''
+
+  const handleCategoryFilterToggle = useCallback((categoryId: ExplorerCategoryFilter) => {
+    setFilters((current) => {
+      const nextCategories = current.categories.includes(categoryId)
+        ? current.categories.filter((value) => value !== categoryId)
+        : [...current.categories, categoryId]
+
+      return {
+        ...current,
+        categories: sortCategoryFilters(nextCategories),
+      }
+    })
+  }, [])
+
+  const resetFilters = useCallback(() => {
+    setFilters(DEFAULT_EXPLORER_FILTERS)
+  }, [])
+
+  const handleRatingMinChange = useCallback((value: number) => {
+    setFilters((current) => ({
+      ...current,
+      ratingMin: Math.min(value, current.ratingMax),
+    }))
+  }, [])
+
+  const handleRatingMaxChange = useCallback((value: number) => {
+    setFilters((current) => ({
+      ...current,
+      ratingMax: Math.max(value, current.ratingMin),
+    }))
+  }, [])
+
+  const handleWebsiteFilterChange = useCallback((website: ExplorerWebsiteFilter) => {
+    setFilters((current) => ({
+      ...current,
+      website,
+    }))
+  }, [])
 
   const handleProjectChange = useCallback((nextProjectId: string) => {
     setSelectedProjectId(nextProjectId)
-    navigate(`/projects/${nextProjectId}/explorer`)
-  }, [navigate])
+    navigate(`/projects/${nextProjectId}/explorer${searchSuffix}`)
+  }, [navigate, searchSuffix])
 
   const handleSortChange = useCallback((key: SortKey) => {
     setSortState((current) => {
@@ -515,7 +597,7 @@ export function ExplorerPage() {
   useEffect(() => {
     setTableScrollTop(0)
     tableScrollRef.current?.scrollTo({ top: 0 })
-  }, [selectedProjectId, debouncedSearchText, tableFilterText, sortState])
+  }, [selectedProjectId, debouncedSearchText, tableFilterText, sortState, filters])
 
   useEffect(() => {
     if (!selectedPlaceId) {
@@ -556,6 +638,17 @@ export function ExplorerPage() {
   useEffect(() => {
     setIsOpeningHoursExpanded(true)
   }, [selectedPlaceId])
+
+  useEffect(() => {
+    if (!selectedPlaceId) {
+      return
+    }
+
+    const existsInFilteredPlaces = filteredPlaces.some((place) => place.id === selectedPlaceId)
+    if (!existsInFilteredPlaces) {
+      setSelectedPlaceId(filteredPlaces[0]?.id ?? null)
+    }
+  }, [filteredPlaces, selectedPlaceId])
 
   useEffect(() => {
     const placeId = selectedPlace?.id
@@ -627,9 +720,16 @@ export function ExplorerPage() {
           />
         </div>
 
-        <button data-testid="explorer-filters-button" type="button" className="explorer-filters-button">
+        <button
+          data-testid="explorer-filters-button"
+          type="button"
+          className="explorer-filters-button"
+          onClick={() => setIsFilterSidebarOpen((current) => !current)}
+          aria-expanded={isFilterSidebarOpen}
+          aria-controls="explorer-filter-sidebar"
+        >
           Filters
-          <span>0</span>
+          <span data-testid="explorer-filters-active-count">{activeFilterCount}</span>
         </button>
       </header>
 
@@ -993,10 +1093,116 @@ export function ExplorerPage() {
           </section>
         </section>
 
-        <aside className="explorer-filter-sidebar">
-          <h2>Filters</h2>
-          <p>Active filters will appear here in US-018.</p>
-        </aside>
+        {isFilterSidebarOpen ? (
+          <aside
+            id="explorer-filter-sidebar"
+            className="explorer-filter-sidebar"
+            data-testid="explorer-filter-sidebar"
+          >
+            <div className="explorer-filter-sidebar-header">
+              <h2>Filters</h2>
+              <button
+                type="button"
+                data-testid="explorer-filter-reset"
+                className="explorer-filter-reset-button"
+                onClick={resetFilters}
+                disabled={activeFilterCount === 0}
+              >
+                Reset
+              </button>
+            </div>
+
+            <section className="explorer-filter-group" data-testid="explorer-filter-rating-group">
+              <h3>Rating</h3>
+              <p className="explorer-filter-helper">{filters.ratingMin.toFixed(1)} to {filters.ratingMax.toFixed(1)}</p>
+              <label htmlFor="explorer-filter-rating-min">Minimum rating</label>
+              <input
+                id="explorer-filter-rating-min"
+                data-testid="explorer-filter-rating-min"
+                type="range"
+                min={RATING_FILTER_MIN}
+                max={RATING_FILTER_MAX}
+                step={0.1}
+                value={filters.ratingMin}
+                onChange={(event) => handleRatingMinChange(Number(event.target.value))}
+              />
+              <label htmlFor="explorer-filter-rating-max">Maximum rating</label>
+              <input
+                id="explorer-filter-rating-max"
+                data-testid="explorer-filter-rating-max"
+                type="range"
+                min={RATING_FILTER_MIN}
+                max={RATING_FILTER_MAX}
+                step={0.1}
+                value={filters.ratingMax}
+                onChange={(event) => handleRatingMaxChange(Number(event.target.value))}
+              />
+            </section>
+
+            <section className="explorer-filter-group" data-testid="explorer-filter-category-group">
+              <h3>Category</h3>
+              <div className="explorer-filter-checkbox-grid">
+                {EXPLORER_CATEGORY_OPTIONS.map((categoryOption) => (
+                  <label key={categoryOption.id}>
+                    <input
+                      data-testid={`explorer-filter-category-${categoryOption.id}`}
+                      type="checkbox"
+                      checked={filters.categories.includes(categoryOption.id)}
+                      onChange={() => handleCategoryFilterToggle(categoryOption.id)}
+                    />
+                    {categoryOption.label}
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            <section className="explorer-filter-group" data-testid="explorer-filter-website-group">
+              <h3>Website</h3>
+              <div className="explorer-filter-radio-grid">
+                <label>
+                  <input
+                    data-testid="explorer-filter-website-all"
+                    type="radio"
+                    name="explorer-website-filter"
+                    checked={filters.website === 'all'}
+                    onChange={() => handleWebsiteFilterChange('all')}
+                  />
+                  All
+                </label>
+                <label>
+                  <input
+                    data-testid="explorer-filter-website-direct"
+                    type="radio"
+                    name="explorer-website-filter"
+                    checked={filters.website === 'direct'}
+                    onChange={() => handleWebsiteFilterChange('direct')}
+                  />
+                  Direct Booking
+                </label>
+                <label>
+                  <input
+                    data-testid="explorer-filter-website-ota"
+                    type="radio"
+                    name="explorer-website-filter"
+                    checked={filters.website === 'ota'}
+                    onChange={() => handleWebsiteFilterChange('ota')}
+                  />
+                  OTA
+                </label>
+                <label>
+                  <input
+                    data-testid="explorer-filter-website-unknown"
+                    type="radio"
+                    name="explorer-website-filter"
+                    checked={filters.website === 'unknown'}
+                    onChange={() => handleWebsiteFilterChange('unknown')}
+                  />
+                  Unknown
+                </label>
+              </div>
+            </section>
+          </aside>
+        ) : null}
       </section>
     </main>
   )
@@ -1425,6 +1631,178 @@ const buildBookingSearchUrl = (searchLabel: string): string =>
 
 const buildAirbnbSearchUrl = (searchLabel: string): string =>
   `https://www.airbnb.com/s/${encodeURIComponent(searchLabel)}/homes`
+
+const DEFAULT_EXPLORER_FILTERS: ExplorerFilterState = {
+  ratingMin: RATING_FILTER_MIN,
+  ratingMax: RATING_FILTER_MAX,
+  categories: [],
+  website: 'all',
+}
+
+const parseExplorerFiltersFromSearchParams = (searchParams: URLSearchParams): ExplorerFilterState => {
+  const parsedRatingMin = Number.parseFloat(searchParams.get(FILTER_PARAM_RATING_MIN) ?? '')
+  const parsedRatingMax = Number.parseFloat(searchParams.get(FILTER_PARAM_RATING_MAX) ?? '')
+  const parsedCategories = (searchParams.get(FILTER_PARAM_CATEGORIES) ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry): entry is ExplorerCategoryFilter => isExplorerCategoryFilter(entry))
+  const parsedWebsite = searchParams.get(FILTER_PARAM_WEBSITE)
+
+  const ratingMin = Number.isFinite(parsedRatingMin)
+    ? clamp(parsedRatingMin, RATING_FILTER_MIN, RATING_FILTER_MAX)
+    : DEFAULT_EXPLORER_FILTERS.ratingMin
+  const ratingMax = Number.isFinite(parsedRatingMax)
+    ? clamp(parsedRatingMax, RATING_FILTER_MIN, RATING_FILTER_MAX)
+    : DEFAULT_EXPLORER_FILTERS.ratingMax
+
+  return {
+    ratingMin: Math.min(ratingMin, ratingMax),
+    ratingMax: Math.max(ratingMin, ratingMax),
+    categories: sortCategoryFilters(parsedCategories),
+    website: FILTER_WEBSITE_OPTIONS.includes(parsedWebsite as ExplorerWebsiteFilter)
+      ? parsedWebsite as ExplorerWebsiteFilter
+      : DEFAULT_EXPLORER_FILTERS.website,
+  }
+}
+
+const buildExplorerFilterSearchParams = (
+  currentSearchParams: URLSearchParams,
+  filters: ExplorerFilterState,
+): URLSearchParams => {
+  const nextSearchParams = new URLSearchParams(currentSearchParams)
+
+  nextSearchParams.delete(FILTER_PARAM_RATING_MIN)
+  nextSearchParams.delete(FILTER_PARAM_RATING_MAX)
+  nextSearchParams.delete(FILTER_PARAM_CATEGORIES)
+  nextSearchParams.delete(FILTER_PARAM_WEBSITE)
+
+  if (filters.ratingMin > RATING_FILTER_MIN) {
+    nextSearchParams.set(FILTER_PARAM_RATING_MIN, filters.ratingMin.toFixed(1))
+  }
+
+  if (filters.ratingMax < RATING_FILTER_MAX) {
+    nextSearchParams.set(FILTER_PARAM_RATING_MAX, filters.ratingMax.toFixed(1))
+  }
+
+  if (filters.categories.length > 0) {
+    nextSearchParams.set(FILTER_PARAM_CATEGORIES, filters.categories.join(','))
+  }
+
+  if (filters.website !== DEFAULT_EXPLORER_FILTERS.website) {
+    nextSearchParams.set(FILTER_PARAM_WEBSITE, filters.website)
+  }
+
+  return nextSearchParams
+}
+
+const placeMatchesExplorerFilters = (place: Place, filters: ExplorerFilterState): boolean => {
+  if (!placeMatchesRatingFilter(place, filters)) {
+    return false
+  }
+
+  if (!placeMatchesCategoryFilter(place, filters.categories)) {
+    return false
+  }
+
+  if (!placeMatchesWebsiteFilter(place, filters.website)) {
+    return false
+  }
+
+  return true
+}
+
+const placeMatchesRatingFilter = (place: Place, filters: ExplorerFilterState): boolean => {
+  if (place.rating === null) {
+    return filters.ratingMin === RATING_FILTER_MIN && filters.ratingMax === RATING_FILTER_MAX
+  }
+
+  return place.rating >= filters.ratingMin && place.rating <= filters.ratingMax
+}
+
+const placeMatchesCategoryFilter = (place: Place, selectedCategories: ExplorerCategoryFilter[]): boolean => {
+  if (selectedCategories.length === 0) {
+    return true
+  }
+
+  const category = normalizeCategoryFilter(place.category)
+  if (!category) {
+    return false
+  }
+
+  return selectedCategories.includes(category)
+}
+
+const placeMatchesWebsiteFilter = (place: Place, websiteFilter: ExplorerWebsiteFilter): boolean => {
+  if (websiteFilter === 'all') {
+    return true
+  }
+
+  return place.websiteType === websiteFilter
+}
+
+const normalizeCategoryFilter = (category: string | null): ExplorerCategoryFilter | null => {
+  if (!category) {
+    return null
+  }
+
+  const normalized = category.trim().toLowerCase()
+
+  if (normalized.includes('hotel')) {
+    return 'hotel'
+  }
+
+  if (normalized.includes('vacation rental') || normalized.includes('holiday home') || normalized.includes('villa')) {
+    return 'vacation-rental'
+  }
+
+  if (normalized.includes('b&b') || normalized.includes('bed and breakfast') || normalized.includes('guest house')) {
+    return 'bed-breakfast'
+  }
+
+  if (normalized.includes('apartment') || normalized.includes('flat') || normalized.includes('condo')) {
+    return 'apartment'
+  }
+
+  return null
+}
+
+const countActiveFilters = (filters: ExplorerFilterState): number => {
+  let count = filters.categories.length
+
+  if (filters.ratingMin > RATING_FILTER_MIN) {
+    count += 1
+  }
+
+  if (filters.ratingMax < RATING_FILTER_MAX) {
+    count += 1
+  }
+
+  if (filters.website !== DEFAULT_EXPLORER_FILTERS.website) {
+    count += 1
+  }
+
+  return count
+}
+
+const sortCategoryFilters = (categories: ExplorerCategoryFilter[]): ExplorerCategoryFilter[] => {
+  const uniqueCategories = Array.from(new Set(categories))
+
+  return EXPLORER_CATEGORY_OPTIONS
+    .map((option) => option.id)
+    .filter((id) => uniqueCategories.includes(id))
+}
+
+const areFilterStatesEqual = (left: ExplorerFilterState, right: ExplorerFilterState): boolean =>
+  left.ratingMin === right.ratingMin
+  && left.ratingMax === right.ratingMax
+  && left.website === right.website
+  && left.categories.length === right.categories.length
+  && left.categories.every((value, index) => value === right.categories[index])
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
+
+const isExplorerCategoryFilter = (value: string): value is ExplorerCategoryFilter =>
+  EXPLORER_CATEGORY_OPTIONS.some((option) => option.id === value)
 
 const formatPriceLevel = (priceLevel: string | null): string => {
   if (!priceLevel) {

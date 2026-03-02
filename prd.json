@@ -361,8 +361,8 @@
         "npm run typecheck --workspace=client passes"
       ],
       "priority": 33,
-      "passes": false,
-      "notes": "Reference mockup: docs/mockups/03-explorer-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
+      "passes": true,
+      "notes": "Implemented with collapsible Explorer filter sidebar controls (rating min/max sliders, category checkboxes, website radio), AND-composed filtering across map + table, active-filter badge count in header, URL query-param persistence, and reset support."
     },
     {
       "id": "US-019",

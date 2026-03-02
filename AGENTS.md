@@ -75,6 +75,7 @@ npm run dev --workspace=client
 - For Explorer marker rendering, keep marker/cluster lifecycles in a dedicated `useMap()` child controller (manage `google.maps.Marker` + `MarkerClusterer` refs there, and update via props/state) instead of creating map objects directly in page components
 - For Explorer map↔table sync with virtualized rows, keep a single selected-place id source of truth and scroll the table viewport to the selected row index when marker selection lands on an off-screen row
 - For Explorer global search, keep the input debounced (~300ms) and run Fuse-based fuzzy matching across name/address/category/amenities plus cached review text; lazily preload per-place reviews only while a search query is active to avoid large background request bursts
+- For Explorer filter panels, keep map/table-shared filters (rating/category/website) as AND-composed state persisted in URL query params (`useSearchParams`) and layer table quick-filter text as a table-only refinement
 - Scraping/discovery now uses Google Places API (New) over server-side HTTP (`places:searchText`, `places/{placeId}`)
 - Keep Places field masks explicit with `X-Goog-FieldMask` headers to control SKU/cost and avoid over-fetching
 - Classify place websites by normalized hostname (supporting protocol-less URLs and subdomains) in `server/src/scraper/classifier.ts`, and persist `websiteType` from that classifier instead of hardcoded defaults

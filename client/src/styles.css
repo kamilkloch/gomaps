@@ -1135,6 +1135,16 @@ a {
 
 .explorer-filter-sidebar {
   padding: 0.95rem;
+  display: grid;
+  align-content: start;
+  gap: 0.8rem;
+}
+
+.explorer-filter-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.65rem;
 }
 
 .explorer-filter-sidebar h2 {
@@ -1142,10 +1152,70 @@ a {
   font-size: 1rem;
 }
 
-.explorer-filter-sidebar p {
-  margin: 0.6rem 0 0;
-  color: #a4bcdc;
-  line-height: 1.45;
+.explorer-filter-reset-button {
+  height: 1.95rem;
+  border-radius: 0.55rem;
+  border: 1px solid #4f6f99;
+  background: #1e324f;
+  color: #d8e8ff;
+  padding: 0 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.explorer-filter-reset-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.explorer-filter-group {
+  border: 1px solid #2b4466;
+  border-radius: 0.75rem;
+  background: rgba(10, 24, 40, 0.75);
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.explorer-filter-group h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9ec3f5;
+}
+
+.explorer-filter-group label {
+  font-size: 0.77rem;
+  color: #bdd3f2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.explorer-filter-helper {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #d9eaff;
+}
+
+.explorer-filter-group input[type="range"] {
+  width: 100%;
+  margin: 0.05rem 0 0.2rem;
+  accent-color: #4e98ff;
+}
+
+.explorer-filter-checkbox-grid,
+.explorer-filter-radio-grid {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.explorer-filter-checkbox-grid input,
+.explorer-filter-radio-grid input {
+  accent-color: #4e98ff;
 }
 
 @keyframes setup-progress-stripes {

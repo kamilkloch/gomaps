@@ -17,6 +17,7 @@
 - **Explorer markers + clustering:** Manage `google.maps.Marker`, `google.maps.Circle`, and `MarkerClusterer` refs inside a dedicated `useMap()` controller; on data updates, diff markers by place id and refresh cluster membership (`clearMarkers()` + `addMarkers()`) to keep map state in sync with React state
 - **Explorer virtualized selection sync:** Keep a single `selectedPlaceId` source of truth across map/table/detail state, and when selection changes, scroll the virtualized table viewport only if the selected row index is outside the current visible range
 - **Explorer fuzzy search:** Drive global search from a debounced input state (~300ms) and run Fuse.js against a normalized per-place index (name/address/category/amenities/review text); lazily preload reviews only while a query is active so initial Explorer loads are not blocked by per-place review fanout.
+- **Explorer filter-state URL sync:** Keep filter controls in local React state, parse initial values from `useSearchParams`, and mirror updates back into query params (only non-default values) so filters survive refresh/deep links without polluting routes.
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
@@ -455,4 +456,17 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - For map+table global search, separate immediate input state from debounced query state so UI typing remains responsive while expensive filtering work happens predictably.
   - Review-text search can stay accurate without harming initial load by lazily hydrating missing review caches only while search is active.
   - Fuse-based weighted keys let Explorer keep high-confidence matches on names/addresses while still surfacing amenity/review hits.
+---
+## 2026-03-02 11:25:50 CET - US-018
+Thread: https://ampcode.com/threads/T-019cae07-9385-75b9-b2c5-07402d99236f
+- Implemented the Explorer filter panel in `client/src/pages/ExplorerPage.tsx` with live AND-composed filtering across rating range (min/max sliders), category checkboxes (Hotel/Vacation Rental/B&B/Apartment), and website radio options (All/Direct/OTA/Unknown).
+- Wired the header `Filters` button to toggle the sidebar and show a dynamic active-filter badge count, plus added a reset action to return filters to defaults.
+- Persisted filter state in URL query parameters via `useSearchParams` so deep links/refreshes retain filter selections while storing only non-default values.
+- Updated Explorer filtering pipeline so map markers and table rows react to the same filtered dataset, while keeping table quick-filter as table-only refinement.
+- Ran mandatory quality gates: `npm run typecheck --workspace=server`, `npm run typecheck --workspace=client`, `npm test --workspace=server`, `npm test --workspace=client`, `npm run test:coverage`.
+- Files changed: `client/src/pages/ExplorerPage.tsx`, `client/src/styles.css`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Treat URL query params as persistence for UI-filter state by parsing on load and writing back only when state changes to avoid navigation churn.
+  - Keep global Explorer filtering map/table-shared, then layer quick table-only text filters on top to preserve expected interaction semantics.
+  - A small active-filter counter tied to non-default state makes collapsible sidebars discoverable without extra onboarding UI.
 ---
