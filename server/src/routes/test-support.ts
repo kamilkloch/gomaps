@@ -68,6 +68,7 @@ const SeedRequestSchema = Schema.Struct({
         photoUrls: Schema.optional(Schema.Array(Schema.String)),
         openingHours: Schema.optional(Schema.String),
         amenities: Schema.optional(Schema.Array(Schema.String)),
+        scrapedAt: Schema.optional(Schema.String),
       })
     )
   ),
@@ -144,6 +145,7 @@ testSupportRouter.post('/seed-fixtures', async (req, res) => {
             ...place,
             photoUrls: place.photoUrls ? [...place.photoUrls] : undefined,
             amenities: place.amenities ? [...place.amenities] : undefined,
+            scrapedAt: place.scrapedAt,
           })
           yield* linkPlaceToScrapeRun(place.id, scrapeRun.id)
         }

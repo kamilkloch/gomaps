@@ -38,9 +38,15 @@ const FILTER_PARAM_REVIEW_KEYWORD = 'reviewKeyword'
 const FILTER_PARAM_DISTANCE_LAT = 'distanceLat'
 const FILTER_PARAM_DISTANCE_LNG = 'distanceLng'
 const FILTER_PARAM_DISTANCE_RADIUS_KM = 'distanceRadiusKm'
+const FILTER_PARAM_STALE_ONLY = 'staleOnly'
+const FILTER_PARAM_STALE_THRESHOLD_DAYS = 'staleThresholdDays'
 const DISTANCE_FILTER_MIN_KM = 1
 const DISTANCE_FILTER_MAX_KM = 50
 const DEFAULT_DISTANCE_RADIUS_KM = 10
+const STALE_THRESHOLD_DEFAULT_DAYS = 7
+const STALE_THRESHOLD_MIN_DAYS = 1
+const STALE_THRESHOLD_MAX_DAYS = 30
+const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000
 const DEFAULT_SHORTLIST_NAME = 'Starred'
 
 const EXPLORER_CATEGORY_OPTIONS = [
@@ -109,6 +115,8 @@ interface ExplorerFilterState {
   ratingMax: number
   categories: ExplorerCategoryFilter[]
   website: ExplorerWebsiteFilter
+  showStaleOnly: boolean
+  staleThresholdDays: number
   reviewKeyword: string
   distanceCenter: { lat: number; lng: number } | null
   distanceRadiusKm: number
@@ -479,12 +487,15 @@ export function ExplorerPage() {
   )
 
   const filteredPlaces = useMemo(() => {
+    const nowTimestampMs = Date.now()
     const trimmedSearch = debouncedSearchText.trim()
     const searchMatchedPlaces = !trimmedSearch
       ? places
       : placeSearchFuse.search(trimmedSearch).map((result) => result.item.place)
 
-    return searchMatchedPlaces.filter((place) => placeMatchesExplorerFilters(place, filters, reviewsByPlaceId))
+    return searchMatchedPlaces.filter((place) =>
+      placeMatchesExplorerFilters(place, filters, reviewsByPlaceId, nowTimestampMs)
+    )
   }, [debouncedSearchText, filters, placeSearchFuse, places, reviewsByPlaceId])
 
   const tableFilteredPlaces = useMemo(() => {
@@ -569,6 +580,14 @@ export function ExplorerPage() {
   )
   const selectedPlaceGoogleMapsUrl = selectedPlace?.googleMapsUri ?? null
   const selectedPlaceGoogleMapsPhotosUrl = selectedPlace?.googleMapsPhotosUri ?? selectedPlaceGoogleMapsUrl
+  const selectedPlaceIsStale = useMemo(
+    () => (selectedPlace ? isPlaceStale(selectedPlace, filters.staleThresholdDays) : false),
+    [filters.staleThresholdDays, selectedPlace],
+  )
+  const staleIndicatorTitle = useMemo(
+    () => buildStaleIndicatorTitle(filters.staleThresholdDays),
+    [filters.staleThresholdDays],
+  )
   const shouldShowExternalSearchActions = selectedPlaceHasSearchContext
     && selectedPlaceGoogleMapsUrl !== null
     && selectedPlaceGoogleMapsUrl.trim().length > 0
@@ -616,6 +635,20 @@ export function ExplorerPage() {
     setFilters((current) => ({
       ...current,
       website,
+    }))
+  }, [])
+
+  const handleShowStaleOnlyChange = useCallback((showStaleOnly: boolean) => {
+    setFilters((current) => ({
+      ...current,
+      showStaleOnly,
+    }))
+  }, [])
+
+  const handleStaleThresholdDaysChange = useCallback((staleThresholdDays: number) => {
+    setFilters((current) => ({
+      ...current,
+      staleThresholdDays: clamp(staleThresholdDays, STALE_THRESHOLD_MIN_DAYS, STALE_THRESHOLD_MAX_DAYS),
     }))
   }, [])
 
@@ -1036,6 +1069,17 @@ export function ExplorerPage() {
 
                 <p data-testid="explorer-detail-scraped-at" className="explorer-detail-scraped-at">
                   Scraped at: {formatScrapedAt(selectedPlace.scrapedAt)}
+                  {selectedPlaceIsStale ? (
+                    <span
+                      data-testid="explorer-detail-stale-indicator"
+                      className="explorer-stale-indicator"
+                      title={staleIndicatorTitle}
+                      aria-label={staleIndicatorTitle}
+                    >
+                      <span aria-hidden="true" className="explorer-stale-indicator-icon">!</span>
+                      <span>Stale</span>
+                    </span>
+                  ) : null}
                 </p>
 
                 <button
@@ -1240,7 +1284,22 @@ export function ExplorerPage() {
                         }
                       }}
                     >
-                      <td>{place.name}</td>
+                      <td>
+                        <div className="explorer-table-name-cell">
+                          <span>{place.name}</span>
+                          {isPlaceStale(place, filters.staleThresholdDays) ? (
+                            <span
+                              data-testid={`explorer-stale-indicator-${place.id}`}
+                              className="explorer-stale-indicator"
+                              title={staleIndicatorTitle}
+                              aria-label={staleIndicatorTitle}
+                            >
+                              <span aria-hidden="true" className="explorer-stale-indicator-icon">!</span>
+                              <span>Stale</span>
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td>{place.category ?? '—'}</td>
                       <td>{place.rating?.toFixed(1) ?? '—'}</td>
                       <td>{place.reviewCount ?? '—'}</td>
@@ -1390,6 +1449,39 @@ export function ExplorerPage() {
                   Unknown
                 </label>
               </div>
+            </section>
+
+            <section className="explorer-filter-group" data-testid="explorer-filter-stale-group">
+              <h3>Data freshness</h3>
+              <label>
+                <input
+                  data-testid="explorer-filter-stale-only"
+                  type="checkbox"
+                  checked={filters.showStaleOnly}
+                  onChange={(event) => handleShowStaleOnlyChange(event.target.checked)}
+                />
+                Show stale only
+              </label>
+              <label htmlFor="explorer-filter-stale-threshold-days">Stale threshold (days)</label>
+              <input
+                id="explorer-filter-stale-threshold-days"
+                data-testid="explorer-filter-stale-threshold-days"
+                type="number"
+                min={STALE_THRESHOLD_MIN_DAYS}
+                max={STALE_THRESHOLD_MAX_DAYS}
+                step={1}
+                value={filters.staleThresholdDays}
+                onChange={(event) => {
+                  const parsed = Number.parseInt(event.target.value, 10)
+                  if (!Number.isFinite(parsed)) {
+                    return
+                  }
+                  handleStaleThresholdDaysChange(parsed)
+                }}
+              />
+              <p className="explorer-filter-note">
+                Places scraped more than {formatStaleThresholdLabel(filters.staleThresholdDays)} ago are marked stale.
+              </p>
             </section>
 
             <section className="explorer-filter-group" data-testid="explorer-filter-review-keyword-group">
@@ -1971,6 +2063,8 @@ const DEFAULT_EXPLORER_FILTERS: ExplorerFilterState = {
   ratingMax: RATING_FILTER_MAX,
   categories: [],
   website: 'all',
+  showStaleOnly: false,
+  staleThresholdDays: STALE_THRESHOLD_DEFAULT_DAYS,
   reviewKeyword: '',
   distanceCenter: null,
   distanceRadiusKm: DEFAULT_DISTANCE_RADIUS_KM,
@@ -1984,6 +2078,8 @@ const parseExplorerFiltersFromSearchParams = (searchParams: URLSearchParams): Ex
     .map((entry) => entry.trim())
     .filter((entry): entry is ExplorerCategoryFilter => isExplorerCategoryFilter(entry))
   const parsedWebsite = searchParams.get(FILTER_PARAM_WEBSITE)
+  const parsedStaleOnly = searchParams.get(FILTER_PARAM_STALE_ONLY)
+  const parsedStaleThresholdDays = Number.parseInt(searchParams.get(FILTER_PARAM_STALE_THRESHOLD_DAYS) ?? '', 10)
   const reviewKeyword = (searchParams.get(FILTER_PARAM_REVIEW_KEYWORD) ?? '').trim()
   const parsedDistanceLat = Number.parseFloat(searchParams.get(FILTER_PARAM_DISTANCE_LAT) ?? '')
   const parsedDistanceLng = Number.parseFloat(searchParams.get(FILTER_PARAM_DISTANCE_LNG) ?? '')
@@ -2009,6 +2105,10 @@ const parseExplorerFiltersFromSearchParams = (searchParams: URLSearchParams): Ex
     website: FILTER_WEBSITE_OPTIONS.includes(parsedWebsite as ExplorerWebsiteFilter)
       ? parsedWebsite as ExplorerWebsiteFilter
       : DEFAULT_EXPLORER_FILTERS.website,
+    showStaleOnly: parsedStaleOnly === '1' || parsedStaleOnly === 'true',
+    staleThresholdDays: Number.isFinite(parsedStaleThresholdDays)
+      ? clamp(parsedStaleThresholdDays, STALE_THRESHOLD_MIN_DAYS, STALE_THRESHOLD_MAX_DAYS)
+      : DEFAULT_EXPLORER_FILTERS.staleThresholdDays,
     reviewKeyword,
     distanceCenter,
     distanceRadiusKm: Number.isFinite(parsedDistanceRadius)
@@ -2027,6 +2127,8 @@ const buildExplorerFilterSearchParams = (
   nextSearchParams.delete(FILTER_PARAM_RATING_MAX)
   nextSearchParams.delete(FILTER_PARAM_CATEGORIES)
   nextSearchParams.delete(FILTER_PARAM_WEBSITE)
+  nextSearchParams.delete(FILTER_PARAM_STALE_ONLY)
+  nextSearchParams.delete(FILTER_PARAM_STALE_THRESHOLD_DAYS)
   nextSearchParams.delete(FILTER_PARAM_REVIEW_KEYWORD)
   nextSearchParams.delete(FILTER_PARAM_DISTANCE_LAT)
   nextSearchParams.delete(FILTER_PARAM_DISTANCE_LNG)
@@ -2048,6 +2150,14 @@ const buildExplorerFilterSearchParams = (
     nextSearchParams.set(FILTER_PARAM_WEBSITE, filters.website)
   }
 
+  if (filters.showStaleOnly) {
+    nextSearchParams.set(FILTER_PARAM_STALE_ONLY, '1')
+  }
+
+  if (filters.staleThresholdDays !== DEFAULT_EXPLORER_FILTERS.staleThresholdDays) {
+    nextSearchParams.set(FILTER_PARAM_STALE_THRESHOLD_DAYS, String(filters.staleThresholdDays))
+  }
+
   const trimmedReviewKeyword = filters.reviewKeyword.trim()
   if (trimmedReviewKeyword.length > 0) {
     nextSearchParams.set(FILTER_PARAM_REVIEW_KEYWORD, trimmedReviewKeyword)
@@ -2066,6 +2176,7 @@ const placeMatchesExplorerFilters = (
   place: Place,
   filters: ExplorerFilterState,
   reviewsByPlaceId: Record<string, PlaceReview[]>,
+  nowTimestampMs: number,
 ): boolean => {
   if (!placeMatchesRatingFilter(place, filters)) {
     return false
@@ -2084,6 +2195,10 @@ const placeMatchesExplorerFilters = (
   }
 
   if (!placeMatchesDistanceFilter(place, filters.distanceCenter, filters.distanceRadiusKm)) {
+    return false
+  }
+
+  if (!placeMatchesStaleFilter(place, filters.showStaleOnly, filters.staleThresholdDays, nowTimestampMs)) {
     return false
   }
 
@@ -2149,6 +2264,37 @@ const placeMatchesDistanceFilter = (
   return distanceInKilometers(distanceCenter, { lat: place.lat, lng: place.lng }) <= distanceRadiusKm
 }
 
+const placeMatchesStaleFilter = (
+  place: Place,
+  showStaleOnly: boolean,
+  staleThresholdDays: number,
+  nowTimestampMs: number,
+): boolean => {
+  if (!showStaleOnly) {
+    return true
+  }
+
+  return isPlaceStale(place, staleThresholdDays, nowTimestampMs)
+}
+
+const isPlaceStale = (
+  place: Place,
+  staleThresholdDays: number,
+  nowTimestampMs: number = Date.now(),
+): boolean => {
+  const scrapedTimestampMs = Date.parse(place.scrapedAt)
+  if (!Number.isFinite(scrapedTimestampMs)) {
+    return false
+  }
+
+  const ageMs = nowTimestampMs - scrapedTimestampMs
+  if (!Number.isFinite(ageMs) || ageMs < 0) {
+    return false
+  }
+
+  return ageMs > staleThresholdDays * MILLISECONDS_IN_DAY
+}
+
 const normalizeCategoryFilter = (category: string | null): ExplorerCategoryFilter | null => {
   if (!category) {
     return null
@@ -2190,6 +2336,14 @@ const countActiveFilters = (filters: ExplorerFilterState): number => {
     count += 1
   }
 
+  if (filters.showStaleOnly) {
+    count += 1
+  }
+
+  if (filters.staleThresholdDays !== DEFAULT_EXPLORER_FILTERS.staleThresholdDays) {
+    count += 1
+  }
+
   if (filters.reviewKeyword.trim().length > 0) {
     count += 1
   }
@@ -2213,6 +2367,8 @@ const areFilterStatesEqual = (left: ExplorerFilterState, right: ExplorerFilterSt
   left.ratingMin === right.ratingMin
   && left.ratingMax === right.ratingMax
   && left.website === right.website
+  && left.showStaleOnly === right.showStaleOnly
+  && left.staleThresholdDays === right.staleThresholdDays
   && left.reviewKeyword === right.reviewKeyword
   && left.distanceRadiusKm === right.distanceRadiusKm
   && areDistanceCentersEqual(left.distanceCenter, right.distanceCenter)
@@ -2282,6 +2438,12 @@ const formatDistanceCenter = (center: { lat: number; lng: number } | null): stri
 
   return `Center: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`
 }
+
+const formatStaleThresholdLabel = (staleThresholdDays: number): string =>
+  `${staleThresholdDays} day${staleThresholdDays === 1 ? '' : 's'}`
+
+const buildStaleIndicatorTitle = (staleThresholdDays: number): string =>
+  `Data is older than ${formatStaleThresholdLabel(staleThresholdDays)}. Consider running Refresh Data.`
 
 const highlightReviewKeyword = (text: string, reviewKeyword: string): ReactNode => {
   const normalizedKeyword = reviewKeyword.trim()

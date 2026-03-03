@@ -38,6 +38,7 @@ interface SeedFixturesPayload {
     photoUrls?: string[]
     openingHours?: string
     amenities?: string[]
+    scrapedAt?: string
   }>
 }
 

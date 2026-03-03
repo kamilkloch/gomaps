@@ -468,8 +468,8 @@
         "npm run typecheck --workspace=client passes"
       ],
       "priority": 39,
-      "passes": false,
-      "notes": "Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
+      "passes": true,
+      "notes": "Implemented stale badges in Explorer table/detail, configurable stale-day threshold (default 7), and stale-only shared filter persisted via URL params; added E2E coverage with deterministic scrapedAt fixture seeding."
     },
     {
       "id": "US-E2E-PRE-01",

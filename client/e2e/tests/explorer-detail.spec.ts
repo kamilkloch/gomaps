@@ -122,6 +122,63 @@ test.describe('explorer detail panel and formatting story-boards', () => {
     await captureStepScreenshot(page, testInfo, 'explorer-detail-missing-search-context')
   })
 
+  test('stale indicators and stale-only filter honor configurable threshold', async ({ page, request }, testInfo) => {
+    const staleScrapedAt = new Date(Date.now() - (10 * 24 * 60 * 60 * 1000)).toISOString()
+    const freshScrapedAt = new Date(Date.now() - (2 * 24 * 60 * 60 * 1000)).toISOString()
+    const seeded = await seedFixtures(request, {
+      project: {
+        name: 'Explorer Stale Indicators',
+        bounds: JSON.stringify({ sw: { lat: 40.0, lng: 9.0 }, ne: { lat: 40.5, lng: 9.5 } }),
+      },
+      places: [
+        {
+          id: 'stale-place',
+          googleMapsUri: 'https://maps.google.com/?cid=stale-place',
+          name: 'Old Data Inn',
+          rating: 4.6,
+          lat: 40.16,
+          lng: 9.16,
+          scrapedAt: staleScrapedAt,
+        },
+        {
+          id: 'fresh-place',
+          googleMapsUri: 'https://maps.google.com/?cid=fresh-place',
+          name: 'Fresh Data Suites',
+          rating: 4.2,
+          lat: 40.17,
+          lng: 9.17,
+          scrapedAt: freshScrapedAt,
+        },
+      ],
+    })
+
+    const explorerPage = createExplorerPage(page)
+    await explorerPage.goto(seeded.projectId)
+
+    await expect(page.getByTestId('explorer-table-count')).toContainText('2 places')
+    await expect(page.getByTestId('explorer-stale-indicator-stale-place')).toBeVisible()
+    await expect(page.getByTestId('explorer-stale-indicator-fresh-place')).toHaveCount(0)
+
+    await explorerPage.clickRow('stale-place')
+    await expect(page.getByTestId('explorer-detail-stale-indicator')).toBeVisible()
+
+    await explorerPage.clickRow('fresh-place')
+    await expect(page.getByTestId('explorer-detail-stale-indicator')).toHaveCount(0)
+
+    await page.getByTestId('explorer-filter-stale-only').check()
+    await expect(page.getByTestId('explorer-table-count')).toContainText('1 places')
+    await expect(page.getByTestId('explorer-row-stale-place')).toBeVisible()
+    await expect(page.getByTestId('explorer-row-fresh-place')).toHaveCount(0)
+
+    await page.getByTestId('explorer-filter-stale-threshold-days').fill('14')
+    await expect(page.getByTestId('explorer-table-count')).toContainText('0 places')
+
+    await page.getByTestId('explorer-filter-stale-threshold-days').fill('1')
+    await expect(page.getByTestId('explorer-table-count')).toContainText('2 places')
+    await expect(page.getByTestId('explorer-row-fresh-place')).toBeVisible()
+    await captureStepScreenshot(page, testInfo, 'explorer-stale-indicators-filter')
+  })
+
   test('website badge classes and price formatting render for all expected variants', async ({ page, request }, testInfo) => {
     const seeded = await seedFixtures(request, {
       project: {

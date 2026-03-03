@@ -22,14 +22,15 @@ export interface CreatePlaceInput {
   photoUrls?: string[]
   openingHours?: string | null
   amenities?: string[]
+  scrapedAt?: string
 }
 
 export const createPlace = (input: CreatePlaceInput): Effect.Effect<Place, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
     tryDb('create place', () => {
         db.prepare(`
-          INSERT INTO places (id, google_maps_uri, google_maps_photos_uri, name, category, rating, review_count, price_level, phone, website, website_type, address, lat, lng, photo_urls, opening_hours, amenities)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO places (id, google_maps_uri, google_maps_photos_uri, name, category, rating, review_count, price_level, phone, website, website_type, address, lat, lng, photo_urls, opening_hours, amenities, scraped_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')))
         `).run(
           input.id,
           input.googleMapsUri,
@@ -47,7 +48,8 @@ export const createPlace = (input: CreatePlaceInput): Effect.Effect<Place, DbErr
           input.lng,
           JSON.stringify(input.photoUrls ?? []),
           input.openingHours ?? null,
-          JSON.stringify(input.amenities ?? [])
+          JSON.stringify(input.amenities ?? []),
+          input.scrapedAt ?? null,
         )
         const row = db.prepare('SELECT * FROM places WHERE id = ?').get(input.id) as Record<string, unknown>
         return mapPlace(row)

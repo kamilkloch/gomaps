@@ -19,6 +19,7 @@
 - **Explorer fuzzy search:** Drive global search from a debounced input state (~300ms) and run Fuse.js against a normalized per-place index (name/address/category/amenities/review text); lazily preload reviews only while a query is active so initial Explorer loads are not blocked by per-place review fanout.
 - **Explorer filter-state URL sync:** Keep filter controls in local React state, parse initial values from `useSearchParams`, and mirror updates back into query params (only non-default values) so filters survive refresh/deep links without polluting routes.
 - **Explorer advanced map filters:** For review-keyword + distance filtering, preload/cached per-place reviews when either global search or review-keyword is active, and keep distance center/radius as map-shared filter state rendered by the `useMap()` marker controller (marker + circle overlay) so map/table filters stay AND-composed.
+- **Explorer stale-data filters:** Derive stale status from `scrapedAt` against a shared day-threshold filter (default 7), show one consistent stale badge treatment in table + detail UI, and keep stale-only + threshold state in URL params alongside the rest of Explorer filters.
 - **Explorer external action links:** Render Google Maps/Booking/Airbnb action buttons only when the selected place has a non-empty name and location context (address preferred; lat/lng fallback) so generated external URLs remain meaningful.
 - **Shortlist starring persistence:** Keep a per-project default shortlist (e.g., `Starred`) and persist Explorer table/detail star toggles through `/api/shortlists/:id/entries`; reload starred place IDs from shortlist entries when project context changes.
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
@@ -568,4 +569,25 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - `npm test --workspace=server`
   - `npm test --workspace=client`
   - `npm run test:coverage`
+---
+## 2026-03-03 23:56:21 CET - US-024
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Implemented Explorer stale-data UX in `client/src/pages/ExplorerPage.tsx`: added stale detection (`scrapedAt` age > configurable threshold), table + detail stale badges with tooltip metadata, and new shared filter controls (`Show stale only`, threshold-in-days input) persisted through `useSearchParams`.
+- Extended Explorer filter state plumbing (active-filter counting, URL parse/serialize, equality checks, AND-composed filtering) so stale-only and stale-threshold compose with existing rating/category/website/review/distance filters.
+- Added stale visual styles in `client/src/styles.css` (badge/icon treatment, table name-cell layout, and stale-threshold numeric input styling).
+- Added deterministic E2E coverage in `client/e2e/tests/explorer-detail.spec.ts` for stale indicator rendering and stale-only threshold behavior; updated the E2E interaction map in `client/e2e/tests/coverage-checklist.md`.
+- Extended test seeding support to accept optional `scrapedAt` in `server/src/routes/test-support.ts`, `server/src/db/places.ts`, and `client/e2e/utils/test-backdoor.ts` so stale/fresh data can be reproduced in browser tests.
+- Added reusable stale-filter guidance in `AGENTS.md` and `progress.txt` Codebase Patterns.
+- Files changed: `client/src/pages/ExplorerPage.tsx`, `client/src/styles.css`, `client/e2e/tests/explorer-detail.spec.ts`, `client/e2e/tests/coverage-checklist.md`, `client/e2e/utils/test-backdoor.ts`, `server/src/routes/test-support.ts`, `server/src/db/places.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Keep time-based UX deterministic by centralizing staleness derivation in a single helper and reusing it for both visual indicators and filter predicates.
+  - URL-backed filter state scales cleanly for additional facets when each facet has explicit parse/serialize/default logic and active-filter accounting.
+  - E2E stale-data scenarios are substantially more stable when fixture seed routes accept explicit timestamps rather than depending on wall-clock timing side effects.
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
+  - `npm run test:e2e --workspace=client -- client/e2e/tests/explorer-detail.spec.ts --grep "stale indicators"`
 ---

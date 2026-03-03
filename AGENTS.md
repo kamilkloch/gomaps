@@ -77,6 +77,7 @@ npm run dev --workspace=client
 - For Explorer global search, keep the input debounced (~300ms) and run Fuse-based fuzzy matching across name/address/category/amenities plus cached review text; lazily preload per-place reviews only while a search query is active to avoid large background request bursts
 - For Explorer filter panels, keep map/table-shared filters (rating/category/website) as AND-composed state persisted in URL query params (`useSearchParams`) and layer table quick-filter text as a table-only refinement
 - For Explorer advanced filters, keep review-keyword matching tied to cached per-place reviews and render distance filtering via map-click center selection plus a radius circle/marker overlay managed inside the `useMap()` marker controller
+- For Explorer stale-data UX, derive staleness from `scrapedAt` against a configurable day-threshold (default 7), surface the same stale badge in both table/detail views, and keep stale-only filtering in the shared URL-backed filter state
 - For Explorer external action links (Google Maps/Booking/Airbnb), only render action buttons when selected place has a non-empty name plus location context (address or lat/lng fallback) so generated OTA URLs are always meaningful
 - For shortlist starring flows, keep a per-project default shortlist (e.g., `Starred`) and persist table/detail-panel star toggles through `/api/shortlists/:id/entries` so favorites survive navigation/reloads
 - Scraping/discovery now uses Google Places API (New) over server-side HTTP (`places:searchText`, `places/{placeId}`)

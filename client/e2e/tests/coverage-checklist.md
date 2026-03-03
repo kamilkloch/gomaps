@@ -60,6 +60,8 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Explorer | Cluster markers expose grouped counts and numeric labels when zoomed out (interactive map mode) | `explorer-map-sync.spec.ts` → `cluster debug snapshot reports grouped marker clusters with numeric labels` |
 | Explorer | Table quick-filter is table-only while global search filters both map markers and table; combined composition verified | `explorer-map-sync.spec.ts` → `table filter stays table-only while global search filters both map and table` |
 | Explorer | Detail panel full-content rendering (name/category/rating/address/phone/website/amenities/photos/opening hours/scraped timestamp) | `explorer-detail.spec.ts` → `detail panel renders full seeded content` |
+| Explorer | Stale data indicator badge renders in table + detail panel for places older than stale threshold | `explorer-detail.spec.ts` → `stale indicators and stale-only filter honor configurable threshold` |
+| Explorer | `Show stale only` checkbox + stale-threshold input filter table results with configurable day threshold | `explorer-detail.spec.ts` → `stale indicators and stale-only filter honor configurable threshold` |
 | Explorer | Website type table badge classes (`direct`/`ota`/`social`) | `explorer-detail.spec.ts` → `website badge classes and price formatting render for all expected variants` |
 | Explorer | Price-level formatting (`$`, `$$`, `$$$`, enum string, null) | `explorer-detail.spec.ts` → `website badge classes and price formatting render for all expected variants` |
 | Explorer | Marker fill-color mapping by rating bands in interactive map mode | `explorer-detail.spec.ts` → `marker colors are derived from place ratings in interactive map mode` |

@@ -938,6 +938,10 @@ a {
 .explorer-detail-scraped-at {
   font-size: 0.78rem;
   color: #96afd1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .explorer-detail-review-list {
@@ -1136,6 +1140,37 @@ a {
   background: rgba(74, 142, 227, 0.28);
 }
 
+.explorer-table-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.explorer-stale-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  border: 1px solid #d8a04f;
+  border-radius: 999px;
+  background: rgba(153, 92, 28, 0.28);
+  color: #ffd79f;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.08rem 0.4rem;
+}
+
+.explorer-stale-indicator-icon {
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 215, 159, 0.8);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
 .explorer-website-badge {
   display: inline-flex;
   align-items: center;
@@ -1272,6 +1307,16 @@ a {
 }
 
 .explorer-filter-group input[type="search"] {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #3a5b86;
+  background: #10253e;
+  color: #e8f2ff;
+  font-size: 0.8rem;
+  padding: 0.45rem 0.55rem;
+}
+
+.explorer-filter-group input[type="number"] {
   width: 100%;
   border-radius: 0.5rem;
   border: 1px solid #3a5b86;
