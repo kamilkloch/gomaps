@@ -487,10 +487,85 @@ describe('placeholder routers', () => {
     })
   })
 
-  it('GET /api/shortlists returns empty array', async () => {
-    const res = await request(app).get('/api/shortlists')
-    expect(res.status).toBe(200)
-    expect(res.body).toEqual([])
+  it('shortlists route supports CRUD and entry lifecycle', async () => {
+    const project = await request(app)
+      .post('/api/projects')
+      .send({ name: 'Shortlists API Project' })
+    expect(project.status).toBe(201)
+
+    const place = await appRuntime.runPromise(
+      createPlace({
+        id: 'shortlists-api-place',
+        googleMapsUri: 'https://maps.google.com/?cid=shortlists-api-place',
+        name: 'Shortlists API Place',
+        lat: 39.4,
+        lng: 9.5,
+      })
+    )
+
+    const missingProjectId = await request(app).get('/api/shortlists')
+    expect(missingProjectId.status).toBe(400)
+    expect(missingProjectId.body.error).toBe('projectId query param is required')
+
+    const createShortlistResponse = await request(app)
+      .post('/api/shortlists')
+      .send({ projectId: project.body.id as string, name: 'Favorites' })
+    expect(createShortlistResponse.status).toBe(201)
+    expect(createShortlistResponse.body.name).toBe('Favorites')
+
+    const shortlistId = createShortlistResponse.body.id as string
+
+    const listShortlistsResponse = await request(app)
+      .get(`/api/shortlists?projectId=${encodeURIComponent(project.body.id as string)}`)
+    expect(listShortlistsResponse.status).toBe(200)
+    expect(listShortlistsResponse.body).toHaveLength(1)
+    expect(listShortlistsResponse.body[0].id).toBe(shortlistId)
+
+    const getShortlistResponse = await request(app).get(`/api/shortlists/${shortlistId}`)
+    expect(getShortlistResponse.status).toBe(200)
+    expect(getShortlistResponse.body.id).toBe(shortlistId)
+
+    const updateShortlistResponse = await request(app)
+      .put(`/api/shortlists/${shortlistId}`)
+      .send({ name: 'Top Picks' })
+    expect(updateShortlistResponse.status).toBe(200)
+    expect(updateShortlistResponse.body.name).toBe('Top Picks')
+
+    const addEntryResponse = await request(app)
+      .post(`/api/shortlists/${shortlistId}/entries`)
+      .send({ placeId: place.id, notes: 'Near the beach' })
+    expect(addEntryResponse.status).toBe(201)
+    expect(addEntryResponse.body).toMatchObject({
+      shortlistId,
+      placeId: place.id,
+      notes: 'Near the beach',
+    })
+
+    const listEntriesResponse = await request(app).get(`/api/shortlists/${shortlistId}/entries`)
+    expect(listEntriesResponse.status).toBe(200)
+    expect(listEntriesResponse.body).toHaveLength(1)
+
+    const getEntryResponse = await request(app).get(`/api/shortlists/${shortlistId}/entries/${place.id}`)
+    expect(getEntryResponse.status).toBe(200)
+    expect(getEntryResponse.body.notes).toBe('Near the beach')
+
+    const updateEntryResponse = await request(app)
+      .put(`/api/shortlists/${shortlistId}/entries/${place.id}`)
+      .send({ notes: 'Walkable and kid friendly' })
+    expect(updateEntryResponse.status).toBe(200)
+    expect(updateEntryResponse.body.notes).toBe('Walkable and kid friendly')
+
+    const removeEntryResponse = await request(app).delete(`/api/shortlists/${shortlistId}/entries/${place.id}`)
+    expect(removeEntryResponse.status).toBe(204)
+
+    const removeEntryAgainResponse = await request(app).delete(`/api/shortlists/${shortlistId}/entries/${place.id}`)
+    expect(removeEntryAgainResponse.status).toBe(404)
+
+    const deleteShortlistResponse = await request(app).delete(`/api/shortlists/${shortlistId}`)
+    expect(deleteShortlistResponse.status).toBe(204)
+
+    const getDeletedShortlistResponse = await request(app).get(`/api/shortlists/${shortlistId}`)
+    expect(getDeletedShortlistResponse.status).toBe(404)
   })
 })
 

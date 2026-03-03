@@ -401,8 +401,8 @@
         "npm run typecheck --workspace=server passes"
       ],
       "priority": 35,
-      "passes": false,
-      "notes": "Reference mockup: docs/mockups/04-shortlists-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
+      "passes": true,
+      "notes": "Implemented full shortlist CRUD + entry endpoints in server/routes, persisted Explorer table/detail star toggles to a default per-project `Starred` shortlist, and shipped a Shortlists UI with sidebar navigation, create/rename/delete controls, inline notes editing, and entry removal backed by `/api/shortlists/:id/entries`."
     },
     {
       "id": "US-021",

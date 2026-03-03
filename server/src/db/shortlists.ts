@@ -34,7 +34,7 @@ export const listShortlists = (projectId: string): Effect.Effect<Shortlist[], Db
   Effect.flatMap(Db, ({ db }) =>
     tryDb('list shortlists', () => {
         const rows = db
-          .prepare('SELECT * FROM shortlists WHERE project_id = ?')
+          .prepare('SELECT * FROM shortlists WHERE project_id = ? ORDER BY rowid DESC')
           .all(projectId) as Record<string, unknown>[]
         return rows.map(mapShortlist)
     })
@@ -92,7 +92,7 @@ export const listShortlistEntries = (shortlistId: string): Effect.Effect<Shortli
   Effect.flatMap(Db, ({ db }) =>
     tryDb('list shortlist entries', () => {
         const rows = db
-          .prepare('SELECT * FROM shortlist_entries WHERE shortlist_id = ?')
+          .prepare('SELECT * FROM shortlist_entries WHERE shortlist_id = ? ORDER BY rowid DESC')
           .all(shortlistId) as Record<string, unknown>[]
         return rows.map(mapShortlistEntry)
     })

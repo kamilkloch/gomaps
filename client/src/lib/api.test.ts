@@ -1,15 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  addShortlistEntry,
   ApiRequestError,
+  createShortlist,
+  deleteShortlist,
   getProject,
   getScrapeStatus,
+  listShortlistEntries,
+  listShortlists,
   listPlaceReviews,
   listPlaces,
   listRunTiles,
   listScrapeRuns,
   pauseScrape,
+  removeShortlistEntry,
   resumeScrape,
   startScrape,
+  updateShortlist,
+  updateShortlistEntryNotes,
   updateProject,
   createProject,
   deleteProject,
@@ -163,6 +171,82 @@ describe('api helpers', () => {
     const result = await listPlaceReviews('ChIJ abc/123')
     expect(result).toEqual([{ id: 'r-1' }])
     expect(mockFetch).toHaveBeenCalledWith('/api/places/ChIJ%20abc%2F123/reviews', expect.any(Object))
+  })
+
+  it('handles shortlist CRUD and entry requests', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify([{ id: 's1' }]), { status: 200 }))
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ id: 's2', projectId: 'p1', name: 'Top Picks' }), { status: 201 }))
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ id: 's2', projectId: 'p1', name: 'Renamed' }), { status: 200 }))
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    const listed = await listShortlists('project/id')
+    const created = await createShortlist('p1', 'Top Picks')
+    const updated = await updateShortlist('s2', 'Renamed')
+    await deleteShortlist('s2')
+
+    expect(listed).toEqual([{ id: 's1' }])
+    expect(created).toEqual({ id: 's2', projectId: 'p1', name: 'Top Picks' })
+    expect(updated).toEqual({ id: 's2', projectId: 'p1', name: 'Renamed' })
+    expect(mockFetch).toHaveBeenNthCalledWith(1, '/api/shortlists?projectId=project%2Fid', expect.any(Object))
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/shortlists',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ projectId: 'p1', name: 'Top Picks' }),
+      }),
+    )
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      3,
+      '/api/shortlists/s2',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ name: 'Renamed' }),
+      }),
+    )
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      4,
+      '/api/shortlists/s2',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+  })
+
+  it('handles shortlist entry CRUD requests', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify([{ shortlistId: 's1', placeId: 'p1', notes: '' }]), { status: 200 }))
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ shortlistId: 's1', placeId: 'p2', notes: 'Great pool' }), { status: 201 }))
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ shortlistId: 's1', placeId: 'p2', notes: 'Updated' }), { status: 200 }))
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    const listedEntries = await listShortlistEntries('s1')
+    const addedEntry = await addShortlistEntry('s1', 'p2', 'Great pool')
+    const updatedEntry = await updateShortlistEntryNotes('s1', 'p2', 'Updated')
+    await removeShortlistEntry('s1', 'p2')
+
+    expect(listedEntries).toEqual([{ shortlistId: 's1', placeId: 'p1', notes: '' }])
+    expect(addedEntry).toEqual({ shortlistId: 's1', placeId: 'p2', notes: 'Great pool' })
+    expect(updatedEntry).toEqual({ shortlistId: 's1', placeId: 'p2', notes: 'Updated' })
+    expect(mockFetch).toHaveBeenNthCalledWith(1, '/api/shortlists/s1/entries', expect.any(Object))
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/shortlists/s1/entries',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ placeId: 'p2', notes: 'Great pool' }),
+      }),
+    )
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      3,
+      '/api/shortlists/s1/entries/p2',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ notes: 'Updated' }),
+      }),
+    )
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      4,
+      '/api/shortlists/s1/entries/p2',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
   })
 
   it('starts scrape with project and query payload', async () => {

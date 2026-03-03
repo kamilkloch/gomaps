@@ -5,13 +5,20 @@ import type { ReactNode, UIEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
+  addShortlistEntry,
+  createShortlist,
+  getErrorMessage,
   getProject,
   listPlaceReviews,
   listPlaces,
   listProjects,
+  listShortlistEntries,
+  listShortlists,
+  removeShortlistEntry,
   type Place,
   type PlaceReview,
   type Project,
+  type Shortlist,
 } from '../lib/api'
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
@@ -34,6 +41,7 @@ const FILTER_PARAM_DISTANCE_RADIUS_KM = 'distanceRadiusKm'
 const DISTANCE_FILTER_MIN_KM = 1
 const DISTANCE_FILTER_MAX_KM = 50
 const DEFAULT_DISTANCE_RADIUS_KM = 10
+const DEFAULT_SHORTLIST_NAME = 'Starred'
 
 const EXPLORER_CATEGORY_OPTIONS = [
   { id: 'hotel', label: 'Hotel' },
@@ -140,6 +148,8 @@ export function ExplorerPage() {
   const [tableFilterText, setTableFilterText] = useState('')
   const [sortState, setSortState] = useState<SortState>({ key: 'rating', direction: 'desc' })
   const [favoritePlaceIds, setFavoritePlaceIds] = useState<Set<string>>(new Set())
+  const [favoriteMutationIds, setFavoriteMutationIds] = useState<Set<string>>(new Set())
+  const [defaultShortlist, setDefaultShortlist] = useState<Shortlist | null>(null)
   const [reviewsByPlaceId, setReviewsByPlaceId] = useState<Record<string, PlaceReview[]>>({})
   const [isLoadingSelectedReviews, setIsLoadingSelectedReviews] = useState(false)
   const [selectedReviewsError, setSelectedReviewsError] = useState<string | null>(null)
@@ -274,6 +284,9 @@ export function ExplorerPage() {
       setReviewsByPlaceId({})
       setSelectedReviewsError(null)
       setIsLoadingSelectedReviews(false)
+      setFavoritePlaceIds(new Set())
+      setFavoriteMutationIds(new Set())
+      setDefaultShortlist(null)
       return
     }
 
@@ -294,6 +307,7 @@ export function ExplorerPage() {
 
         setSelectedProject(project)
         setPlaces(projectPlaces)
+        setFavoriteMutationIds(new Set())
         setReviewsByPlaceId({})
         setSelectedReviewsError(null)
         setIsLoadingSelectedReviews(false)
@@ -388,6 +402,52 @@ export function ExplorerPage() {
       isCancelled = true
     }
   }, [debouncedSearchText, filters.reviewKeyword, hasCachedReviews, loadReviewsForPlace, places])
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      return
+    }
+
+    let isCancelled = false
+
+    const syncDefaultShortlist = async () => {
+      try {
+        const existingShortlists = await listShortlists(selectedProjectId)
+        if (isCancelled) {
+          return
+        }
+
+        let shortlist = existingShortlists.find((item) => item.name === DEFAULT_SHORTLIST_NAME)
+        if (!shortlist) {
+          shortlist = await createShortlist(selectedProjectId, DEFAULT_SHORTLIST_NAME)
+          if (isCancelled) {
+            return
+          }
+        }
+
+        setDefaultShortlist(shortlist)
+        const entries = await listShortlistEntries(shortlist.id)
+        if (isCancelled) {
+          return
+        }
+
+        setFavoritePlaceIds(new Set(entries.map((entry) => entry.placeId)))
+      }
+      catch (error) {
+        if (!isCancelled) {
+          setDefaultShortlist(null)
+          setFavoritePlaceIds(new Set())
+          setErrorMessage(getErrorMessage(error, 'Unable to load shortlist favorites right now.'))
+        }
+      }
+    }
+
+    void syncDefaultShortlist()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [selectedProjectId])
 
   const searchablePlaceEntries = useMemo<SearchablePlaceEntry[]>(
     () =>
@@ -594,10 +654,21 @@ export function ExplorerPage() {
     })
   }, [])
 
-  const toggleFavorite = useCallback((placeId: string) => {
+  const toggleFavorite = useCallback(async (placeId: string) => {
+    if (!defaultShortlist) {
+      setErrorMessage('Favorite shortlist is not ready yet.')
+      return
+    }
+
+    if (favoriteMutationIds.has(placeId)) {
+      return
+    }
+
+    const wasFavorite = favoritePlaceIds.has(placeId)
+    setFavoriteMutationIds((current) => new Set(current).add(placeId))
     setFavoritePlaceIds((current) => {
       const next = new Set(current)
-      if (next.has(placeId)) {
+      if (wasFavorite) {
         next.delete(placeId)
       }
       else {
@@ -606,7 +677,36 @@ export function ExplorerPage() {
 
       return next
     })
-  }, [])
+
+    try {
+      if (wasFavorite) {
+        await removeShortlistEntry(defaultShortlist.id, placeId)
+      }
+      else {
+        await addShortlistEntry(defaultShortlist.id, placeId)
+      }
+    }
+    catch (error) {
+      setFavoritePlaceIds((current) => {
+        const next = new Set(current)
+        if (wasFavorite) {
+          next.add(placeId)
+        }
+        else {
+          next.delete(placeId)
+        }
+        return next
+      })
+      setErrorMessage(getErrorMessage(error, 'Unable to update shortlist favorite right now.'))
+    }
+    finally {
+      setFavoriteMutationIds((current) => {
+        const next = new Set(current)
+        next.delete(placeId)
+        return next
+      })
+    }
+  }, [defaultShortlist, favoriteMutationIds, favoritePlaceIds])
 
   const handleTableScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
     const scrollContainer = event.currentTarget
@@ -927,6 +1027,19 @@ export function ExplorerPage() {
                   Scraped at: {formatScrapedAt(selectedPlace.scrapedAt)}
                 </p>
 
+                <button
+                  type="button"
+                  data-testid="explorer-detail-favorite-button"
+                  className="explorer-detail-favorite-button"
+                  aria-pressed={favoritePlaceIds.has(selectedPlace.id)}
+                  disabled={favoriteMutationIds.has(selectedPlace.id)}
+                  onClick={() => {
+                    void toggleFavorite(selectedPlace.id)
+                  }}
+                >
+                  {favoritePlaceIds.has(selectedPlace.id) ? '★ Saved to Shortlist' : '☆ Save to Shortlist'}
+                </button>
+
                 <div data-testid="explorer-detail-reviews" className="explorer-detail-section">
                   <h3>Reviews</h3>
                   {isLoadingSelectedReviews ? (
@@ -1114,9 +1227,10 @@ export function ExplorerPage() {
                           className="explorer-favorite-button"
                           aria-label={`Toggle favorite for ${place.name}`}
                           aria-pressed={favoritePlaceIds.has(place.id)}
+                          disabled={favoriteMutationIds.has(place.id)}
                           onClick={(event) => {
                             event.stopPropagation()
-                            toggleFavorite(place.id)
+                            void toggleFavorite(place.id)
                           }}
                         >
                           {favoritePlaceIds.has(place.id) ? '★' : '☆'}

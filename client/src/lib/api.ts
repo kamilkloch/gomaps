@@ -87,6 +87,18 @@ export interface PlaceReview {
   relativeDate: string | null
 }
 
+export interface Shortlist {
+  id: string
+  projectId: string
+  name: string
+}
+
+export interface ShortlistEntry {
+  shortlistId: string
+  placeId: string
+  notes: string
+}
+
 const API_BASE = '/api'
 
 const API_ROUTING_HINT =
@@ -184,6 +196,54 @@ export const listPlaces = async (projectId?: string): Promise<Place[]> =>
 
 export const listPlaceReviews = async (placeId: string): Promise<PlaceReview[]> =>
   requestJson<PlaceReview[]>(`/places/${encodeURIComponent(placeId)}/reviews`)
+
+export const listShortlists = async (projectId: string): Promise<Shortlist[]> =>
+  requestJson<Shortlist[]>(`/shortlists?projectId=${encodeURIComponent(projectId)}`)
+
+export const createShortlist = async (projectId: string, name: string): Promise<Shortlist> =>
+  requestJson<Shortlist>('/shortlists', {
+    method: 'POST',
+    body: JSON.stringify({ projectId, name }),
+  })
+
+export const updateShortlist = async (shortlistId: string, name: string): Promise<Shortlist> =>
+  requestJson<Shortlist>(`/shortlists/${encodeURIComponent(shortlistId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  })
+
+export const deleteShortlist = async (shortlistId: string): Promise<void> =>
+  requestJson<void>(`/shortlists/${encodeURIComponent(shortlistId)}`, {
+    method: 'DELETE',
+  })
+
+export const listShortlistEntries = async (shortlistId: string): Promise<ShortlistEntry[]> =>
+  requestJson<ShortlistEntry[]>(`/shortlists/${encodeURIComponent(shortlistId)}/entries`)
+
+export const addShortlistEntry = async (
+  shortlistId: string,
+  placeId: string,
+  notes?: string,
+): Promise<ShortlistEntry> =>
+  requestJson<ShortlistEntry>(`/shortlists/${encodeURIComponent(shortlistId)}/entries`, {
+    method: 'POST',
+    body: JSON.stringify({ placeId, notes }),
+  })
+
+export const updateShortlistEntryNotes = async (
+  shortlistId: string,
+  placeId: string,
+  notes: string,
+): Promise<ShortlistEntry> =>
+  requestJson<ShortlistEntry>(`/shortlists/${encodeURIComponent(shortlistId)}/entries/${encodeURIComponent(placeId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ notes }),
+  })
+
+export const removeShortlistEntry = async (shortlistId: string, placeId: string): Promise<void> =>
+  requestJson<void>(`/shortlists/${encodeURIComponent(shortlistId)}/entries/${encodeURIComponent(placeId)}`, {
+    method: 'DELETE',
+  })
 
 export const startScrape = async (
   projectId: string,

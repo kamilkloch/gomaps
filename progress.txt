@@ -19,6 +19,7 @@
 - **Explorer fuzzy search:** Drive global search from a debounced input state (~300ms) and run Fuse.js against a normalized per-place index (name/address/category/amenities/review text); lazily preload reviews only while a query is active so initial Explorer loads are not blocked by per-place review fanout.
 - **Explorer filter-state URL sync:** Keep filter controls in local React state, parse initial values from `useSearchParams`, and mirror updates back into query params (only non-default values) so filters survive refresh/deep links without polluting routes.
 - **Explorer advanced map filters:** For review-keyword + distance filtering, preload/cached per-place reviews when either global search or review-keyword is active, and keep distance center/radius as map-shared filter state rendered by the `useMap()` marker controller (marker + circle overlay) so map/table filters stay AND-composed.
+- **Shortlist starring persistence:** Keep a per-project default shortlist (e.g., `Starred`) and persist Explorer table/detail star toggles through `/api/shortlists/:id/entries`; reload starred place IDs from shortlist entries when project context changes.
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
@@ -483,6 +484,25 @@ Thread: https://ampcode.com/threads/T-019cb5aa-54f3-734d-964e-83bc72256d7e
   - Map-driven distance filtering is most stable when map click writes filter-center state through a callback on the map controller rather than reading map internals from page components.
   - Review-keyword filtering should piggyback on existing per-place review cache and preload flow to avoid introducing a second asynchronous reviews pipeline.
   - When coverage thresholds are tight, a tiny targeted test can recover branch coverage without broadening implementation scope.
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
+---
+## 2026-03-03 23:05:14 CET - US-020
+Thread: https://ampcode.com/threads/T-019cb5b5-8fc7-7719-bd18-935d45886e0d
+- Implemented full shortlist API routes in `server/src/routes/shortlists.ts` covering shortlist CRUD and entry CRUD (`/api/shortlists` and `/api/shortlists/:id/entries`) with Effect Schema validation and typed error mapping.
+- Extended client API helpers in `client/src/lib/api.ts` and tests in `client/src/lib/api.test.ts` for shortlist/entry operations.
+- Upgraded Explorer favorites in `client/src/pages/ExplorerPage.tsx` so table-row and detail-panel star toggles persist to a default per-project `Starred` shortlist and remain synced after navigation/reload.
+- Replaced placeholder Shortlists UI with a functional management page in `client/src/pages/ShortlistsPage.tsx` (sidebar navigation, create/rename/delete shortlist, entries table, inline notes updates, and remove-entry actions).
+- Added integration coverage for shortlist route lifecycle in `server/tests/projects.test.ts` and styling for new shortlist/detail controls in `client/src/styles.css`.
+- Files changed: `server/src/routes/shortlists.ts`, `server/src/db/shortlists.ts`, `server/tests/projects.test.ts`, `client/src/lib/api.ts`, `client/src/lib/api.test.ts`, `client/src/pages/ExplorerPage.tsx`, `client/src/pages/ShortlistsPage.tsx`, `client/src/styles.css`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For star/favorite UX that must survive refreshes, treat shortlist entries as the source of truth and hydrate favorites from the default shortlist on project switch.
+  - Route-level Effect Schema decode + `ValidationError` mapping keeps shortlist API contracts explicit while preserving typed DB effects.
+  - Shortlist CRUD UX is simpler to reason about when project context is selected first and all shortlist/entry operations are scoped to that project.
 - Quality-gate commands run:
   - `npm run typecheck --workspace=server`
   - `npm run typecheck --workspace=client`
