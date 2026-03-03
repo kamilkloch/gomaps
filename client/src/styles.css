@@ -1229,6 +1229,40 @@ a {
   accent-color: #4e98ff;
 }
 
+.explorer-filter-group input[type="search"] {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #3a5b86;
+  background: #10253e;
+  color: #e8f2ff;
+  font-size: 0.8rem;
+  padding: 0.45rem 0.55rem;
+}
+
+.explorer-filter-note {
+  margin: 0;
+  color: #93add2;
+  font-size: 0.72rem;
+}
+
+.explorer-filter-clear-button {
+  height: 1.9rem;
+  border-radius: 0.5rem;
+  border: 1px solid #486992;
+  background: #1a3354;
+  color: #d9e8ff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.explorer-review-highlight {
+  background: rgba(245, 208, 82, 0.32);
+  color: #fff6ce;
+  border-radius: 0.22rem;
+  padding: 0 0.1rem;
+}
+
 .explorer-filter-checkbox-grid,
 .explorer-filter-radio-grid {
   display: grid;

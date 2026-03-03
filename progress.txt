@@ -18,6 +18,7 @@
 - **Explorer virtualized selection sync:** Keep a single `selectedPlaceId` source of truth across map/table/detail state, and when selection changes, scroll the virtualized table viewport only if the selected row index is outside the current visible range
 - **Explorer fuzzy search:** Drive global search from a debounced input state (~300ms) and run Fuse.js against a normalized per-place index (name/address/category/amenities/review text); lazily preload reviews only while a query is active so initial Explorer loads are not blocked by per-place review fanout.
 - **Explorer filter-state URL sync:** Keep filter controls in local React state, parse initial values from `useSearchParams`, and mirror updates back into query params (only non-default values) so filters survive refresh/deep links without polluting routes.
+- **Explorer advanced map filters:** For review-keyword + distance filtering, preload/cached per-place reviews when either global search or review-keyword is active, and keep distance center/radius as map-shared filter state rendered by the `useMap()` marker controller (marker + circle overlay) so map/table filters stay AND-composed.
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
@@ -469,4 +470,23 @@ Thread: https://ampcode.com/threads/T-019cae07-9385-75b9-b2c5-07402d99236f
   - Treat URL query params as persistence for UI-filter state by parsing on load and writing back only when state changes to avoid navigation churn.
   - Keep global Explorer filtering map/table-shared, then layer quick table-only text filters on top to preserve expected interaction semantics.
   - A small active-filter counter tied to non-default state makes collapsible sidebars discoverable without extra onboarding UI.
+---
+## 2026-03-03 22:52:17 CET - US-019
+Thread: https://ampcode.com/threads/T-019cb5aa-54f3-734d-964e-83bc72256d7e
+- Implemented Explorer review-keyword filtering and distance-from-point filtering in `client/src/pages/ExplorerPage.tsx`.
+- Added review-keyword UI, map-click distance center capture, 1–50km radius slider, clear-distance action, and AND-composed filtering across existing + new filter criteria.
+- Added distance filter map overlays (center marker + radius circle) inside the `useMap()` marker controller and kept map-click deselection behavior for selected places.
+- Added keyword highlighting in detail-panel review snippets and expanded review preloading to run when either global search or review-keyword filter is active.
+- Added small UI style updates for new filter controls/highlighting and added a classifier regression assertion for `file:///...` URLs so server branch coverage remains above threshold.
+- Files changed: `client/src/pages/ExplorerPage.tsx`, `client/src/styles.css`, `server/tests/classifier.test.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Map-driven distance filtering is most stable when map click writes filter-center state through a callback on the map controller rather than reading map internals from page components.
+  - Review-keyword filtering should piggyback on existing per-place review cache and preload flow to avoid introducing a second asynchronous reviews pipeline.
+  - When coverage thresholds are tight, a tiny targeted test can recover branch coverage without broadening implementation scope.
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
 ---

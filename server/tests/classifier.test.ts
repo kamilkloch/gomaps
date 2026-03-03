@@ -39,5 +39,6 @@ describe('classifyWebsite', () => {
   it('returns unknown when URL parsing fails', () => {
     expect(classifyWebsite('http://')).toBe('unknown')
     expect(classifyWebsite('https://?bad-url')).toBe('unknown')
+    expect(classifyWebsite('file:///tmp/hotel-site.html')).toBe('unknown')
   })
 })

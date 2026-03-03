@@ -379,8 +379,8 @@
         "npm run typecheck --workspace=client passes"
       ],
       "priority": 34,
-      "passes": false,
-      "notes": "Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
+      "passes": true,
+      "notes": "Implemented review-keyword filtering backed by cached place reviews (with detail-panel keyword highlighting) and distance-from-point filtering using map-click center selection + 1-50km radius overlay/filtering, integrated with existing AND-composed Explorer filters."
     },
     {
       "id": "US-020",

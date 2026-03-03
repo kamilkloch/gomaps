@@ -1,7 +1,7 @@
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps'
 import { MarkerClusterer, MarkerClustererEvents } from '@googlemaps/markerclusterer'
 import Fuse from 'fuse.js'
-import type { UIEvent } from 'react'
+import type { ReactNode, UIEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -27,6 +27,13 @@ const FILTER_PARAM_RATING_MIN = 'ratingMin'
 const FILTER_PARAM_RATING_MAX = 'ratingMax'
 const FILTER_PARAM_CATEGORIES = 'categories'
 const FILTER_PARAM_WEBSITE = 'website'
+const FILTER_PARAM_REVIEW_KEYWORD = 'reviewKeyword'
+const FILTER_PARAM_DISTANCE_LAT = 'distanceLat'
+const FILTER_PARAM_DISTANCE_LNG = 'distanceLng'
+const FILTER_PARAM_DISTANCE_RADIUS_KM = 'distanceRadiusKm'
+const DISTANCE_FILTER_MIN_KM = 1
+const DISTANCE_FILTER_MAX_KM = 50
+const DEFAULT_DISTANCE_RADIUS_KM = 10
 
 const EXPLORER_CATEGORY_OPTIONS = [
   { id: 'hotel', label: 'Hotel' },
@@ -94,6 +101,9 @@ interface ExplorerFilterState {
   ratingMax: number
   categories: ExplorerCategoryFilter[]
   website: ExplorerWebsiteFilter
+  reviewKeyword: string
+  distanceCenter: { lat: number; lng: number } | null
+  distanceRadiusKm: number
 }
 
 const EMPTY_CLUSTER_DEBUG_SNAPSHOT: ClusterDebugSnapshot = {
@@ -323,7 +333,8 @@ export function ExplorerPage() {
 
   useEffect(() => {
     const trimmedSearch = debouncedSearchText.trim()
-    if (trimmedSearch.length === 0 || places.length === 0) {
+    const trimmedReviewKeyword = filters.reviewKeyword.trim()
+    if ((trimmedSearch.length === 0 && trimmedReviewKeyword.length === 0) || places.length === 0) {
       return
     }
 
@@ -376,7 +387,7 @@ export function ExplorerPage() {
     return () => {
       isCancelled = true
     }
-  }, [debouncedSearchText, hasCachedReviews, loadReviewsForPlace, places])
+  }, [debouncedSearchText, filters.reviewKeyword, hasCachedReviews, loadReviewsForPlace, places])
 
   const searchablePlaceEntries = useMemo<SearchablePlaceEntry[]>(
     () =>
@@ -413,8 +424,8 @@ export function ExplorerPage() {
       ? places
       : placeSearchFuse.search(trimmedSearch).map((result) => result.item.place)
 
-    return searchMatchedPlaces.filter((place) => placeMatchesExplorerFilters(place, filters))
-  }, [debouncedSearchText, filters, placeSearchFuse, places])
+    return searchMatchedPlaces.filter((place) => placeMatchesExplorerFilters(place, filters, reviewsByPlaceId))
+  }, [debouncedSearchText, filters, placeSearchFuse, places, reviewsByPlaceId])
 
   const tableFilteredPlaces = useMemo(() => {
     const trimmedFilter = tableFilterText.trim().toLowerCase()
@@ -494,6 +505,7 @@ export function ExplorerPage() {
   )
   const selectedPlaceGoogleMapsUrl = selectedPlace?.googleMapsUri ?? null
   const selectedPlaceGoogleMapsPhotosUrl = selectedPlace?.googleMapsPhotosUri ?? selectedPlaceGoogleMapsUrl
+  const distanceCenterLabel = formatDistanceCenter(filters.distanceCenter)
 
   const defaultMapCenter = getProjectCenter(selectedProject?.bounds) ?? FALLBACK_CENTER
   const searchSuffix = searchParams.toString().length > 0 ? `?${searchParams.toString()}` : ''
@@ -533,6 +545,34 @@ export function ExplorerPage() {
     setFilters((current) => ({
       ...current,
       website,
+    }))
+  }, [])
+
+  const handleReviewKeywordChange = useCallback((reviewKeyword: string) => {
+    setFilters((current) => ({
+      ...current,
+      reviewKeyword,
+    }))
+  }, [])
+
+  const handleDistanceRadiusChange = useCallback((distanceRadiusKm: number) => {
+    setFilters((current) => ({
+      ...current,
+      distanceRadiusKm: clamp(distanceRadiusKm, DISTANCE_FILTER_MIN_KM, DISTANCE_FILTER_MAX_KM),
+    }))
+  }, [])
+
+  const handleDistanceCenterChange = useCallback((distanceCenter: { lat: number; lng: number } | null) => {
+    setFilters((current) => ({
+      ...current,
+      distanceCenter,
+    }))
+  }, [])
+
+  const clearDistanceCenter = useCallback(() => {
+    setFilters((current) => ({
+      ...current,
+      distanceCenter: null,
     }))
   }, [])
 
@@ -756,6 +796,9 @@ export function ExplorerPage() {
                     places={filteredPlaces}
                     selectedPlaceId={selectedPlaceId}
                     onSelectPlace={setSelectedPlaceId}
+                    distanceFilterCenter={filters.distanceCenter}
+                    distanceFilterRadiusKm={filters.distanceCenter ? filters.distanceRadiusKm : null}
+                    onMapBackgroundClick={handleDistanceCenterChange}
                     onMarkerDebugSnapshot={setMarkerDebugEntries}
                     onClusterDebugSnapshot={IS_E2E_TEST_MODE ? setClusterDebugSnapshot : undefined}
                     onSelectionCircleDebugSnapshot={IS_E2E_TEST_MODE ? setSelectionCircleDebugSnapshot : undefined}
@@ -901,7 +944,7 @@ export function ExplorerPage() {
                               <span className="explorer-detail-review-date">{review.relativeDate}</span>
                             ) : null}
                           </div>
-                          <p>{truncateReviewText(review.text)}</p>
+                          <p>{highlightReviewKeyword(truncateReviewText(review.text), filters.reviewKeyword)}</p>
                         </li>
                       ))}
                     </ul>
@@ -1201,6 +1244,50 @@ export function ExplorerPage() {
                 </label>
               </div>
             </section>
+
+            <section className="explorer-filter-group" data-testid="explorer-filter-review-keyword-group">
+              <h3>Review keyword</h3>
+              <label htmlFor="explorer-filter-review-keyword">Keyword</label>
+              <input
+                id="explorer-filter-review-keyword"
+                data-testid="explorer-filter-review-keyword"
+                type="search"
+                placeholder="e.g. quiet, pool, breakfast"
+                value={filters.reviewKeyword}
+                onChange={(event) => handleReviewKeywordChange(event.target.value)}
+              />
+            </section>
+
+            <section className="explorer-filter-group" data-testid="explorer-filter-distance-group">
+              <h3>Distance</h3>
+              <p data-testid="explorer-filter-distance-center" className="explorer-filter-helper">
+                {distanceCenterLabel}
+              </p>
+              <p className="explorer-filter-note">Click anywhere on the map to set the center point.</p>
+              {filters.distanceCenter ? (
+                <>
+                  <label htmlFor="explorer-filter-distance-radius">Radius: {filters.distanceRadiusKm} km</label>
+                  <input
+                    id="explorer-filter-distance-radius"
+                    data-testid="explorer-filter-distance-radius"
+                    type="range"
+                    min={DISTANCE_FILTER_MIN_KM}
+                    max={DISTANCE_FILTER_MAX_KM}
+                    step={1}
+                    value={filters.distanceRadiusKm}
+                    onChange={(event) => handleDistanceRadiusChange(Number(event.target.value))}
+                  />
+                  <button
+                    type="button"
+                    data-testid="explorer-filter-distance-clear"
+                    className="explorer-filter-clear-button"
+                    onClick={clearDistanceCenter}
+                  >
+                    Clear distance point
+                  </button>
+                </>
+              ) : null}
+            </section>
           </aside>
         ) : null}
       </section>
@@ -1212,6 +1299,9 @@ interface PlaceMarkerControllerProps {
   places: Place[]
   selectedPlaceId: string | null
   onSelectPlace: (placeId: string | null) => void
+  distanceFilterCenter: { lat: number; lng: number } | null
+  distanceFilterRadiusKm: number | null
+  onMapBackgroundClick: (center: { lat: number; lng: number }) => void
   onMarkerDebugSnapshot?: (entries: MarkerDebugEntry[]) => void
   onClusterDebugSnapshot?: (snapshot: ClusterDebugSnapshot) => void
   onSelectionCircleDebugSnapshot?: (snapshot: SelectionCircleDebugSnapshot) => void
@@ -1221,6 +1311,9 @@ function PlaceMarkerController({
   places,
   selectedPlaceId,
   onSelectPlace,
+  distanceFilterCenter,
+  distanceFilterRadiusKm,
+  onMapBackgroundClick,
   onMarkerDebugSnapshot,
   onClusterDebugSnapshot,
   onSelectionCircleDebugSnapshot,
@@ -1229,7 +1322,10 @@ function PlaceMarkerController({
   const markersRef = useRef(new globalThis.Map<string, google.maps.Marker>())
   const clustererRef = useRef<MarkerClusterer | null>(null)
   const selectionCircleRef = useRef<google.maps.Circle | null>(null)
+  const distanceCircleRef = useRef<google.maps.Circle | null>(null)
+  const distanceMarkerRef = useRef<google.maps.Marker | null>(null)
   const onSelectRef = useRef(onSelectPlace)
+  const onMapBackgroundClickRef = useRef(onMapBackgroundClick)
   const onMarkerDebugSnapshotRef = useRef(onMarkerDebugSnapshot)
   const onClusterDebugSnapshotRef = useRef(onClusterDebugSnapshot)
   const onSelectionCircleDebugSnapshotRef = useRef(onSelectionCircleDebugSnapshot)
@@ -1278,6 +1374,10 @@ function PlaceMarkerController({
   useEffect(() => {
     onSelectRef.current = onSelectPlace
   }, [onSelectPlace])
+
+  useEffect(() => {
+    onMapBackgroundClickRef.current = onMapBackgroundClick
+  }, [onMapBackgroundClick])
 
   useEffect(() => {
     onMarkerDebugSnapshotRef.current = onMarkerDebugSnapshot
@@ -1365,7 +1465,13 @@ function PlaceMarkerController({
     clustererRef.current = clusterer
     emitClusterDebugSnapshot()
 
-    const clickListener = map.addListener('click', () => {
+    const clickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
+      if (event.latLng) {
+        onMapBackgroundClickRef.current({
+          lat: event.latLng.lat(),
+          lng: event.latLng.lng(),
+        })
+      }
       onSelectRef.current(null)
     })
     const clusteringListener = clusterer.addListener(MarkerClustererEvents.CLUSTERING_END, () => {
@@ -1493,6 +1599,58 @@ function PlaceMarkerController({
     }
   }, [emitSelectionCircleDebugSnapshot, map, placesById, selectedPlaceId])
 
+  useEffect(() => {
+    if (!map) {
+      return
+    }
+
+    if (!distanceFilterCenter || distanceFilterRadiusKm === null) {
+      if (distanceCircleRef.current) {
+        distanceCircleRef.current.setMap(null)
+        distanceCircleRef.current = null
+      }
+
+      if (distanceMarkerRef.current) {
+        distanceMarkerRef.current.setMap(null)
+        distanceMarkerRef.current = null
+      }
+
+      return
+    }
+
+    const marker = distanceMarkerRef.current
+      ?? new google.maps.Marker({
+        map,
+        zIndex: 1090,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 6,
+          fillColor: '#5cabff',
+          fillOpacity: 1,
+          strokeColor: '#e4f2ff',
+          strokeWeight: 2,
+        },
+        title: 'Distance filter center',
+      })
+    distanceMarkerRef.current = marker
+    marker.setPosition(distanceFilterCenter)
+
+    const circle = distanceCircleRef.current
+      ?? new google.maps.Circle({
+        map,
+        strokeColor: '#59a8ff',
+        strokeOpacity: 0.95,
+        strokeWeight: 2,
+        fillColor: '#4b95f1',
+        fillOpacity: 0.14,
+        clickable: false,
+        zIndex: 1030,
+      })
+    distanceCircleRef.current = circle
+    circle.setCenter(distanceFilterCenter)
+    circle.setRadius(distanceFilterRadiusKm * 1000)
+  }, [distanceFilterCenter, distanceFilterRadiusKm, map])
+
   useEffect(() => () => {
     for (const marker of markersRef.current.values()) {
       marker.setMap(null)
@@ -1501,6 +1659,14 @@ function PlaceMarkerController({
     if (selectionCircleRef.current) {
       selectionCircleRef.current.setMap(null)
       selectionCircleRef.current = null
+    }
+    if (distanceCircleRef.current) {
+      distanceCircleRef.current.setMap(null)
+      distanceCircleRef.current = null
+    }
+    if (distanceMarkerRef.current) {
+      distanceMarkerRef.current.setMap(null)
+      distanceMarkerRef.current = null
     }
     onClusterDebugSnapshotRef.current?.(EMPTY_CLUSTER_DEBUG_SNAPSHOT)
     onSelectionCircleDebugSnapshotRef.current?.(EMPTY_SELECTION_CIRCLE_DEBUG_SNAPSHOT)
@@ -1637,6 +1803,9 @@ const DEFAULT_EXPLORER_FILTERS: ExplorerFilterState = {
   ratingMax: RATING_FILTER_MAX,
   categories: [],
   website: 'all',
+  reviewKeyword: '',
+  distanceCenter: null,
+  distanceRadiusKm: DEFAULT_DISTANCE_RADIUS_KM,
 }
 
 const parseExplorerFiltersFromSearchParams = (searchParams: URLSearchParams): ExplorerFilterState => {
@@ -1647,6 +1816,10 @@ const parseExplorerFiltersFromSearchParams = (searchParams: URLSearchParams): Ex
     .map((entry) => entry.trim())
     .filter((entry): entry is ExplorerCategoryFilter => isExplorerCategoryFilter(entry))
   const parsedWebsite = searchParams.get(FILTER_PARAM_WEBSITE)
+  const reviewKeyword = (searchParams.get(FILTER_PARAM_REVIEW_KEYWORD) ?? '').trim()
+  const parsedDistanceLat = Number.parseFloat(searchParams.get(FILTER_PARAM_DISTANCE_LAT) ?? '')
+  const parsedDistanceLng = Number.parseFloat(searchParams.get(FILTER_PARAM_DISTANCE_LNG) ?? '')
+  const parsedDistanceRadius = Number.parseFloat(searchParams.get(FILTER_PARAM_DISTANCE_RADIUS_KM) ?? '')
 
   const ratingMin = Number.isFinite(parsedRatingMin)
     ? clamp(parsedRatingMin, RATING_FILTER_MIN, RATING_FILTER_MAX)
@@ -1654,6 +1827,12 @@ const parseExplorerFiltersFromSearchParams = (searchParams: URLSearchParams): Ex
   const ratingMax = Number.isFinite(parsedRatingMax)
     ? clamp(parsedRatingMax, RATING_FILTER_MIN, RATING_FILTER_MAX)
     : DEFAULT_EXPLORER_FILTERS.ratingMax
+  const distanceCenter = Number.isFinite(parsedDistanceLat) && Number.isFinite(parsedDistanceLng)
+    ? {
+        lat: parsedDistanceLat,
+        lng: parsedDistanceLng,
+      }
+    : null
 
   return {
     ratingMin: Math.min(ratingMin, ratingMax),
@@ -1662,6 +1841,11 @@ const parseExplorerFiltersFromSearchParams = (searchParams: URLSearchParams): Ex
     website: FILTER_WEBSITE_OPTIONS.includes(parsedWebsite as ExplorerWebsiteFilter)
       ? parsedWebsite as ExplorerWebsiteFilter
       : DEFAULT_EXPLORER_FILTERS.website,
+    reviewKeyword,
+    distanceCenter,
+    distanceRadiusKm: Number.isFinite(parsedDistanceRadius)
+      ? clamp(parsedDistanceRadius, DISTANCE_FILTER_MIN_KM, DISTANCE_FILTER_MAX_KM)
+      : DEFAULT_EXPLORER_FILTERS.distanceRadiusKm,
   }
 }
 
@@ -1675,6 +1859,10 @@ const buildExplorerFilterSearchParams = (
   nextSearchParams.delete(FILTER_PARAM_RATING_MAX)
   nextSearchParams.delete(FILTER_PARAM_CATEGORIES)
   nextSearchParams.delete(FILTER_PARAM_WEBSITE)
+  nextSearchParams.delete(FILTER_PARAM_REVIEW_KEYWORD)
+  nextSearchParams.delete(FILTER_PARAM_DISTANCE_LAT)
+  nextSearchParams.delete(FILTER_PARAM_DISTANCE_LNG)
+  nextSearchParams.delete(FILTER_PARAM_DISTANCE_RADIUS_KM)
 
   if (filters.ratingMin > RATING_FILTER_MIN) {
     nextSearchParams.set(FILTER_PARAM_RATING_MIN, filters.ratingMin.toFixed(1))
@@ -1692,10 +1880,25 @@ const buildExplorerFilterSearchParams = (
     nextSearchParams.set(FILTER_PARAM_WEBSITE, filters.website)
   }
 
+  const trimmedReviewKeyword = filters.reviewKeyword.trim()
+  if (trimmedReviewKeyword.length > 0) {
+    nextSearchParams.set(FILTER_PARAM_REVIEW_KEYWORD, trimmedReviewKeyword)
+  }
+
+  if (filters.distanceCenter) {
+    nextSearchParams.set(FILTER_PARAM_DISTANCE_LAT, filters.distanceCenter.lat.toFixed(6))
+    nextSearchParams.set(FILTER_PARAM_DISTANCE_LNG, filters.distanceCenter.lng.toFixed(6))
+    nextSearchParams.set(FILTER_PARAM_DISTANCE_RADIUS_KM, String(filters.distanceRadiusKm))
+  }
+
   return nextSearchParams
 }
 
-const placeMatchesExplorerFilters = (place: Place, filters: ExplorerFilterState): boolean => {
+const placeMatchesExplorerFilters = (
+  place: Place,
+  filters: ExplorerFilterState,
+  reviewsByPlaceId: Record<string, PlaceReview[]>,
+): boolean => {
   if (!placeMatchesRatingFilter(place, filters)) {
     return false
   }
@@ -1705,6 +1908,14 @@ const placeMatchesExplorerFilters = (place: Place, filters: ExplorerFilterState)
   }
 
   if (!placeMatchesWebsiteFilter(place, filters.website)) {
+    return false
+  }
+
+  if (!placeMatchesReviewKeywordFilter(place, filters.reviewKeyword, reviewsByPlaceId)) {
+    return false
+  }
+
+  if (!placeMatchesDistanceFilter(place, filters.distanceCenter, filters.distanceRadiusKm)) {
     return false
   }
 
@@ -1738,6 +1949,36 @@ const placeMatchesWebsiteFilter = (place: Place, websiteFilter: ExplorerWebsiteF
   }
 
   return place.websiteType === websiteFilter
+}
+
+const placeMatchesReviewKeywordFilter = (
+  place: Place,
+  reviewKeyword: string,
+  reviewsByPlaceId: Record<string, PlaceReview[]>,
+): boolean => {
+  const normalizedKeyword = reviewKeyword.trim().toLowerCase()
+  if (!normalizedKeyword) {
+    return true
+  }
+
+  const placeReviews = reviewsByPlaceId[place.id] ?? []
+  if (placeReviews.length === 0) {
+    return false
+  }
+
+  return placeReviews.some((review) => review.text.toLowerCase().includes(normalizedKeyword))
+}
+
+const placeMatchesDistanceFilter = (
+  place: Place,
+  distanceCenter: { lat: number; lng: number } | null,
+  distanceRadiusKm: number,
+): boolean => {
+  if (!distanceCenter) {
+    return true
+  }
+
+  return distanceInKilometers(distanceCenter, { lat: place.lat, lng: place.lng }) <= distanceRadiusKm
 }
 
 const normalizeCategoryFilter = (category: string | null): ExplorerCategoryFilter | null => {
@@ -1781,6 +2022,14 @@ const countActiveFilters = (filters: ExplorerFilterState): number => {
     count += 1
   }
 
+  if (filters.reviewKeyword.trim().length > 0) {
+    count += 1
+  }
+
+  if (filters.distanceCenter) {
+    count += 1
+  }
+
   return count
 }
 
@@ -1796,8 +2045,22 @@ const areFilterStatesEqual = (left: ExplorerFilterState, right: ExplorerFilterSt
   left.ratingMin === right.ratingMin
   && left.ratingMax === right.ratingMax
   && left.website === right.website
+  && left.reviewKeyword === right.reviewKeyword
+  && left.distanceRadiusKm === right.distanceRadiusKm
+  && areDistanceCentersEqual(left.distanceCenter, right.distanceCenter)
   && left.categories.length === right.categories.length
   && left.categories.every((value, index) => value === right.categories[index])
+
+const areDistanceCentersEqual = (
+  left: { lat: number; lng: number } | null,
+  right: { lat: number; lng: number } | null,
+): boolean => {
+  if (left === null || right === null) {
+    return left === right
+  }
+
+  return left.lat === right.lat && left.lng === right.lng
+}
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
 
@@ -1843,6 +2106,50 @@ const parseJsonArray = (value: string | null | undefined): string[] => {
     return []
   }
 }
+
+const formatDistanceCenter = (center: { lat: number; lng: number } | null): string => {
+  if (!center) {
+    return 'No center point selected.'
+  }
+
+  return `Center: ${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`
+}
+
+const highlightReviewKeyword = (text: string, reviewKeyword: string): ReactNode => {
+  const normalizedKeyword = reviewKeyword.trim()
+  if (!normalizedKeyword) {
+    return text
+  }
+
+  const escapedKeyword = normalizedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(`(${escapedKeyword})`, 'ig')
+  const segments = text.split(pattern)
+
+  return segments.map((segment, index) =>
+    segment.toLowerCase() === normalizedKeyword.toLowerCase()
+      ? <mark key={`${segment}-${index}`} className="explorer-review-highlight">{segment}</mark>
+      : <span key={`${segment}-${index}`}>{segment}</span>
+  )
+}
+
+const distanceInKilometers = (
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+): number => {
+  const earthRadiusKm = 6371
+  const latDelta = toRadians(to.lat - from.lat)
+  const lngDelta = toRadians(to.lng - from.lng)
+  const fromLatRadians = toRadians(from.lat)
+  const toLatRadians = toRadians(to.lat)
+
+  const haversine =
+    (Math.sin(latDelta / 2) ** 2)
+    + Math.cos(fromLatRadians) * Math.cos(toLatRadians) * (Math.sin(lngDelta / 2) ** 2)
+
+  return 2 * earthRadiusKm * Math.asin(Math.sqrt(haversine))
+}
+
+const toRadians = (value: number): number => value * (Math.PI / 180)
 
 const sortIndicator = (sortState: SortState, key: SortKey): string => {
   if (sortState.key !== key) {
