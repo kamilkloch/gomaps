@@ -16,7 +16,7 @@ describe('places-api', () => {
     vi.restoreAllMocks()
   })
 
-  it('textSearch calls Places Text Search endpoint with field mask and location bias', async () => {
+  it('textSearch calls Places Text Search endpoint with field mask and location restriction', async () => {
     const fetchMock = vi.mocked(fetch)
     fetchMock.mockResolvedValue(
       new Response(
@@ -55,9 +55,9 @@ describe('places-api', () => {
     const result = await Effect.runPromise(
       textSearch({
         query: 'vacation rentals',
-        locationBias: {
-          center: { lat: 37.1, lng: 25.3 },
-          radiusMeters: 2000,
+        locationRestriction: {
+          sw: { lat: 37.0, lng: 25.2 },
+          ne: { lat: 37.2, lng: 25.4 },
         },
       })
     )
@@ -73,13 +73,16 @@ describe('places-api', () => {
 
     const body = JSON.parse(String(init.body)) as Record<string, unknown>
     expect(body.textQuery).toBe('vacation rentals')
-    expect(body.locationBias).toEqual({
-      circle: {
-        center: {
-          latitude: 37.1,
-          longitude: 25.3,
+    expect(body.locationRestriction).toEqual({
+      rectangle: {
+        low: {
+          latitude: 37.0,
+          longitude: 25.2,
         },
-        radius: 2000,
+        high: {
+          latitude: 37.2,
+          longitude: 25.4,
+        },
       },
     })
 

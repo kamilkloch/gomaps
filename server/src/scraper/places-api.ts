@@ -57,12 +57,9 @@ export interface ParsedPlace {
 
 export interface TextSearchInput {
   query: string
-  locationBias?: {
-    center: {
-      lat: number
-      lng: number
-    }
-    radiusMeters: number
+  locationRestriction?: {
+    sw: { lat: number; lng: number }
+    ne: { lat: number; lng: number }
   }
   pageToken?: string
 }
@@ -84,14 +81,17 @@ export const textSearch = (input: TextSearchInput): Effect.Effect<TextSearchResu
       textQuery: input.query,
     }
 
-    if (input.locationBias) {
-      payload.locationBias = {
-        circle: {
-          center: {
-            latitude: input.locationBias.center.lat,
-            longitude: input.locationBias.center.lng,
+    if (input.locationRestriction) {
+      payload.locationRestriction = {
+        rectangle: {
+          low: {
+            latitude: input.locationRestriction.sw.lat,
+            longitude: input.locationRestriction.sw.lng,
           },
-          radius: input.locationBias.radiusMeters,
+          high: {
+            latitude: input.locationRestriction.ne.lat,
+            longitude: input.locationRestriction.ne.lng,
+          },
         },
       }
     }

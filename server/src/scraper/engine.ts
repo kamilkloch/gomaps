@@ -242,10 +242,7 @@ const searchTilePages = (
       const response = yield* textSearch({
         query,
         pageToken,
-        locationBias: {
-          center: getBoundsCenter(bounds),
-          radiusMeters: getRadiusMeters(bounds),
-        },
+        locationRestriction: bounds,
       })
 
       resultCount += response.places.length
@@ -319,21 +316,6 @@ const persistTilePlaces = (
       })
     }
   })
-
-const getBoundsCenter = (bounds: Bounds): { lat: number; lng: number } => ({
-  lat: (bounds.sw.lat + bounds.ne.lat) / 2,
-  lng: (bounds.sw.lng + bounds.ne.lng) / 2,
-})
-
-const getRadiusMeters = (bounds: Bounds): number => {
-  const center = getBoundsCenter(bounds)
-  const latHalfSpanMeters = ((bounds.ne.lat - bounds.sw.lat) / 2) * 111_320
-  const lngHalfSpanMeters =
-    ((bounds.ne.lng - bounds.sw.lng) / 2) * 111_320 * Math.cos((center.lat * Math.PI) / 180)
-
-  const radius = Math.sqrt(latHalfSpanMeters ** 2 + lngHalfSpanMeters ** 2)
-  return Math.max(Math.ceil(radius), 50)
-}
 
 const sleep = (delayMs: number): Effect.Effect<void, ScrapeError> =>
   Effect.tryPromise({

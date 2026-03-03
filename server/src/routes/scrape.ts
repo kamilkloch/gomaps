@@ -341,12 +341,29 @@ const toProgressPayload = (
     placesFound: number
     placesUnique: number
     startedAt: string | null
+    completedAt: string | null
   }
 ): ScrapeProgress => {
   const parsedStartedAt = Date.parse(run.startedAt ?? '')
-  const elapsedMs = Number.isFinite(parsedStartedAt)
-    ? Math.max(0, Date.now() - parsedStartedAt)
-    : 0
+  if (!Number.isFinite(parsedStartedAt)) {
+    return {
+      scrapeRunId: run.id,
+      status: run.status,
+      tilesTotal: run.tilesTotal,
+      tilesCompleted: run.tilesCompleted,
+      tilesSubdivided: run.tilesSubdivided,
+      placesFound: run.placesFound,
+      placesUnique: run.placesUnique,
+      elapsedMs: 0,
+    }
+  }
+
+  // For terminal runs, freeze elapsed time at completedAt instead of
+  // letting it grow with Date.now().
+  const endMs = isTerminalStatus(run.status) && run.completedAt
+    ? Date.parse(run.completedAt)
+    : Date.now()
+  const elapsedMs = Math.max(0, (Number.isFinite(endMs) ? endMs : Date.now()) - parsedStartedAt)
 
   return {
     scrapeRunId: run.id,

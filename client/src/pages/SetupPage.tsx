@@ -58,11 +58,12 @@ export function SetupPage() {
   const [isProjectMissing, setIsProjectMissing] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const hasAppliedInitialBounds = useRef(false)
+  const refreshRunsRef = useRef<() => void>(() => {})
 
   const selectRun = useCallback((runId: string | null) => {
     setActiveRunId(runId)
-    setProgress(null)
-    setRunTiles([])
+    // Don't null out progress/tiles here — keep stale data visible until
+    // fresh data arrives to avoid an ugly flash when switching runs.
   }, [])
 
   const forcedMapDiagnostic = getForcedMapDiagnostic()
@@ -254,10 +255,26 @@ export function SetupPage() {
       return
     }
 
-    setProgress(null)
-    setRunTiles([])
-
     let isCancelled = false
+
+    let prevStatus: string | null = null
+
+    const handleProgress = (nextProgress: ScrapeProgress) => {
+      if (isCancelled) {
+        return
+      }
+
+      setProgress(nextProgress)
+
+      // Refresh the run list when status transitions to a terminal state
+      // so run cards stay in sync with the live progress.
+      const isTerminal = nextProgress.status === 'completed'
+        || nextProgress.status === 'failed'
+      if (isTerminal && prevStatus && prevStatus !== nextProgress.status) {
+        refreshRunsRef.current()
+      }
+      prevStatus = nextProgress.status
+    }
 
     const refreshRunSnapshot = async () => {
       try {
@@ -270,7 +287,7 @@ export function SetupPage() {
           return
         }
 
-        setProgress(status)
+        handleProgress(status)
         setRunTiles(tiles)
       }
       catch {
@@ -284,13 +301,7 @@ export function SetupPage() {
 
     const unsubscribe = subscribeScrapeProgress(
       activeRunId,
-      (nextProgress) => {
-        if (isCancelled) {
-          return
-        }
-
-        setProgress(nextProgress)
-      },
+      handleProgress,
       () => {
         if (isCancelled) {
           return
@@ -310,6 +321,37 @@ export function SetupPage() {
       clearInterval(pollInterval)
     }
   }, [activeRunId])
+
+  // Client-side 1s timer to smoothly interpolate elapsed time between
+  // server SSE/poll updates so the clock doesn't jump every 4s.
+  const serverElapsedRef = useRef<{ ms: number; at: number } | null>(null)
+  const [clientElapsedMs, setClientElapsedMs] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (progress) {
+      serverElapsedRef.current = { ms: progress.elapsedMs, at: Date.now() }
+      setClientElapsedMs(progress.elapsedMs)
+    } else {
+      serverElapsedRef.current = null
+      setClientElapsedMs(null)
+    }
+  }, [progress])
+
+  useEffect(() => {
+    const isActive = progress?.status === 'running' || progress?.status === 'paused'
+    if (!isActive || !serverElapsedRef.current) {
+      return
+    }
+
+    const tick = setInterval(() => {
+      const ref = serverElapsedRef.current
+      if (ref) {
+        setClientElapsedMs(ref.ms + (Date.now() - ref.at))
+      }
+    }, 1_000)
+
+    return () => clearInterval(tick)
+  }, [progress?.status])
 
   const persistBounds = useCallback(
     async (nextBounds: Bounds | null) => {
@@ -404,6 +446,10 @@ export function SetupPage() {
     selectRun(preferredRun?.id ?? null)
   }, [activeRunId, projectId, selectRun])
 
+  useEffect(() => {
+    refreshRunsRef.current = () => { void refreshRuns() }
+  }, [refreshRuns])
+
   const handleStartScrape = useCallback(async () => {
     if (!projectId || !selectionBounds) {
       return
@@ -471,12 +517,16 @@ export function SetupPage() {
   const effectiveCompletedTiles = progress
     ? Math.min(progress.tilesTotal, progress.tilesCompleted + progress.tilesSubdivided)
     : 0
-  const progressPercent = progress && progress.tilesTotal > 0
+  const rawPercent = progress && progress.tilesTotal > 0
     ? Math.round((effectiveCompletedTiles / progress.tilesTotal) * 100)
     : 0
+  // Cap at 99% while the run is still active — the engine may still be
+  // persisting place details after all tiles report "completed".
+  const progressPercent = isRunActive ? Math.min(rawPercent, 99) : rawPercent
   const estimatedRemaining = progress
     ? estimateRemaining(progress)
     : null
+  const displayElapsedMs = clientElapsedMs ?? progress?.elapsedMs ?? 0
 
   return (
     <main className="setup-page" data-testid="setup-page">
@@ -648,7 +698,7 @@ export function SetupPage() {
 
               <div className="setup-progress-track" data-testid="setup-progress-track" role="progressbar" aria-valuenow={progressPercent}>
                 <div
-                  className={`setup-progress-fill ${progress.status === 'running' ? 'is-running' : ''}`}
+                  className={`setup-progress-fill${progress.status === 'running' ? ' is-running' : ''}${progress.status === 'completed' ? ' is-completed' : ''}`}
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -660,7 +710,7 @@ export function SetupPage() {
                 Places: {progress.placesFound} ({progress.placesUnique} unique)
               </p>
               <p className="setup-progress-stats">
-                Time: {formatDuration(progress.elapsedMs)}
+                Time: {formatDuration(displayElapsedMs)}
                 {estimatedRemaining !== null ? ` · Est. remaining ${formatDuration(estimatedRemaining)}` : ''}
               </p>
 
