@@ -418,8 +418,8 @@
         "npm run typecheck --workspace=client passes"
       ],
       "priority": 36,
-      "passes": false,
-      "notes": "Reference mockup: docs/mockups/04-shortlists-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
+      "passes": true,
+      "notes": "Implemented shortlist row selection (max 3), header compare/export actions, horizontal comparison cards, selected-row highlight, and CSV export with full place fields plus notes in ShortlistsPage."
     },
     {
       "id": "US-022",

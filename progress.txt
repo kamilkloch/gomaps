@@ -510,3 +510,20 @@ Thread: https://ampcode.com/threads/T-019cb5b5-8fc7-7719-bd18-935d45886e0d
   - `npm test --workspace=client`
   - `npm run test:coverage`
 ---
+## 2026-03-03 23:09:35 CET - US-021
+Thread: https://ampcode.com/threads/T-019cb5bd-4ff2-702d-9348-72f63d917ce5
+- Implemented shortlist comparison workflow on the Shortlists page with checkbox selection capped at 3 places, selected-row highlighting, a visible selection-cap hint, and a header `Compare (N)` action that tracks selected items.
+- Added a horizontal comparison-cards section that renders selected places side-by-side with thumbnail/fallback, title, rating + review count, price, website source badge, amenities chips, address, and notes preview.
+- Implemented `Export CSV` download action that exports the current shortlist with all place fields plus user notes into a CSV file named from the shortlist.
+- Files changed: `client/src/pages/ShortlistsPage.tsx`, `client/src/styles.css`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - For browser-only CSV exports, create a `Blob` + object URL and trigger a temporary anchor click so no backend endpoint is required.
+  - Keep comparison selection deterministic by storing selected place IDs and filtering against current shortlist rows whenever list data refreshes.
+  - For shortlist comparisons, capping selection at 3 in checkbox state logic is simpler and more reliable than validating only on compare action.
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
+---

@@ -35,6 +35,7 @@ export function ShortlistsPage() {
   const [newShortlistName, setNewShortlistName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [selectedPlaceIds, setSelectedPlaceIds] = useState<string[]>([])
 
   const selectedShortlist = useMemo(
     () => shortlists.find((shortlist) => shortlist.id === selectedShortlistId) ?? null,
@@ -138,6 +139,7 @@ export function ShortlistsPage() {
   useEffect(() => {
     if (!selectedShortlistId) {
       setEntries([])
+      setSelectedPlaceIds([])
       return
     }
 
@@ -251,11 +253,62 @@ export function ShortlistsPage() {
     try {
       await removeShortlistEntry(selectedShortlistId, placeId)
       setEntries((current) => current.filter((entry) => entry.placeId !== placeId))
+      setSelectedPlaceIds((current) => current.filter((id) => id !== placeId))
     }
     catch (error) {
       setErrorMessage(getErrorMessage(error, 'Unable to remove shortlist entry right now.'))
     }
   }, [selectedShortlistId])
+
+  useEffect(() => {
+    setSelectedPlaceIds((current) => current.filter((placeId) => shortlistRows.some((row) => row.place.id === placeId)))
+  }, [shortlistRows])
+
+  const selectedRows = useMemo(
+    () => shortlistRows.filter((row) => selectedPlaceIds.includes(row.place.id)),
+    [selectedPlaceIds, shortlistRows],
+  )
+
+  const comparisonRows = selectedRows.slice(0, 3)
+
+  const comparisonDisabled = comparisonRows.length < 2
+
+  const togglePlaceSelection = useCallback((placeId: string) => {
+    setSelectedPlaceIds((current) => {
+      if (current.includes(placeId)) {
+        return current.filter((id) => id !== placeId)
+      }
+
+      if (current.length >= 3) {
+        return current
+      }
+
+      return [...current, placeId]
+    })
+  }, [])
+
+  const handleExportCsv = useCallback(() => {
+    if (!selectedShortlist) {
+      return
+    }
+
+    const exportRows = shortlistRows.map(({ entry, place }) => ({
+      ...place,
+      notes: entry.notes,
+    }))
+
+    const csv = toCsv(exportRows)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const objectUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const normalizedShortlistName = selectedShortlist.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    link.href = objectUrl
+    link.download = `${normalizedShortlistName || 'shortlist'}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(objectUrl)
+  }, [selectedShortlist, shortlistRows])
 
   return (
     <main className="shortlists-page" data-testid="shortlists-page">
@@ -343,8 +396,66 @@ export function ShortlistsPage() {
         <section className="shortlists-main" data-testid="shortlists-main" role="region" aria-label="Shortlist entries">
           <div className="shortlists-main-header">
             <h2>{selectedShortlist?.name ?? 'No shortlist selected'}</h2>
-            <span>{shortlistRows.length} places</span>
+            <div className="shortlists-main-header-actions">
+              <span>{shortlistRows.length} places</span>
+              <button
+                type="button"
+                className="shortlists-compare-button"
+                data-testid="shortlists-compare-button"
+                disabled={comparisonDisabled}
+              >
+                Compare ({comparisonRows.length})
+              </button>
+              <button
+                type="button"
+                className="shortlists-export-button"
+                data-testid="shortlists-export-button"
+                disabled={shortlistRows.length === 0}
+                onClick={handleExportCsv}
+              >
+                Export CSV
+              </button>
+            </div>
           </div>
+
+          {comparisonRows.length > 0 ? (
+            <section className="shortlists-comparison" data-testid="shortlists-comparison">
+              {comparisonRows.map(({ entry, place }) => {
+                const photoUrls = parseJsonArray(place.photoUrls)
+                const amenities = parseJsonArray(place.amenities).slice(0, 4)
+                const imageSource = photoUrls[0] ?? null
+
+                return (
+                  <article key={place.id} className="shortlists-comparison-card" data-testid={`shortlists-comparison-card-${place.id}`}>
+                    {imageSource ? (
+                      <img src={imageSource} alt={`${place.name} preview`} loading="lazy" />
+                    ) : (
+                      <div className="shortlists-comparison-image-fallback">No photo</div>
+                    )}
+                    <h3>{place.name}</h3>
+                    <p>
+                      <strong>{place.rating?.toFixed(1) ?? '—'}</strong> · {place.reviewCount ?? '—'} reviews
+                    </p>
+                    <p>{formatPriceLevel(place.priceLevel)}</p>
+                    <span className={`shortlists-website-badge shortlists-website-${place.websiteType}`}>
+                      {place.websiteType === 'direct' ? 'Direct' : place.websiteType.toUpperCase()}
+                    </span>
+                    <div className="shortlists-comparison-amenities">
+                      {amenities.length === 0 ? <span className="shortlists-comparison-amenity">No amenities</span> : amenities.map((amenity) => (
+                        <span key={amenity} className="shortlists-comparison-amenity">{amenity}</span>
+                      ))}
+                    </div>
+                    <p className="shortlists-comparison-address">{place.address ?? 'No address available'}</p>
+                    {entry.notes.trim() ? <p className="shortlists-comparison-notes">Note: {entry.notes}</p> : null}
+                  </article>
+                )
+              })}
+            </section>
+          ) : null}
+
+          {selectedPlaceIds.length >= 3 ? (
+            <p className="shortlists-selection-cap" data-testid="shortlists-selection-cap">Maximum 3 places can be compared.</p>
+          ) : null}
 
           <div className="shortlists-table-wrap">
             <table data-testid="shortlists-table">
@@ -366,45 +477,54 @@ export function ShortlistsPage() {
                     <td colSpan={8} className="shortlists-empty-row">No places in this shortlist yet.</td>
                   </tr>
                 ) : (
-                  shortlistRows.map(({ entry, place }) => (
-                    <tr key={place.id}>
-                      <td>
-                        <input type="checkbox" aria-label={`Select ${place.name}`} />
-                      </td>
-                      <td>{place.name}</td>
-                      <td>{place.rating?.toFixed(1) ?? '—'}</td>
-                      <td>{place.reviewCount ?? '—'}</td>
-                      <td>{formatPriceLevel(place.priceLevel)}</td>
-                      <td>
-                        <span className={`shortlists-website-badge shortlists-website-${place.websiteType}`}>
-                          {place.websiteType.toUpperCase()}
-                        </span>
-                      </td>
-                      <td>
-                        <input
-                          data-testid={`shortlist-note-${place.id}`}
-                          type="text"
-                          defaultValue={entry.notes}
-                          placeholder="[Add a note]"
-                          onBlur={(event) => {
-                            void handleUpdateNotes(place.id, event.target.value)
-                          }}
-                        />
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="shortlists-remove-entry"
-                          aria-label={`Remove ${place.name} from shortlist`}
-                          onClick={() => {
-                            void handleRemoveEntry(place.id)
-                          }}
-                        >
-                          🗑
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  shortlistRows.map(({ entry, place }) => {
+                    const isSelected = selectedPlaceIds.includes(place.id)
+
+                    return (
+                      <tr key={place.id} data-selected={isSelected ? 'true' : 'false'}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => togglePlaceSelection(place.id)}
+                            aria-label={`Select ${place.name}`}
+                          />
+                        </td>
+                        <td>{place.name}</td>
+                        <td>{place.rating?.toFixed(1) ?? '—'}</td>
+                        <td>{place.reviewCount ?? '—'}</td>
+                        <td>{formatPriceLevel(place.priceLevel)}</td>
+                        <td>
+                          <span className={`shortlists-website-badge shortlists-website-${place.websiteType}`}>
+                            {place.websiteType.toUpperCase()}
+                          </span>
+                        </td>
+                        <td>
+                          <input
+                            data-testid={`shortlist-note-${place.id}`}
+                            type="text"
+                            defaultValue={entry.notes}
+                            placeholder="[Add a note]"
+                            onBlur={(event) => {
+                              void handleUpdateNotes(place.id, event.target.value)
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="shortlists-remove-entry"
+                            aria-label={`Remove ${place.name} from shortlist`}
+                            onClick={() => {
+                              void handleRemoveEntry(place.id)
+                            }}
+                          >
+                            🗑
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -413,6 +533,71 @@ export function ShortlistsPage() {
       </section>
     </main>
   )
+}
+
+interface ExportShortlistRow extends Place {
+  notes: string
+}
+
+function parseJsonArray(value: string | null | undefined): string[] {
+  if (!value) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+
+    return parsed.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+  }
+  catch {
+    return []
+  }
+}
+
+function escapeCsvValue(value: string): string {
+  return `"${value.split('"').join('""')}"`
+}
+
+function toCsv(rows: ExportShortlistRow[]): string {
+  const headers: Array<keyof ExportShortlistRow> = [
+    'id',
+    'googleMapsUri',
+    'googleMapsPhotosUri',
+    'name',
+    'category',
+    'rating',
+    'reviewCount',
+    'priceLevel',
+    'phone',
+    'website',
+    'websiteType',
+    'address',
+    'lat',
+    'lng',
+    'photoUrls',
+    'openingHours',
+    'amenities',
+    'scrapedAt',
+    'notes',
+  ]
+
+  const lines = rows.map((row) => headers.map((header) => {
+    const value = row[header]
+    if (value === null || value === undefined) {
+      return '""'
+    }
+
+    if (typeof value === 'number') {
+      return escapeCsvValue(String(value))
+    }
+
+    return escapeCsvValue(value)
+  }).join(','))
+
+  return [headers.join(','), ...lines].join('\n')
 }
 
 function formatPriceLevel(priceLevel: string | null): string {
