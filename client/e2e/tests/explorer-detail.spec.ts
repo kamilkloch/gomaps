@@ -44,6 +44,7 @@ test.describe('explorer detail panel and formatting story-boards', () => {
     await captureStepScreenshot(page, testInfo, 'explorer-detail-full-before-selection')
 
     await explorerPage.clickRow('detail-rich-place')
+    const encodedSearchLabel = encodeURIComponent('Villa Sunset Retreat, Via del Mare 12, Cagliari')
     await expect(page.getByTestId('explorer-detail-name')).toHaveText('Villa Sunset Retreat')
     await expect(page.getByTestId('explorer-detail-category')).toContainText('Vacation rental')
     await expect(page.getByTestId('explorer-detail-rating')).toContainText('4.8')
@@ -64,13 +65,61 @@ test.describe('explorer detail panel and formatting story-boards', () => {
       'href',
       'https://example.com/photo-b.jpg',
     )
+    await expect(page.getByTestId('explorer-detail-action-open-google-maps')).toHaveAttribute(
+      'href',
+      'https://maps.google.com/?cid=detail-rich-place',
+    )
+    await expect(page.getByTestId('explorer-detail-action-open-google-maps')).toHaveAttribute('target', '_blank')
+    await expect(page.getByTestId('explorer-detail-action-open-google-maps').locator('svg')).toHaveCount(1)
     await expect(page.getByTestId('explorer-detail-action-view-photos-google-maps')).toHaveAttribute(
       'href',
       'https://maps.google.com/?cid=detail-rich-place&view=photos',
     )
+    await expect(page.getByTestId('explorer-detail-action-view-photos-google-maps')).toHaveAttribute('target', '_blank')
+    await expect(page.getByTestId('explorer-detail-action-view-photos-google-maps').locator('svg')).toHaveCount(1)
+    await expect(page.getByTestId('explorer-detail-action-search-booking')).toHaveAttribute(
+      'href',
+      `https://www.booking.com/searchresults.html?ss=${encodedSearchLabel}`,
+    )
+    await expect(page.getByTestId('explorer-detail-action-search-booking')).toHaveAttribute('target', '_blank')
+    await expect(page.getByTestId('explorer-detail-action-search-booking').locator('svg')).toHaveCount(1)
+    await expect(page.getByTestId('explorer-detail-action-search-airbnb')).toHaveAttribute(
+      'href',
+      `https://www.airbnb.com/s/${encodedSearchLabel}/homes`,
+    )
+    await expect(page.getByTestId('explorer-detail-action-search-airbnb')).toHaveAttribute('target', '_blank')
+    await expect(page.getByTestId('explorer-detail-action-search-airbnb').locator('svg')).toHaveCount(1)
     await expect(page.getByTestId('explorer-detail-opening-hours')).toContainText('Mon-Sun 08:00-22:00')
     await expect(page.getByTestId('explorer-detail-scraped-at')).toContainText('Scraped at:')
     await captureStepScreenshot(page, testInfo, 'explorer-detail-full-after-selection')
+  })
+
+  test('external search actions stay hidden when selected place has no search context', async ({ page, request }, testInfo) => {
+    const seeded = await seedFixtures(request, {
+      project: {
+        name: 'Explorer Missing Search Context',
+        bounds: JSON.stringify({ sw: { lat: 40.0, lng: 9.0 }, ne: { lat: 40.5, lng: 9.5 } }),
+      },
+      places: [
+        {
+          id: 'place-no-name',
+          googleMapsUri: 'https://maps.google.com/?cid=place-no-name',
+          name: '   ',
+          lat: 40.22,
+          lng: 9.22,
+        },
+      ],
+    })
+
+    const explorerPage = createExplorerPage(page)
+    await explorerPage.goto(seeded.projectId)
+    await explorerPage.clickRow('place-no-name')
+
+    await expect(page.getByTestId('explorer-detail-action-open-google-maps')).toHaveCount(0)
+    await expect(page.getByTestId('explorer-detail-action-view-photos-google-maps')).toHaveCount(0)
+    await expect(page.getByTestId('explorer-detail-action-search-booking')).toHaveCount(0)
+    await expect(page.getByTestId('explorer-detail-action-search-airbnb')).toHaveCount(0)
+    await captureStepScreenshot(page, testInfo, 'explorer-detail-missing-search-context')
   })
 
   test('website badge classes and price formatting render for all expected variants', async ({ page, request }, testInfo) => {

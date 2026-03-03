@@ -19,6 +19,7 @@
 - **Explorer fuzzy search:** Drive global search from a debounced input state (~300ms) and run Fuse.js against a normalized per-place index (name/address/category/amenities/review text); lazily preload reviews only while a query is active so initial Explorer loads are not blocked by per-place review fanout.
 - **Explorer filter-state URL sync:** Keep filter controls in local React state, parse initial values from `useSearchParams`, and mirror updates back into query params (only non-default values) so filters survive refresh/deep links without polluting routes.
 - **Explorer advanced map filters:** For review-keyword + distance filtering, preload/cached per-place reviews when either global search or review-keyword is active, and keep distance center/radius as map-shared filter state rendered by the `useMap()` marker controller (marker + circle overlay) so map/table filters stay AND-composed.
+- **Explorer external action links:** Render Google Maps/Booking/Airbnb action buttons only when the selected place has a non-empty name and location context (address preferred; lat/lng fallback) so generated external URLs remain meaningful.
 - **Shortlist starring persistence:** Keep a per-project default shortlist (e.g., `Starred`) and persist Explorer table/detail star toggles through `/api/shortlists/:id/entries`; reload starred place IDs from shortlist entries when project context changes.
 - **Scraper modules:** `server/src/scraper/` — keep API clients isolated per provider (e.g., `places-api.ts`) and return parsed DB-ready payloads instead of raw API JSON
 - **Tiling module structure:** keep `server/src/scraper/tiling.ts` split into pure bounds math (`generateTiles`, `subdivideTile`, `shouldSubdivide`) and thin DB-backed progress helpers (`initializeTilesForRun`, `markTileCompleted`, `subdivideTileInRun`, `getRunTileProgress`)
@@ -542,6 +543,25 @@ Thread: https://ampcode.com/threads/T-019cb5c6-3edc-7778-97bd-c8875a892d0b
   - Re-scrape flows should reuse existing run-state/SSE route infrastructure and only swap the executor to keep pause/progress behavior consistent with discovery runs.
   - Persisting run kind in SQLite is a low-friction way to keep cross-view status/history UX deterministic when multiple scrape workflows coexist.
   - Updating `scraped_at` during `updatePlace()` avoids stale metadata drift whenever Place Details overwrite existing rows.
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
+---
+## 2026-03-03 23:39:40 CET - US-023
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Updated Explorer detail-panel outbound actions in `client/src/pages/ExplorerPage.tsx` by adding icon-bearing button content, enforcing full-width action button layout hooks, and constructing Booking/Airbnb URLs from place name + location context (address first, lat/lng fallback).
+- Added strict action visibility guards so external action links render only when the selected place has usable search context (non-empty name and location), while preserving the optional existing "View photos on Google Maps" action.
+- Extended style rules in `client/src/styles.css` for icon alignment and full-width action-link rendering.
+- Expanded E2E assertions in `client/e2e/tests/explorer-detail.spec.ts` to verify outbound URLs, `_blank` targets, icon presence, and hidden action states when search context is missing.
+- Added reusable Explorer external-link guidance in `AGENTS.md` and `## Codebase Patterns`.
+- Files changed: `client/src/pages/ExplorerPage.tsx`, `client/src/styles.css`, `client/e2e/tests/explorer-detail.spec.ts`, `AGENTS.md`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Build outbound OTA search labels from a dedicated "search context" helper (name + location) so rendering conditions and URL generation share one deterministic rule.
+  - In strict TypeScript React code, deriving nullable link URLs and rendering them under a single boolean guard keeps `href` props typed while preventing placeholder/dead links.
+  - E2E coverage for outbound actions is more robust when asserting concrete `href` values and `target` behavior, not just link visibility.
 - Quality-gate commands run:
   - `npm run typecheck --workspace=server`
   - `npm run typecheck --workspace=client`

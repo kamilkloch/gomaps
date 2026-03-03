@@ -554,17 +554,28 @@ export function ExplorerPage() {
 
     return reviewsByPlaceId[selectedPlace.id] ?? []
   }, [reviewsByPlaceId, selectedPlace])
-  const selectedPlaceSearchLabel = useMemo(() => buildPlaceSearchLabel(selectedPlace), [selectedPlace])
+  const selectedPlaceHasSearchContext = useMemo(() => hasPlaceSearchContext(selectedPlace), [selectedPlace])
+  const selectedPlaceSearchLabel = useMemo(
+    () => (selectedPlaceHasSearchContext ? buildPlaceSearchLabel(selectedPlace) : ''),
+    [selectedPlace, selectedPlaceHasSearchContext],
+  )
   const selectedPlaceBookingUrl = useMemo(
-    () => buildBookingSearchUrl(selectedPlaceSearchLabel),
-    [selectedPlaceSearchLabel],
+    () => (selectedPlaceHasSearchContext ? buildBookingSearchUrl(selectedPlaceSearchLabel) : null),
+    [selectedPlaceHasSearchContext, selectedPlaceSearchLabel],
   )
   const selectedPlaceAirbnbUrl = useMemo(
-    () => buildAirbnbSearchUrl(selectedPlaceSearchLabel),
-    [selectedPlaceSearchLabel],
+    () => (selectedPlaceHasSearchContext ? buildAirbnbSearchUrl(selectedPlaceSearchLabel) : null),
+    [selectedPlaceHasSearchContext, selectedPlaceSearchLabel],
   )
   const selectedPlaceGoogleMapsUrl = selectedPlace?.googleMapsUri ?? null
   const selectedPlaceGoogleMapsPhotosUrl = selectedPlace?.googleMapsPhotosUri ?? selectedPlaceGoogleMapsUrl
+  const shouldShowExternalSearchActions = selectedPlaceHasSearchContext
+    && selectedPlaceGoogleMapsUrl !== null
+    && selectedPlaceGoogleMapsUrl.trim().length > 0
+    && selectedPlaceGoogleMapsPhotosUrl !== null
+    && selectedPlaceGoogleMapsPhotosUrl.trim().length > 0
+    && selectedPlaceBookingUrl !== null
+    && selectedPlaceAirbnbUrl !== null
   const distanceCenterLabel = formatDistanceCenter(filters.distanceCenter)
 
   const defaultMapCenter = getProjectCenter(selectedProject?.bounds) ?? FALLBACK_CENTER
@@ -1066,44 +1077,66 @@ export function ExplorerPage() {
                   )}
                 </div>
 
-                <div className="explorer-detail-actions">
-                  <a
-                    data-testid="explorer-detail-action-open-google-maps"
-                    href={selectedPlaceGoogleMapsUrl ?? '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="explorer-detail-action-button"
-                  >
-                    Open in Google Maps
-                  </a>
-                  <a
-                    data-testid="explorer-detail-action-view-photos-google-maps"
-                    href={selectedPlaceGoogleMapsPhotosUrl ?? '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="explorer-detail-action-button"
-                  >
-                    View photos on Google Maps
-                  </a>
-                  <a
-                    data-testid="explorer-detail-action-search-booking"
-                    href={selectedPlaceBookingUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="explorer-detail-action-button"
-                  >
-                    Search on Booking.com
-                  </a>
-                  <a
-                    data-testid="explorer-detail-action-search-airbnb"
-                    href={selectedPlaceAirbnbUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="explorer-detail-action-button"
-                  >
-                    Search on Airbnb
-                  </a>
-                </div>
+                {shouldShowExternalSearchActions ? (
+                  <div className="explorer-detail-actions">
+                    <a
+                      data-testid="explorer-detail-action-open-google-maps"
+                      href={selectedPlaceGoogleMapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="explorer-detail-action-button"
+                    >
+                      <span aria-hidden="true" className="explorer-detail-action-icon">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 2c-3.31 0-6 2.69-6 6 0 4.35 6 12 6 12s6-7.65 6-12c0-3.31-2.69-6-6-6Zm0 8.5A2.5 2.5 0 1 1 12 5.5a2.5 2.5 0 0 1 0 5Z" />
+                        </svg>
+                      </span>
+                      <span>Open in Google Maps</span>
+                    </a>
+                    <a
+                      data-testid="explorer-detail-action-view-photos-google-maps"
+                      href={selectedPlaceGoogleMapsPhotosUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="explorer-detail-action-button"
+                    >
+                      <span aria-hidden="true" className="explorer-detail-action-icon">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M4 4h16v16H4V4Zm2 2v12h12V6H6Zm3 8 2.5-3 2 2 1.5-2L18 15H6l3-1Zm-.5-4.5A1.5 1.5 0 1 0 8.5 12a1.5 1.5 0 0 0 0-3Z" />
+                        </svg>
+                      </span>
+                      <span>View photos on Google Maps</span>
+                    </a>
+                    <a
+                      data-testid="explorer-detail-action-search-booking"
+                      href={selectedPlaceBookingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="explorer-detail-action-button"
+                    >
+                      <span aria-hidden="true" className="explorer-detail-action-icon">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M4 3h16v18H4V3Zm2 2v14h12V5H6Zm2 2h2v2H8V7Zm0 4h2v2H8v-2Zm0 4h2v2H8v-2Zm4-8h2v2h-2V7Zm0 4h2v2h-2v-2Zm0 4h2v2h-2v-2Z" />
+                        </svg>
+                      </span>
+                      <span>Search on Booking.com</span>
+                    </a>
+                    <a
+                      data-testid="explorer-detail-action-search-airbnb"
+                      href={selectedPlaceAirbnbUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="explorer-detail-action-button"
+                    >
+                      <span aria-hidden="true" className="explorer-detail-action-icon">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 3 3 10v11h6v-6h6v6h6V10l-9-7Zm0 2.5 7 5.44V19h-2v-6H7v6H5v-8.06L12 5.5Z" />
+                        </svg>
+                      </span>
+                      <span>Search on Airbnb</span>
+                    </a>
+                  </div>
+                ) : null}
               </section>
             ) : (
               <p className="explorer-placeholder">Select a marker to inspect place details.</p>
@@ -1894,16 +1927,37 @@ const formatScrapedAt = (scrapedAtRaw: string): string => {
   return new Date(timestamp).toLocaleString()
 }
 
-const buildPlaceSearchLabel = (place: Place | null): string => {
-  if (!place) {
+const buildPlaceLocationLabel = (place: Place | null): string => {
+  if (place === null) {
     return ''
   }
 
-  const chunks = [place.name, place.address ?? '']
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0)
+  const addressLabel = (place.address ?? '').trim()
+  if (addressLabel.length > 0) {
+    return addressLabel
+  }
 
-  return chunks.join(', ')
+  if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng)) {
+    return ''
+  }
+
+  return `${place.lat.toFixed(5)}, ${place.lng.toFixed(5)}`
+}
+
+const hasPlaceSearchContext = (place: Place | null): boolean => {
+  if (place === null) {
+    return false
+  }
+
+  return place.name.trim().length > 0 && buildPlaceLocationLabel(place).length > 0
+}
+
+const buildPlaceSearchLabel = (place: Place | null): string => {
+  if (!hasPlaceSearchContext(place) || place === null) {
+    return ''
+  }
+
+  return `${place.name.trim()}, ${buildPlaceLocationLabel(place)}`
 }
 
 const buildBookingSearchUrl = (searchLabel: string): string =>

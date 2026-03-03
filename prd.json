@@ -452,8 +452,8 @@
         "npm run typecheck --workspace=client passes"
       ],
       "priority": 38,
-      "passes": false,
-      "notes": "Reference mockup: docs/mockups/03-explorer-page.png. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
+      "passes": true,
+      "notes": "Implemented Explorer detail-panel outbound actions with icon-styled full-width buttons, encoded Booking/Airbnb search links built from place name + location context, and conditional rendering when search context is unavailable. Kept the existing optional 'View photos on Google Maps' action."
     },
     {
       "id": "US-024",

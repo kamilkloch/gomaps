@@ -985,11 +985,32 @@ a {
   border-radius: 0.72rem;
   background: linear-gradient(165deg, #2b6fcb, #2459a0);
   color: #eff7ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   font-weight: 700;
   font-size: 0.84rem;
+  line-height: 1.1;
   text-align: center;
   text-decoration: none;
   padding: 0.52rem 0.62rem;
+  width: 100%;
+}
+
+.explorer-detail-action-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.explorer-detail-action-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
 }
 
 .explorer-detail-action-button:hover {
