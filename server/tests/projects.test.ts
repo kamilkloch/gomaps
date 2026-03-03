@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { unlinkSync } from 'node:fs'
 import request from 'supertest'
 import type { ScrapeRun } from '../src/db/types.js'
-import type { ScrapeProgress, StartScrapeConfig } from '../src/scraper/engine.js'
+import type { ScrapeProgress, StartRescrapeConfig, StartScrapeConfig } from '../src/scraper/engine.js'
 
 const dbPath = join(tmpdir(), `gomaps-test-${randomUUID()}.db`)
 
@@ -37,6 +37,7 @@ const {
   removeShortlistEntry,
   truncateAllTables,
   unlinkPlaceFromScrapeRun,
+  updatePlace,
   updateScrapeRun,
   updateShortlist,
   updateShortlistEntryNotes,
@@ -44,6 +45,7 @@ const {
 const { appRuntime } = await import('../src/runtime.js')
 const {
   resetScrapeRouteStateForTests,
+  setRescrapeExecutorForTests,
   setScrapeExecutorForTests,
 } = await import('../src/routes/scrape.js')
 const { app } = await import('../src/index.js')
@@ -330,6 +332,67 @@ describe('scrape API', () => {
     expect(status.body.placesFound).toBe(6)
     expect(status.body.placesUnique).toBe(4)
     expect(status.body.elapsedMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it('starts a refresh run and updates existing place details', async () => {
+    setRescrapeExecutorForTests(createMockRescrapeExecutor())
+
+    const project = await request(app)
+      .post('/api/projects')
+      .send({ name: 'Refresh Project' })
+    expect(project.status).toBe(201)
+
+    await appRuntime.runPromise(
+      Effect.gen(function* () {
+        const discoveryRun = yield* createScrapeRun(project.body.id as string, 'seed run')
+        yield* createPlace({
+          id: 'refresh-place-1',
+          googleMapsUri: 'https://maps.google.com/?cid=refresh-place-1',
+          name: 'Old Place Name',
+          rating: 2.5,
+          reviewCount: 1,
+          lat: 40.22,
+          lng: 9.41,
+        })
+        yield* createReview('refresh-place-1', 1, 'Old review copy', '1 year ago')
+        yield* linkPlaceToScrapeRun('refresh-place-1', discoveryRun.id)
+      })
+    )
+
+    const start = await request(app)
+      .post('/api/scrape/rescrape')
+      .send({ projectId: project.body.id })
+
+    expect(start.status).toBe(202)
+    expect(typeof start.body.scrapeRunId).toBe('string')
+
+    await waitForRunStatus(start.body.scrapeRunId as string, 'completed')
+
+    const runStatus = await request(app).get(`/api/scrape/${start.body.scrapeRunId as string}`)
+    expect(runStatus.status).toBe(200)
+    expect(runStatus.body.status).toBe('completed')
+    expect(runStatus.body.tilesTotal).toBe(1)
+    expect(runStatus.body.tilesCompleted).toBe(1)
+    expect(runStatus.body.placesFound).toBe(1)
+    expect(runStatus.body.placesUnique).toBe(1)
+
+    const runs = await request(app).get(`/api/scrape?projectId=${project.body.id as string}`)
+    expect(runs.status).toBe(200)
+    const refreshRun = (runs.body as Array<Record<string, unknown>>)
+      .find((run) => run.id === (start.body.scrapeRunId as string))
+    expect(refreshRun).toBeDefined()
+    expect(refreshRun?.kind).toBe('refresh')
+
+    const placesResponse = await request(app).get(`/api/places?projectId=${project.body.id as string}`)
+    expect(placesResponse.status).toBe(200)
+    expect(placesResponse.body).toHaveLength(1)
+    expect(placesResponse.body[0].name).toBe('Refreshed Place Name')
+    expect(placesResponse.body[0].rating).toBe(4.7)
+
+    const reviewsResponse = await request(app).get('/api/places/refresh-place-1/reviews')
+    expect(reviewsResponse.status).toBe(200)
+    expect(reviewsResponse.body).toHaveLength(1)
+    expect(reviewsResponse.body[0].text).toBe('Refreshed review copy')
   })
 
   it('pauses and resumes a run', async () => {
@@ -799,6 +862,31 @@ const createMockScrapeExecutor = (
       config.onProgress?.(toProgressPayload(completedRun))
     })
 }
+
+const createMockRescrapeExecutor = (): ((config: StartRescrapeConfig) => Effect.Effect<void, never, import('../src/db/Db.js').Db>) =>
+  (config) =>
+    Effect.gen(function* () {
+      yield* updateScrapeRun(config.scrapeRunId, {
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        tilesTotal: 1,
+        placesUnique: 1,
+      })
+      yield* updatePlace('refresh-place-1', {
+        name: 'Refreshed Place Name',
+        rating: 4.7,
+        reviewCount: 203,
+      })
+      yield* deleteReviewsByPlace('refresh-place-1')
+      yield* createReview('refresh-place-1', 5, 'Refreshed review copy', 'today')
+      yield* updateScrapeRun(config.scrapeRunId, {
+        status: 'completed',
+        tilesCompleted: 1,
+        placesFound: 1,
+        placesUnique: 1,
+        completedAt: new Date().toISOString(),
+      })
+    })
 
 const toProgressPayload = (run: ScrapeRun): ScrapeProgress => {
   const startedAt = Date.parse(run.startedAt ?? '')

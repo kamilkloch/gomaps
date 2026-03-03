@@ -10,6 +10,7 @@ import {
   createProject,
   createScrapeRun,
   getScrapeRun,
+  linkPlaceToScrapeRun,
   listPlaceScrapeRuns,
   listPlaces,
 } from '../src/db/index.js'
@@ -27,7 +28,7 @@ vi.mock('../src/scraper/places-api.js', () => ({
   getPlaceDetails: getPlaceDetailsMock,
 }))
 
-import { startScrape } from '../src/scraper/engine.js'
+import { startRescrape, startScrape } from '../src/scraper/engine.js'
 
 describe('scraper engine', () => {
   let dbPath = ''
@@ -250,7 +251,133 @@ describe('scraper engine', () => {
     expect(result.placeCount).toBe(60)
     expect(result.linkCount).toBe(60)
   })
+
+  it('refreshes existing project places using place details', async () => {
+    getPlaceDetailsMock.mockImplementation((placeId: string) =>
+      Effect.succeed({
+        place: {
+          ...parsedPlace(placeId).place,
+          name: `Refreshed ${placeId}`,
+          rating: 4.9,
+          reviewCount: 222,
+        },
+        reviews: [{ rating: 5, text: `refresh-${placeId}`, relativeDate: 'today' }],
+      })
+    )
+
+    const result = await runtime.runPromise(
+      Effect.gen(function* () {
+        const project = yield* createProject('Refresh flow', null)
+        const discoveryRun = yield* createScrapeRun(project.id, 'seed run')
+        const refreshRun = yield* createScrapeRun(project.id, 'Refresh Data', 'refresh')
+
+        yield* createPlace(parsedPlace('refresh-a').place)
+        yield* createPlace(parsedPlace('refresh-b').place)
+        yield* linkPlacesToRun(['refresh-a', 'refresh-b'], discoveryRun.id)
+
+        yield* startRescrape({
+          scrapeRunId: refreshRun.id,
+          projectId: project.id,
+          delayMs: 0,
+        })
+
+        const updatedRun = yield* getScrapeRun(refreshRun.id)
+        const refreshedPlaces = yield* listPlaces(project.id)
+        const refreshedReviews = yield* Effect.forEach(refreshedPlaces, (place) => listReviews(place.id))
+        const refreshLinks = yield* listPlaceScrapeRuns(refreshRun.id)
+
+        return {
+          updatedRun,
+          refreshedPlaces,
+          refreshedReviews,
+          refreshLinks,
+        }
+      })
+    )
+
+    expect(getPlaceDetailsMock).toHaveBeenCalledTimes(2)
+    expect(result.updatedRun.status).toBe('completed')
+    expect(result.updatedRun.tilesTotal).toBe(2)
+    expect(result.updatedRun.tilesCompleted).toBe(2)
+    expect(result.updatedRun.placesFound).toBe(2)
+    expect(result.updatedRun.placesUnique).toBe(2)
+    expect(result.refreshedPlaces.every((place) => place.name.startsWith('Refreshed '))).toBe(true)
+    expect(result.refreshedReviews.every((reviews) => reviews[0]?.text.startsWith('refresh-'))).toBe(true)
+    expect(result.refreshLinks).toHaveLength(2)
+  })
+
+  it('can pause an in-flight refresh run', async () => {
+    getPlaceDetailsMock.mockImplementation((placeId: string) =>
+      Effect.succeed({
+        place: parsedPlace(placeId).place,
+        reviews: [],
+      })
+    )
+
+    const result = await runtime.runPromise(
+      Effect.gen(function* () {
+        const project = yield* createProject('Paused refresh flow', null)
+        const discoveryRun = yield* createScrapeRun(project.id, 'seed run')
+        const refreshRun = yield* createScrapeRun(project.id, 'Refresh Data', 'refresh')
+
+        yield* createPlace(parsedPlace('pause-a').place)
+        yield* createPlace(parsedPlace('pause-b').place)
+        yield* linkPlacesToRun(['pause-a', 'pause-b'], discoveryRun.id)
+
+        let pauseRequested = false
+        yield* startRescrape({
+          scrapeRunId: refreshRun.id,
+          projectId: project.id,
+          delayMs: 0,
+          shouldPause: () => pauseRequested,
+          onProgress: () => {
+            pauseRequested = true
+          },
+        })
+
+        return yield* getScrapeRun(refreshRun.id)
+      })
+    )
+
+    expect(result.status).toBe('paused')
+    expect(result.tilesCompleted).toBe(0)
+    expect(result.placesFound).toBe(0)
+  })
+
+  it('marks refresh run as failed when details fetch fails', async () => {
+    getPlaceDetailsMock.mockReturnValue(
+      Effect.fail(new Error('Places API unavailable'))
+    )
+
+    const result = await runtime.runPromise(
+      Effect.gen(function* () {
+        const project = yield* createProject('Failed refresh flow', null)
+        const discoveryRun = yield* createScrapeRun(project.id, 'seed run')
+        const refreshRun = yield* createScrapeRun(project.id, 'Refresh Data', 'refresh')
+
+        yield* createPlace(parsedPlace('fail-a').place)
+        yield* linkPlacesToRun(['fail-a'], discoveryRun.id)
+
+        yield* startRescrape({
+          scrapeRunId: refreshRun.id,
+          projectId: project.id,
+          delayMs: 0,
+        }).pipe(Effect.catchAll(() => Effect.void))
+
+        return yield* getScrapeRun(refreshRun.id)
+      })
+    )
+
+    expect(result.status).toBe('failed')
+    expect(result.completedAt).not.toBeNull()
+  })
 })
+
+const linkPlacesToRun = (
+  placeIds: string[],
+  scrapeRunId: string
+): Effect.Effect<void, never, import('../src/db/Db.js').Db> =>
+  Effect.forEach(placeIds, (placeId) => linkPlaceToScrapeRun(placeId, scrapeRunId)).pipe(Effect.asVoid)
 
 const parsedPlace = (id: string) => ({
   placeId: id,

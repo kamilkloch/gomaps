@@ -1,11 +1,21 @@
 import { Router } from 'express'
 import { Effect, Schema } from 'effect'
 import type { Db } from '../db/Db.js'
-import { createScrapeRun, getProject, getScrapeRun, listScrapeRuns, listTiles } from '../db/index.js'
+import {
+  createScrapeRun,
+  getProject,
+  getScrapeRun,
+  listPlaces,
+  listScrapeRuns,
+  listTiles,
+  updateScrapeRun,
+} from '../db/index.js'
 import { NotFoundError, ValidationError } from '../errors.js'
 import {
+  startRescrape,
   startScrape,
   type ScrapeProgress,
+  type StartRescrapeConfig,
   type StartScrapeConfig,
 } from '../scraper/engine.js'
 import type { Bounds } from '../scraper/tiling.js'
@@ -19,17 +29,24 @@ const StartScrapeBody = Schema.Struct({
   delayMs: Schema.optional(Schema.Number),
 })
 
+const StartRescrapeBody = Schema.Struct({
+  projectId: Schema.String,
+  delayMs: Schema.optional(Schema.Number),
+})
+
 interface RunState {
   pauseRequested: boolean
   task?: Promise<void>
 }
 
 type ScrapeExecutor = (config: StartScrapeConfig) => Effect.Effect<void, unknown, Db>
+type RescrapeExecutor = (config: StartRescrapeConfig) => Effect.Effect<void, unknown, Db>
 
 const runStates = new Map<string, RunState>()
 const progressSubscribers = new Map<string, Set<(progress: ScrapeProgress) => void>>()
 
 let scrapeExecutor: ScrapeExecutor = startScrape
+let rescrapeExecutor: RescrapeExecutor = startRescrape
 
 scrapeRouter.get('/', async (req, res) => {
   const projectId = req.query.projectId
@@ -65,6 +82,44 @@ scrapeRouter.post('/start', async (req, res) => {
         scrapeRunId: run.id,
         query: run.query,
         bounds,
+        delayMs: body.delayMs,
+      })
+
+      res.status(202).json({ scrapeRunId: run.id })
+    }).pipe(
+      Effect.catchTag('ValidationError', (error) =>
+        Effect.sync(() => res.status(400).json({ error: error.message }))
+      ),
+      Effect.catchTag('NotFoundError', () =>
+        Effect.sync(() => res.status(404).json({ error: 'Project not found' }))
+      ),
+      Effect.catchTag('DbError', (error) =>
+        Effect.sync(() => res.status(500).json({ error: error.message }))
+      )
+    )
+  )
+})
+
+scrapeRouter.post('/rescrape', async (req, res) => {
+  await appRuntime.runPromise(
+    Effect.gen(function* () {
+      const body = yield* Schema.decodeUnknown(StartRescrapeBody)(req.body).pipe(
+        Effect.mapError(() =>
+          new ValidationError({ message: 'projectId is required' })
+        )
+      )
+
+      const project = yield* getProject(body.projectId)
+      const places = yield* listPlaces(project.id)
+      const run = yield* createScrapeRun(project.id, 'Refresh Data', 'refresh')
+      yield* updateScrapeRun(run.id, {
+        tilesTotal: places.length,
+        placesUnique: places.length,
+      })
+
+      startBackgroundRescrape({
+        scrapeRunId: run.id,
+        projectId: project.id,
         delayMs: body.delayMs,
       })
 
@@ -287,6 +342,33 @@ const startBackgroundScrape = (config: StartScrapeConfig): void => {
   runState.task = backgroundTask
 }
 
+const startBackgroundRescrape = (config: StartRescrapeConfig): void => {
+  const runState = getRunState(config.scrapeRunId)
+  if (runState.task) {
+    return
+  }
+
+  runState.pauseRequested = false
+  const backgroundTask = appRuntime
+    .runPromise(
+      rescrapeExecutor({
+        ...config,
+        shouldPause: () => runState.pauseRequested,
+        onProgress: (progress) => {
+          broadcastProgress(progress)
+        },
+      })
+    )
+    .catch((error) => {
+      console.error('Re-scrape run failed', error)
+    })
+    .finally(() => {
+      runState.task = undefined
+    })
+
+  runState.task = backgroundTask
+}
+
 const getRunState = (runId: string): RunState => {
   const existing = runStates.get(runId)
   if (existing) {
@@ -387,8 +469,13 @@ export const setScrapeExecutorForTests = (executor?: ScrapeExecutor): void => {
   scrapeExecutor = executor ?? startScrape
 }
 
+export const setRescrapeExecutorForTests = (executor?: RescrapeExecutor): void => {
+  rescrapeExecutor = executor ?? startRescrape
+}
+
 export const resetScrapeRouteStateForTests = (): void => {
   runStates.clear()
   progressSubscribers.clear()
   scrapeExecutor = startScrape
+  rescrapeExecutor = startRescrape
 }

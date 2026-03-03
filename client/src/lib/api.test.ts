@@ -15,6 +15,7 @@ import {
   pauseScrape,
   removeShortlistEntry,
   resumeScrape,
+  startRescrape,
   startScrape,
   updateShortlist,
   updateShortlistEntryNotes,
@@ -259,6 +260,20 @@ describe('api helpers', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ projectId: 'project-7', query: 'hotel' }),
+      }),
+    )
+  })
+
+  it('starts a refresh scrape run for a project', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ scrapeRunId: 'refresh-run-1' }), { status: 202 }))
+
+    const result = await startRescrape('project-7')
+    expect(result).toEqual({ scrapeRunId: 'refresh-run-1' })
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/scrape/rescrape',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ projectId: 'project-7' }),
       }),
     )
   })

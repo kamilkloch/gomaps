@@ -435,8 +435,8 @@
         "npm run typecheck --workspace=server passes"
       ],
       "priority": 37,
-      "passes": false,
-      "notes": "Uses Place Details API instead of re-visiting browser pages. Sequenced after outstanding E2E hardening stories (US-E2E-PRE-01, US-E2E-05/06/07)."
+      "passes": true,
+      "notes": "Implemented `/api/scrape/rescrape` with `refresh` run kind + Setup Refresh Data action; re-scrape iterates existing project place IDs, overwrites place/review data from Place Details, links refreshed places to the run, and streams progress through existing SSE/status endpoints."
     },
     {
       "id": "US-023",

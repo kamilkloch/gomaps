@@ -132,7 +132,7 @@ export const updatePlace = (
     if (sets.length === 0) return yield* getPlace(id)
     values.push(id)
     yield* tryDb('update place', () => {
-        db.prepare(`UPDATE places SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+        db.prepare(`UPDATE places SET ${sets.join(', ')}, scraped_at = datetime('now') WHERE id = ?`).run(...values)
     })
     return yield* getPlace(id)
   })

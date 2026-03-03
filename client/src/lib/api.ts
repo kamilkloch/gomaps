@@ -27,6 +27,7 @@ export interface ScrapeRun {
   id: string
   projectId: string
   query: string
+  kind: 'discovery' | 'refresh'
   status: 'pending' | 'running' | 'paused' | 'completed' | 'failed'
   tilesTotal: number
   tilesCompleted: number
@@ -252,6 +253,14 @@ export const startScrape = async (
   requestJson<{ scrapeRunId: string }>('/scrape/start', {
     method: 'POST',
     body: JSON.stringify({ projectId, query }),
+  })
+
+export const startRescrape = async (
+  projectId: string,
+): Promise<{ scrapeRunId: string }> =>
+  requestJson<{ scrapeRunId: string }>('/scrape/rescrape', {
+    method: 'POST',
+    body: JSON.stringify({ projectId }),
   })
 
 export const pauseScrape = async (runId: string): Promise<{ status: 'pausing' }> =>

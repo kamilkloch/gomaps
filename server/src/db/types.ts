@@ -17,6 +17,7 @@ export interface ScrapeRun {
   id: string
   projectId: string
   query: string
+  kind: 'discovery' | 'refresh'
   status: 'pending' | 'running' | 'paused' | 'completed' | 'failed'
   tilesTotal: number
   tilesCompleted: number

@@ -9,6 +9,7 @@ import {
   listScrapeRuns,
   pauseScrape,
   resumeScrape,
+  startRescrape,
   startScrape,
   subscribeScrapeProgress,
   updateProject,
@@ -499,6 +500,25 @@ export function SetupPage() {
     }
   }, [activeRunId, progress, refreshRuns])
 
+  const handleRescrape = useCallback(async () => {
+    if (!projectId) {
+      return
+    }
+
+    try {
+      setIsStartingScrape(true)
+      setErrorMessage(null)
+      const started = await startRescrape(projectId)
+      await refreshRuns(started.scrapeRunId)
+    }
+    catch {
+      setErrorMessage('Unable to refresh project place data right now.')
+    }
+    finally {
+      setIsStartingScrape(false)
+    }
+  }, [projectId, refreshRuns])
+
   if (!projectId) {
     return <main className="setup-page" data-testid="setup-page"><p className="setup-state">Project not found.</p></main>
   }
@@ -660,6 +680,17 @@ export function SetupPage() {
               disabled={!selectionBounds || isStartingScrape}
             >
               {isStartingScrape ? 'Starting…' : 'Start Scrape'}
+            </button>
+            <button
+              data-testid="setup-rescrape-button"
+              type="button"
+              className="setup-clear-button"
+              onClick={() => {
+                void handleRescrape()
+              }}
+              disabled={isStartingScrape}
+            >
+              {isStartingScrape ? 'Refreshing…' : 'Refresh Data'}
             </button>
           </div>
 

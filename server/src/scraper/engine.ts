@@ -5,6 +5,7 @@ import {
   createReview,
   deleteReviewsByPlace,
   getPlace,
+  listPlaces,
   getScrapeRun,
   linkPlaceToScrapeRun,
   listTiles,
@@ -29,6 +30,14 @@ export interface StartScrapeConfig {
   scrapeRunId: string
   query: string
   bounds: Bounds
+  delayMs?: number
+  shouldPause?: () => boolean
+  onProgress?: (progress: ScrapeProgress) => void
+}
+
+export interface StartRescrapeConfig {
+  scrapeRunId: string
+  projectId: string
   delayMs?: number
   shouldPause?: () => boolean
   onProgress?: (progress: ScrapeProgress) => void
@@ -103,6 +112,87 @@ export const startScrape = (config: StartScrapeConfig): Effect.Effect<void, Engi
   })
 
   return scrapeEffect.pipe(
+    Effect.catchAll((error) =>
+      Effect.gen(function* () {
+        yield* updateScrapeRun(config.scrapeRunId, {
+          status: 'failed',
+          completedAt: new Date().toISOString(),
+        }).pipe(Effect.catchAll(() => Effect.void))
+        yield* notifyProgress(config.scrapeRunId, runStartedAt, config.onProgress).pipe(
+          Effect.catchAll(() => Effect.void)
+        )
+        return yield* Effect.fail(error)
+      })
+    )
+  )
+}
+
+export const startRescrape = (config: StartRescrapeConfig): Effect.Effect<void, EngineError, Db> => {
+  const delayMs = config.delayMs ?? DEFAULT_DELAY_MS
+
+  if (delayMs < 0) {
+    return Effect.fail(new ScrapeError({ message: 'delayMs must be >= 0' }))
+  }
+
+  const runStartedAt = new Date().toISOString()
+
+  return Effect.gen(function* () {
+    const run = yield* getScrapeRun(config.scrapeRunId)
+    const startedAt = run.startedAt ?? runStartedAt
+    const places = yield* listPlaces(config.projectId)
+    const totalPlaces = places.length
+
+    yield* updateScrapeRun(config.scrapeRunId, {
+      status: 'running',
+      startedAt,
+      completedAt: null,
+      tilesTotal: totalPlaces,
+      tilesCompleted: 0,
+      tilesSubdivided: 0,
+      placesFound: 0,
+      placesUnique: totalPlaces,
+    })
+    yield* notifyProgress(config.scrapeRunId, startedAt, config.onProgress)
+
+    for (let placeIndex = 0; placeIndex < places.length; placeIndex += 1) {
+      if (config.shouldPause?.()) {
+        yield* updateScrapeRun(config.scrapeRunId, {
+          status: 'paused',
+          completedAt: null,
+        })
+        yield* notifyProgress(config.scrapeRunId, startedAt, config.onProgress)
+        return
+      }
+
+      const place = places[placeIndex]
+      const details = yield* getPlaceDetails(place.id)
+      yield* updatePlace(place.id, details.place)
+      yield* deleteReviewsByPlace(place.id)
+      if (details.reviews.length > 0) {
+        yield* Effect.forEach(details.reviews, (review) =>
+          createReview(place.id, review.rating, review.text, review.relativeDate ?? undefined)
+        )
+      }
+      yield* linkPlaceToScrapeRun(place.id, config.scrapeRunId)
+
+      const refreshedPlacesCount = placeIndex + 1
+      yield* updateScrapeRun(config.scrapeRunId, {
+        tilesCompleted: refreshedPlacesCount,
+        placesFound: refreshedPlacesCount,
+      })
+      yield* notifyProgress(config.scrapeRunId, startedAt, config.onProgress)
+
+      if (delayMs > 0 && refreshedPlacesCount < totalPlaces) {
+        yield* sleep(delayMs)
+      }
+    }
+
+    yield* updateScrapeRun(config.scrapeRunId, {
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+    })
+    yield* notifyProgress(config.scrapeRunId, startedAt, config.onProgress)
+  }).pipe(
     Effect.catchAll((error) =>
       Effect.gen(function* () {
         yield* updateScrapeRun(config.scrapeRunId, {
