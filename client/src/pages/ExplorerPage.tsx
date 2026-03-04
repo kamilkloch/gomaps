@@ -1,7 +1,7 @@
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps'
 import { MarkerClusterer, MarkerClustererEvents } from '@googlemaps/markerclusterer'
 import Fuse from 'fuse.js'
-import type { ReactNode, UIEvent } from 'react'
+import type { MouseEvent, ReactNode, UIEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -48,6 +48,7 @@ const STALE_THRESHOLD_MIN_DAYS = 1
 const STALE_THRESHOLD_MAX_DAYS = 30
 const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000
 const DEFAULT_SHORTLIST_NAME = 'Starred'
+const PHOTO_BROWSER_FOCUSABLE_SELECTOR = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
 const EXPLORER_CATEGORY_OPTIONS = [
   { id: 'hotel', label: 'Hotel' },
@@ -162,6 +163,8 @@ export function ExplorerPage() {
   const [isLoadingSelectedReviews, setIsLoadingSelectedReviews] = useState(false)
   const [selectedReviewsError, setSelectedReviewsError] = useState<string | null>(null)
   const [isOpeningHoursExpanded, setIsOpeningHoursExpanded] = useState(true)
+  const [isPhotoBrowserOpen, setIsPhotoBrowserOpen] = useState(false)
+  const [photoBrowserActiveIndex, setPhotoBrowserActiveIndex] = useState(0)
   const [markerDebugEntries, setMarkerDebugEntries] = useState<MarkerDebugEntry[]>([])
   const [clusterDebugSnapshot, setClusterDebugSnapshot] = useState<ClusterDebugSnapshot>(EMPTY_CLUSTER_DEBUG_SNAPSHOT)
   const [selectionCircleDebugSnapshot, setSelectionCircleDebugSnapshot] = useState<SelectionCircleDebugSnapshot>(
@@ -177,6 +180,11 @@ export function ExplorerPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const reviewsByPlaceIdRef = useRef(reviewsByPlaceId)
   const reviewRequestPromisesRef = useRef(new globalThis.Map<string, Promise<PlaceReview[]>>())
+  const detailPhotoTriggerRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const photoBrowserDialogRef = useRef<HTMLDivElement | null>(null)
+  const photoBrowserCloseButtonRef = useRef<HTMLButtonElement | null>(null)
+  const lastPhotoTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const shouldRestorePhotoTriggerFocusRef = useRef(false)
 
   const hasMapsKey = Boolean(API_KEY)
   const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters])
@@ -554,6 +562,7 @@ export function ExplorerPage() {
     () => parseJsonArray(selectedPlace?.photoUrls),
     [selectedPlace?.photoUrls],
   )
+  const selectedPlaceActivePhotoUrl = selectedPlacePhotoUrls[photoBrowserActiveIndex] ?? null
   const selectedPlaceAmenities = useMemo(
     () => parseJsonArray(selectedPlace?.amenities),
     [selectedPlace?.amenities],
@@ -758,6 +767,48 @@ export function ExplorerPage() {
     setTableViewportHeight(scrollContainer.clientHeight)
   }, [])
 
+  const closePhotoBrowser = useCallback(() => {
+    setIsPhotoBrowserOpen(false)
+  }, [])
+
+  const openPhotoBrowser = useCallback((photoIndex: number) => {
+    if (selectedPlacePhotoUrls.length === 0) {
+      return
+    }
+
+    const normalizedIndex = normalizePhotoIndex(photoIndex, selectedPlacePhotoUrls.length)
+    lastPhotoTriggerRef.current = detailPhotoTriggerRefs.current[normalizedIndex] ?? null
+    shouldRestorePhotoTriggerFocusRef.current = true
+    setPhotoBrowserActiveIndex(normalizedIndex)
+    setIsPhotoBrowserOpen(true)
+  }, [selectedPlacePhotoUrls.length])
+
+  const showPreviousPhoto = useCallback(() => {
+    if (selectedPlacePhotoUrls.length === 0) {
+      return
+    }
+
+    setPhotoBrowserActiveIndex((currentIndex) =>
+      normalizePhotoIndex(currentIndex - 1, selectedPlacePhotoUrls.length)
+    )
+  }, [selectedPlacePhotoUrls.length])
+
+  const showNextPhoto = useCallback(() => {
+    if (selectedPlacePhotoUrls.length === 0) {
+      return
+    }
+
+    setPhotoBrowserActiveIndex((currentIndex) =>
+      normalizePhotoIndex(currentIndex + 1, selectedPlacePhotoUrls.length)
+    )
+  }, [selectedPlacePhotoUrls.length])
+
+  const handlePhotoBrowserOverlayClick = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      closePhotoBrowser()
+    }
+  }, [closePhotoBrowser])
+
   useEffect(() => {
     const scrollContainer = tableScrollRef.current
     if (!scrollContainer) {
@@ -821,7 +872,117 @@ export function ExplorerPage() {
 
   useEffect(() => {
     setIsOpeningHoursExpanded(true)
+    setIsPhotoBrowserOpen(false)
+    setPhotoBrowserActiveIndex(0)
+    detailPhotoTriggerRefs.current = []
+    lastPhotoTriggerRef.current = null
+    shouldRestorePhotoTriggerFocusRef.current = false
   }, [selectedPlaceId])
+
+  useEffect(() => {
+    if (!isPhotoBrowserOpen) {
+      return
+    }
+
+    if (selectedPlacePhotoUrls.length === 0) {
+      setIsPhotoBrowserOpen(false)
+      return
+    }
+
+    setPhotoBrowserActiveIndex((currentIndex) =>
+      normalizePhotoIndex(currentIndex, selectedPlacePhotoUrls.length)
+    )
+  }, [isPhotoBrowserOpen, selectedPlacePhotoUrls.length])
+
+  useEffect(() => {
+    if (!isPhotoBrowserOpen) {
+      const photoTrigger = lastPhotoTriggerRef.current
+      if (shouldRestorePhotoTriggerFocusRef.current && photoTrigger?.isConnected) {
+        photoTrigger.focus()
+      }
+      shouldRestorePhotoTriggerFocusRef.current = false
+      return
+    }
+
+    photoBrowserCloseButtonRef.current?.focus()
+  }, [isPhotoBrowserOpen])
+
+  useEffect(() => {
+    if (!isPhotoBrowserOpen) {
+      return
+    }
+
+    const previousBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+    }
+  }, [isPhotoBrowserOpen])
+
+  useEffect(() => {
+    if (!isPhotoBrowserOpen) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closePhotoBrowser()
+        return
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        showPreviousPhoto()
+        return
+      }
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        showNextPhoto()
+        return
+      }
+
+      if (event.key !== 'Tab') {
+        return
+      }
+
+      const dialog = photoBrowserDialogRef.current
+      if (!dialog) {
+        return
+      }
+
+      const focusableElements = getFocusableElements(dialog)
+      if (focusableElements.length === 0) {
+        event.preventDefault()
+        return
+      }
+
+      const firstElement = focusableElements[0]
+      const lastElement = focusableElements[focusableElements.length - 1]
+      const activeElement = document.activeElement
+
+      if (event.shiftKey) {
+        if (activeElement === firstElement || !dialog.contains(activeElement)) {
+          event.preventDefault()
+          lastElement.focus()
+        }
+        return
+      }
+
+      if (activeElement === lastElement || !dialog.contains(activeElement)) {
+        event.preventDefault()
+        firstElement.focus()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [closePhotoBrowser, isPhotoBrowserOpen, showNextPhoto, showPreviousPhoto])
 
   useEffect(() => {
     if (!selectedPlaceId) {
@@ -1036,16 +1197,19 @@ export function ExplorerPage() {
                   {selectedPlacePhotoUrls.length > 0 ? (
                     <div className="explorer-detail-photo-strip">
                       {selectedPlacePhotoUrls.map((photoUrl, index) => (
-                        <a
-                          key={photoUrl}
+                        <button
+                          key={`${photoUrl}-${index}`}
+                          type="button"
                           data-testid={`explorer-detail-photo-${index}`}
-                          href={photoUrl}
-                          target="_blank"
-                          rel="noreferrer"
                           className="explorer-detail-photo-link"
+                          aria-label={`Open photo ${index + 1} of ${selectedPlacePhotoUrls.length}`}
+                          onClick={() => openPhotoBrowser(index)}
+                          ref={(node) => {
+                            detailPhotoTriggerRefs.current[index] = node
+                          }}
                         >
                           <img src={photoUrl} alt={`${selectedPlace.name} photo ${index + 1}`} loading="lazy" />
-                        </a>
+                        </button>
                       ))}
                     </div>
                   ) : (
@@ -1530,9 +1694,103 @@ export function ExplorerPage() {
           </aside>
         ) : null}
       </section>
+
+      {isPhotoBrowserOpen && selectedPlace && selectedPlaceActivePhotoUrl ? (
+        <div
+          className="explorer-photo-browser-overlay"
+          data-testid="explorer-photo-browser-overlay"
+          onClick={handlePhotoBrowserOverlayClick}
+        >
+          <div
+            ref={photoBrowserDialogRef}
+            className="explorer-photo-browser-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Photo browser for ${selectedPlace.name}`}
+          >
+            <div
+              className="explorer-photo-browser-thumbnails"
+              data-testid="explorer-photo-browser-thumbnails"
+            >
+              {selectedPlacePhotoUrls.map((photoUrl, index) => (
+                <button
+                  key={`${photoUrl}-${index}`}
+                  type="button"
+                  data-testid={`explorer-photo-browser-thumbnail-${index}`}
+                  className={`explorer-photo-browser-thumbnail ${index === photoBrowserActiveIndex ? 'is-active' : ''}`}
+                  onClick={() => setPhotoBrowserActiveIndex(index)}
+                  aria-label={`Show photo ${index + 1}`}
+                >
+                  <img src={photoUrl} alt={`${selectedPlace.name} thumbnail ${index + 1}`} loading="lazy" />
+                </button>
+              ))}
+            </div>
+
+            <section className="explorer-photo-browser-main" data-testid="explorer-photo-browser-main">
+              <header className="explorer-photo-browser-toolbar">
+                <p className="explorer-photo-browser-place-name">{selectedPlace.name}</p>
+                <span className="explorer-photo-browser-position">
+                  {photoBrowserActiveIndex + 1} / {selectedPlacePhotoUrls.length}
+                </span>
+                <button
+                  type="button"
+                  ref={photoBrowserCloseButtonRef}
+                  data-testid="explorer-photo-browser-close"
+                  className="explorer-photo-browser-close"
+                  onClick={closePhotoBrowser}
+                >
+                  Close
+                </button>
+              </header>
+
+              <div className="explorer-photo-browser-frame">
+                <button
+                  type="button"
+                  data-testid="explorer-photo-browser-prev"
+                  className="explorer-photo-browser-nav explorer-photo-browser-nav-prev"
+                  onClick={showPreviousPhoto}
+                  aria-label="Previous photo"
+                >
+                  ‹
+                </button>
+
+                <img
+                  data-testid="explorer-photo-browser-active-image"
+                  className="explorer-photo-browser-active-image"
+                  src={selectedPlaceActivePhotoUrl}
+                  alt={`${selectedPlace.name} photo ${photoBrowserActiveIndex + 1}`}
+                />
+
+                <button
+                  type="button"
+                  data-testid="explorer-photo-browser-next"
+                  className="explorer-photo-browser-nav explorer-photo-browser-nav-next"
+                  onClick={showNextPhoto}
+                  aria-label="Next photo"
+                >
+                  ›
+                </button>
+              </div>
+            </section>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
+
+const normalizePhotoIndex = (index: number, totalPhotos: number): number => {
+  if (totalPhotos <= 0) {
+    return 0
+  }
+
+  const normalized = index % totalPhotos
+  return normalized < 0 ? normalized + totalPhotos : normalized
+}
+
+const getFocusableElements = (container: HTMLElement): HTMLElement[] =>
+  Array.from(container.querySelectorAll<HTMLElement>(PHOTO_BROWSER_FOCUSABLE_SELECTOR))
+    .filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true')
 
 interface PlaceMarkerControllerProps {
   places: Place[]
@@ -1704,8 +1962,8 @@ function PlaceMarkerController({
     clustererRef.current = clusterer
     emitClusterDebugSnapshot()
 
-    const clickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
-      if (event.latLng) {
+    const clickListener = map.addListener('click', (event: google.maps.MapMouseEvent | undefined) => {
+      if (event?.latLng) {
         onMapBackgroundClickRef.current({
           lat: event.latLng.lat(),
           lng: event.latLng.lng(),

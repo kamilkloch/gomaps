@@ -57,14 +57,12 @@ test.describe('explorer detail panel and formatting story-boards', () => {
     await expect(page.getByTestId('explorer-detail-amenities')).toContainText('Pool')
     await expect(page.getByTestId('explorer-detail-amenities')).toContainText('WiFi')
     await expect(page.getByTestId('explorer-detail-amenities')).toContainText('Parking')
-    await expect(page.getByTestId('explorer-detail-photos').getByTestId('explorer-detail-photo-0')).toHaveAttribute(
-      'href',
-      'https://example.com/photo-a.jpg',
-    )
-    await expect(page.getByTestId('explorer-detail-photos').getByTestId('explorer-detail-photo-1')).toHaveAttribute(
-      'href',
-      'https://example.com/photo-b.jpg',
-    )
+    await expect(
+      page.getByTestId('explorer-detail-photos').getByTestId('explorer-detail-photo-0').locator('img'),
+    ).toHaveAttribute('src', 'https://example.com/photo-a.jpg')
+    await expect(
+      page.getByTestId('explorer-detail-photos').getByTestId('explorer-detail-photo-1').locator('img'),
+    ).toHaveAttribute('src', 'https://example.com/photo-b.jpg')
     await expect(page.getByTestId('explorer-detail-action-open-google-maps')).toHaveAttribute(
       'href',
       'https://maps.google.com/?cid=detail-rich-place',
@@ -92,6 +90,71 @@ test.describe('explorer detail panel and formatting story-boards', () => {
     await expect(page.getByTestId('explorer-detail-opening-hours')).toContainText('Mon-Sun 08:00-22:00')
     await expect(page.getByTestId('explorer-detail-scraped-at')).toContainText('Scraped at:')
     await captureStepScreenshot(page, testInfo, 'explorer-detail-full-after-selection')
+  })
+
+  test('fullscreen photo browser supports split layout, keyboard navigation, and focus return', async ({ page, request }, testInfo) => {
+    const seeded = await seedFixtures(request, {
+      project: {
+        name: 'Explorer Photo Browser',
+        bounds: JSON.stringify({ sw: { lat: 40.0, lng: 9.0 }, ne: { lat: 40.5, lng: 9.5 } }),
+      },
+      places: [
+        {
+          id: 'detail-photo-place',
+          googleMapsUri: 'https://maps.google.com/?cid=detail-photo-place',
+          googleMapsPhotosUri: 'https://maps.google.com/?cid=detail-photo-place&view=photos',
+          name: 'Gallery Test Stay',
+          category: 'Vacation rental',
+          rating: 4.6,
+          reviewCount: 88,
+          lat: 40.12,
+          lng: 9.11,
+          photoUrls: [
+            'https://example.com/photo-a.jpg',
+            'https://example.com/photo-b.jpg',
+            'https://example.com/photo-c.jpg',
+          ],
+        },
+      ],
+    })
+
+    const explorerPage = createExplorerPage(page)
+    await explorerPage.goto(seeded.projectId)
+    await explorerPage.clickRow('detail-photo-place')
+
+    const triggerPhoto = page.getByTestId('explorer-detail-photo-1')
+    await triggerPhoto.focus()
+    await expect(triggerPhoto).toBeFocused()
+    await triggerPhoto.press('Enter')
+
+    const overlay = page.getByTestId('explorer-photo-browser-overlay')
+    await expect(overlay).toBeVisible()
+    await expect(page.getByTestId('explorer-photo-browser-thumbnails')).toBeVisible()
+    await expect(page.getByTestId('explorer-photo-browser-main')).toBeVisible()
+    await expect(page.getByTestId('explorer-photo-browser-thumbnail-0')).toBeVisible()
+    await expect(page.getByTestId('explorer-photo-browser-thumbnail-1')).toHaveClass(/is-active/)
+    await expect(page.getByTestId('explorer-photo-browser-thumbnail-2')).toBeVisible()
+    await expect(page.getByTestId('explorer-photo-browser-active-image')).toHaveAttribute(
+      'src',
+      'https://example.com/photo-b.jpg',
+    )
+
+    await page.getByTestId('explorer-photo-browser-next').click()
+    await expect(page.getByTestId('explorer-photo-browser-active-image')).toHaveAttribute(
+      'src',
+      'https://example.com/photo-c.jpg',
+    )
+
+    await page.keyboard.press('ArrowLeft')
+    await expect(page.getByTestId('explorer-photo-browser-active-image')).toHaveAttribute(
+      'src',
+      'https://example.com/photo-b.jpg',
+    )
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('explorer-photo-browser-overlay')).toHaveCount(0)
+    await expect(triggerPhoto).toBeFocused()
+    await captureStepScreenshot(page, testInfo, 'explorer-photo-browser-overlay')
   })
 
   test('external search actions stay hidden when selected place has no search context', async ({ page, request }, testInfo) => {

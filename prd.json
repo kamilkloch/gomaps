@@ -678,6 +678,27 @@
       "priority": -2,
       "passes": true,
       "notes": "Completed with `client/e2e/tests/error-resilience.spec.ts` covering API 500 handling (Projects/Explorer/Setup start), deferred-route bounds save timeout UI, cross-project place isolation, concurrent run switching on Setup, cascading delete verification via API, favorite toggle-off regression, and Explorer sort stability/direction toggle assertions."
+    },
+    {
+      "id": "US-029",
+      "title": "Explorer fullscreen photo browser (Google Maps-style split layout)",
+      "description": "Upgrade Explorer detail-panel photo browsing from new-tab links to an in-app fullscreen overlay. The overlay should use a Google Maps-like split layout with a vertical thumbnail rail on the left and the active large photo on the right, while preserving a clear escape path to external Google Maps photos when needed.",
+      "acceptanceCriteria": [
+        "Clicking any detail-panel photo opens a fullscreen modal overlay instead of a new browser tab",
+        "Overlay layout uses two panes: left vertical thumbnail strip, right active photo viewport",
+        "Thumbnail strip supports scrolling for larger photo sets and highlights the active thumbnail",
+        "Selecting a thumbnail updates the active photo immediately",
+        "Keyboard navigation works in overlay: ArrowLeft/ArrowRight changes photo, Escape closes overlay",
+        "Pointer controls exist in overlay for previous/next photo navigation (left/right arrows)",
+        "Focus is trapped while modal is open and returns to the triggering thumbnail when closed",
+        "Existing external action button 'View photos on Google Maps' remains available and unchanged",
+        "Add stable test IDs for overlay root, active image, thumbnail list/items, and nav controls",
+        "Add/extend Playwright coverage to assert open/close behavior, split layout rendering, thumbnail selection sync, keyboard navigation, and focus return behavior",
+        "Run and pass: npm run typecheck --workspace=client, npm test --workspace=client, npm run test:e2e"
+      ],
+      "priority": -9,
+      "passes": true,
+      "notes": "Implemented in Explorer detail panel: fullscreen photo browser overlay with Google Maps-style split layout (left thumbnail rail, right active image), keyboard navigation (ArrowLeft/ArrowRight/Escape), focus trap + focus return, modal test ids, and Playwright coverage in explorer-detail.spec.ts."
     }
   ]
 }

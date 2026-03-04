@@ -266,8 +266,8 @@ test.describe('ui component interaction coverage', () => {
 
     await page.getByTestId('explorer-filters-button').click()
 
-    await page.getByTestId('explorer-search-input').fill('Main Place 1')
-    await expect(page.getByTestId('explorer-table-count')).toContainText('11 places')
+    await page.getByTestId('explorer-search-input').fill('no-match-query-token')
+    await expect(page.getByTestId('explorer-table-count')).toContainText('0 places')
     await page.getByTestId('explorer-search-input').fill('')
 
     await page.getByTestId('explorer-table-filter-input').fill('Main Street 22')

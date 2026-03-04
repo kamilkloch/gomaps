@@ -897,10 +897,18 @@ a {
   overflow: hidden;
   background: #0f1c2f;
   text-decoration: none;
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
 }
 
 .explorer-detail-photo-link:hover {
   border-color: #5f83ad;
+}
+
+.explorer-detail-photo-link:focus-visible {
+  outline: 2px solid #6db2ff;
+  outline-offset: 1px;
 }
 
 .explorer-detail-photo-link img {
@@ -908,6 +916,174 @@ a {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.explorer-photo-browser-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2400;
+  background: rgba(6, 12, 21, 0.92);
+  backdrop-filter: blur(2px);
+  padding: 1rem;
+}
+
+.explorer-photo-browser-dialog {
+  margin: 0 auto;
+  width: min(1320px, 100%);
+  height: 100%;
+  max-height: calc(100vh - 2rem);
+  border-radius: 1rem;
+  border: 1px solid #284261;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr);
+  background: #050d19;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+
+.explorer-photo-browser-thumbnails {
+  border-right: 1px solid #1d314a;
+  background: linear-gradient(180deg, #0c1828, #081220);
+  padding: 0.75rem 0.55rem;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+}
+
+.explorer-photo-browser-thumbnail {
+  border: 1px solid #3f5b80;
+  border-radius: 0.6rem;
+  padding: 0;
+  overflow: hidden;
+  background: #102035;
+  cursor: pointer;
+  appearance: none;
+}
+
+.explorer-photo-browser-thumbnail img {
+  width: 100%;
+  height: 72px;
+  object-fit: cover;
+  display: block;
+}
+
+.explorer-photo-browser-thumbnail:hover {
+  border-color: #6d9dd3;
+}
+
+.explorer-photo-browser-thumbnail:focus-visible {
+  outline: 2px solid #7ab4ff;
+  outline-offset: 1px;
+}
+
+.explorer-photo-browser-thumbnail.is-active {
+  border-color: #8dc1ff;
+  box-shadow: 0 0 0 2px rgba(86, 154, 236, 0.45);
+}
+
+.explorer-photo-browser-main {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  background: radial-gradient(circle at top, #10213b, #070f1d 68%);
+}
+
+.explorer-photo-browser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid #223a57;
+  background: rgba(8, 18, 32, 0.85);
+}
+
+.explorer-photo-browser-place-name {
+  margin: 0;
+  color: #dfecff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorer-photo-browser-position {
+  margin-left: auto;
+  color: #adc7e7;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.explorer-photo-browser-close {
+  border: 1px solid #5f83ad;
+  border-radius: 0.55rem;
+  background: #1d3453;
+  color: #e9f2ff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.34rem 0.6rem;
+  cursor: pointer;
+}
+
+.explorer-photo-browser-close:hover {
+  filter: brightness(1.1);
+}
+
+.explorer-photo-browser-close:focus-visible {
+  outline: 2px solid #7cb7ff;
+  outline-offset: 2px;
+}
+
+.explorer-photo-browser-frame {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem 3.8rem;
+}
+
+.explorer-photo-browser-active-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 0.7rem;
+}
+
+.explorer-photo-browser-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  border: 1px solid #5d7ea8;
+  background: rgba(12, 24, 42, 0.84);
+  color: #e8f2ff;
+  font-size: 1.7rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.explorer-photo-browser-nav:hover {
+  filter: brightness(1.12);
+}
+
+.explorer-photo-browser-nav:focus-visible {
+  outline: 2px solid #7cb7ff;
+  outline-offset: 2px;
+}
+
+.explorer-photo-browser-nav-prev {
+  left: 0.85rem;
+}
+
+.explorer-photo-browser-nav-next {
+  right: 0.85rem;
 }
 
 .explorer-detail-accordion {
@@ -1782,6 +1958,37 @@ a {
       'detail'
       'table';
     min-height: auto;
+  }
+
+  .explorer-photo-browser-overlay {
+    padding: 0.4rem;
+  }
+
+  .explorer-photo-browser-dialog {
+    max-height: calc(100vh - 0.8rem);
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+
+  .explorer-photo-browser-thumbnail img {
+    height: 64px;
+  }
+
+  .explorer-photo-browser-frame {
+    padding: 1rem 2.7rem;
+  }
+
+  .explorer-photo-browser-nav {
+    width: 2.2rem;
+    height: 2.2rem;
+    font-size: 1.45rem;
+  }
+
+  .explorer-photo-browser-nav-prev {
+    left: 0.45rem;
+  }
+
+  .explorer-photo-browser-nav-next {
+    right: 0.45rem;
   }
 }
 
