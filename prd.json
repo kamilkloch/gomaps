@@ -680,6 +680,23 @@
       "notes": "Completed with `client/e2e/tests/error-resilience.spec.ts` covering API 500 handling (Projects/Explorer/Setup start), deferred-route bounds save timeout UI, cross-project place isolation, concurrent run switching on Setup, cascading delete verification via API, favorite toggle-off regression, and Explorer sort stability/direction toggle assertions."
     },
     {
+      "id": "US-E2E-08",
+      "title": "Playwright harness hardening and deterministic test mechanics",
+      "description": "Harden the Playwright harness and opt-in live smoke coverage so the suite fails loudly on ambiguity and remains deterministic. Touch `client/tsconfig*.json`, `client/package.json`, `client/e2e/utils/{locators,waiters,test-backdoor}.ts`, `client/e2e/tests/{explorer-detail,explorer-map-sync,ui-components,live-scrape}.spec.ts`, and related Playwright guidance docs.",
+      "acceptanceCriteria": [
+        "Client typecheck covers `client/e2e/**/*.ts` via a dedicated tsconfig or equivalent wiring, and the current E2E compile errors are resolved",
+        "Shared locator helpers preserve Playwright strictness: ambiguous `getByTestId`/role/text matches fail instead of silently using `.first()`",
+        "Shared Playwright wait utilities and page objects stop defaulting to `waitForLoadState('networkidle')` for Projects/Explorer/Setup flows and use stable UI-state waits instead",
+        "Map interaction assertions fail loudly when deterministic debug hooks or map-center helpers are unavailable; no catch block may silently skip the only proof of movement or selection",
+        "The opt-in live scrape migration test no longer depends on the host `sqlite3` CLI and no longer chooses ports via `Math.random()` range guessing",
+        "Playwright hard requirements are codified in `AGENTS.md` and `prompt.md` for future stories",
+        "Run and pass: npm run typecheck --workspace=client, npm run test:e2e --workspace=client"
+      ],
+      "priority": -10,
+      "passes": false,
+      "notes": "Follow-up to the 2026-03-06 Playwright suite review findings. Execute before further Playwright suite expansion or harness refactors."
+    },
+    {
       "id": "US-029",
       "title": "Explorer fullscreen photo browser (Google Maps-style split layout)",
       "description": "Upgrade Explorer detail-panel photo browsing from new-tab links to an in-app fullscreen overlay. The overlay should use a Google Maps-like split layout with a vertical thumbnail rail on the left and the active large photo on the right, while preserving a clear escape path to external Google Maps photos when needed.",

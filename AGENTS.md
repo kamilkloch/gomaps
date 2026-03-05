@@ -156,7 +156,7 @@ Do NOT use XPath or fragile CSS selectors (e.g., `div > span:nth-child(2)`). You
 
 React batches state updates. You must never assume an action resolves instantly.
 * **Never use hardcoded sleeps** (e.g., `page.waitForTimeout(5000)`).
-* **Wait for state:** After clicking or typing, wait for the specific visual change to appear in the DOM using `await expect(locator).toBeVisible()` or wait for the network to settle using `await page.waitForLoadState('networkidle')`.
+* **Wait for state:** After clicking or typing, wait for the specific visual change to appear in the DOM using `await expect(locator).toBeVisible()`, explicit response waits, or deterministic E2E debug state. Do not default to `await page.waitForLoadState('networkidle')` on pages with Google Maps, SSE, or other background traffic.
 * **Pending-request states:** To verify temporary loading copy (e.g., "Saving bounds…"), hold the matching `page.route()` response behind a deferred promise, assert the loading UI, then resolve the request.
 
 
@@ -174,10 +174,14 @@ Always execute interactions from a clean state. Ensure you are resetting the bro
 ### 5. E2E Test Harness Pattern
 
 - Keep Playwright helpers under `client/e2e/` with shared fixtures/utilities/page objects (`fixtures/`, `utils/`, `pages/`, `tests/`) so future stories reuse the same stability primitives.
+- Keep Playwright TypeScript covered by the client typecheck via a dedicated tsconfig or equivalent wiring; do not let `client/e2e/**` drift outside `npm run typecheck --workspace=client`.
 - For deterministic UI-flow coverage, prefer a single stateful `page.route('**/api/**', ...)` mock per test and mutate in-memory fixtures instead of relying on live backend/external API behavior.
 - For backend-integration e2e coverage, run server in `E2E_TEST_MODE=1` and reset SQLite state before each test via `POST /api/test/reset-db`; this endpoint must stay disabled outside test mode.
 - In `client/playwright.config.ts`, load root `.env` values before defining web servers so `VITE_GOOGLE_MAPS_API_KEY`/`GOOGLE_MAPS_API_KEY` are available consistently in local and CI-style runs.
-- Avoid `waitForLoadState('networkidle')` on pages that keep long-lived requests open (e.g., SSE progress streams in Setup); prefer waiting on stable UI locators/state changes.
+- Shared locator helpers must preserve strict locator behavior; do not mask duplicate matches in reusable helpers by returning `.first()`.
+- Avoid `waitForLoadState('networkidle')` as a default on map-heavy or SSE-driven pages; prefer waiting on stable UI locators/state changes, targeted responses, or deterministic debug snapshots.
 - Setup page map diagnostics can be forced in Playwright-only mode (`VITE_E2E_TEST_MODE=1`) via `?e2eMapDiagnostic=api-key-error|init-timeout|tiles-timeout`; tile-overlay style/status assertions can read the hidden `setup-tile-overlay-debug` JSON snapshot.
 - For Explorer map marker assertions in Playwright, prefer the hidden `explorer-marker-debug` JSON snapshot (enabled only in `VITE_E2E_TEST_MODE=1`) instead of brittle Google Maps internal DOM hooks.
 - For Explorer map interaction + clustering assertions in Playwright, use the E2E-only hooks exposed in test mode: `explorer-cluster-debug`, `explorer-selection-circle-debug`, and `window.__gomapsExplorerDebug` (marker-click/map-click/zoom actions).
+- If a test relies on Playwright-only debug hooks or snapshots, missing hooks are failures; do not swallow the only assertion proving movement, selection, or clustering.
+- Live Playwright tests must remain opt-in and should not depend on host-only CLI tools or random port guessing when repo-managed Node helpers can provide the same setup.
