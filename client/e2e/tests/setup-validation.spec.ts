@@ -233,7 +233,7 @@ test.describe('setup page validation, estimates, and chrome story boards', () =>
       endYRatio: 0.61,
     })
     await expect.poll(() => saveRequestCount).toBe(1)
-    await expect(page.getByTestId('setup-status-copy')).toHaveText('Saving bounds…')
+    await expect(page.getByTestId('setup-status-saving')).toHaveText('Saving bounds…')
     expect(didDetectOverlappingSaves).toBe(false)
     const releaseFirstSave = pendingSaveResolvers.shift()
     if (!releaseFirstSave) {
@@ -250,7 +250,7 @@ test.describe('setup page validation, estimates, and chrome story boards', () =>
       endYRatio: 0.75,
     })
     await expect.poll(() => saveRequestCount).toBe(2)
-    await expect(page.getByTestId('setup-status-copy')).toHaveText('Saving bounds…')
+    await expect(page.getByTestId('setup-status-saving')).toHaveText('Saving bounds…')
     expect(didDetectOverlappingSaves).toBe(false)
     const releaseSecondSave = pendingSaveResolvers.shift()
     if (!releaseSecondSave) {
@@ -322,7 +322,7 @@ test.describe('setup page validation, estimates, and chrome story boards', () =>
 
     await moveSelectionRectangleOnGoogleMap(page, 'setup-map-shell')
     await expect.poll(() => saveRequestCount).toBe(1)
-    await expect(page.getByTestId('setup-status-copy')).toHaveText('Saving bounds…')
+    await expect(page.getByTestId('setup-status-saving')).toHaveText('Saving bounds…')
     expect(didDetectOverlappingSaves).toBe(false)
     const releaseMoveSave = pendingSaveResolvers.shift()
     if (!releaseMoveSave) {
@@ -330,7 +330,7 @@ test.describe('setup page validation, estimates, and chrome story boards', () =>
     }
     releaseMoveSave()
     await expect(page.getByTestId('setup-status-copy')).toContainText('Selection saved to project.')
-    expect(saveRequestCount).toBe(1)
+    await expect.poll(() => saveRequestCount, { timeout: 1_200 }).toBe(1)
 
     await captureStepScreenshot(page, testInfo, 'setup-move-stability')
   })

@@ -127,7 +127,7 @@ test.describe('error handling, data isolation, and resilience story-boards', () 
     await expect(page.getByTestId('setup-status-copy')).toContainText('Selection saved to project.')
 
     await page.getByTestId('setup-clear-area-button').click()
-    await expect(page.getByTestId('setup-status-copy')).toHaveText('Saving bounds…')
+    await expect(page.getByTestId('setup-status-saving')).toHaveText('Saving bounds…')
     await captureStepScreenshot(page, testInfo, 'resilience-setup-saving-bounds')
 
     pendingSave.resolve()

@@ -541,15 +541,13 @@ export function SetupPage() {
     ? estimateRemaining(progress)
     : null
   const displayElapsedMs = clientElapsedMs ?? progress?.elapsedMs ?? 0
-  const statusCopy = isSaving
-    ? 'Saving bounds…'
-    : selectionBounds
-      ? mapInteractionMode === 'select'
-        ? 'Selection saved to project. Select mode: drag on map to redraw, or drag handles to fine-tune.'
-        : 'Selection saved to project. Pan mode: move/zoom map. Switch to Select mode to adjust area.'
-      : mapInteractionMode === 'select'
-        ? 'No area selected yet. Select mode: drag on map to draw your scrape area.'
-        : 'No area selected yet. Pan mode: move/zoom map, then switch to Select mode to draw an area.'
+  const statusCopy = selectionBounds
+    ? mapInteractionMode === 'select'
+      ? 'Selection saved to project. Select mode: drag on map to redraw, or drag handles to fine-tune.'
+      : 'Selection saved to project. Pan mode: move/zoom map. Switch to Select mode to adjust area.'
+    : mapInteractionMode === 'select'
+      ? 'No area selected yet. Select mode: drag on map to draw your scrape area.'
+      : 'No area selected yet. Pan mode: move/zoom map, then switch to Select mode to draw an area.'
 
   return (
     <main className="setup-page" data-testid="setup-page">
@@ -675,7 +673,15 @@ export function SetupPage() {
           <p>Use map controls to switch between Pan and Select mode. In Select mode, drag to draw a new rectangle or adjust the existing one.</p>
 
           <p className="setup-status" data-testid="setup-status-copy">
-            {statusCopy}
+            <span data-testid="setup-status-primary">{statusCopy}</span>
+            <span
+              data-testid="setup-status-saving"
+              className={`setup-status-saving ${isSaving ? 'is-visible' : ''}`}
+              aria-live="polite"
+              role="status"
+            >
+              {isSaving ? 'Saving bounds…' : ''}
+            </span>
           </p>
 
           <div className="setup-query-block">

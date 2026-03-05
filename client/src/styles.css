@@ -454,6 +454,18 @@ a {
   margin-top: 0.9rem;
   font-size: 0.82rem;
   color: #b8d3f4;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.setup-status-saving {
+  min-height: 1rem;
+  color: #7eb6ff;
+  opacity: 0;
+}
+
+.setup-status-saving.is-visible {
+  opacity: 1;
 }
 
 .setup-query-block,
