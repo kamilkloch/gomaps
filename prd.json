@@ -693,8 +693,8 @@
         "Run and pass: npm run typecheck --workspace=client, npm run test:e2e --workspace=client"
       ],
       "priority": -10,
-      "passes": false,
-      "notes": "Follow-up to the 2026-03-06 Playwright suite review findings. Execute before further Playwright suite expansion or harness refactors."
+      "passes": true,
+      "notes": "Completed by wiring client typecheck through `client/tsconfig.e2e.json`, hardening shared Playwright locator/wait/debug helpers, replacing live-smoke host `sqlite3` + random-port dependencies with repo-managed Node helpers and OS-assigned ports, and codifying the rules in `AGENTS.md` + `prompt.md`."
     },
     {
       "id": "US-029",

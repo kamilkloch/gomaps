@@ -4,6 +4,7 @@ import { createSetupPage } from '../pages/setup-page'
 import { captureStepScreenshot } from '../utils/screenshots'
 import { seedFixtures } from '../utils/test-backdoor'
 import { expectGoogleMapHasContent, expectGoogleMapRendered, getGoogleMapCenter, panGoogleMap } from '../utils/waiters'
+import type { Page } from '@playwright/test'
 
 const mapsKeyForE2E = (process.env.VITE_GOOGLE_MAPS_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY ?? '').trim()
 const shouldRequireInteractiveMaps = mapsKeyForE2E.length > 0
@@ -154,7 +155,6 @@ test.describe('ui component interaction coverage', () => {
       await expectGoogleMapHasContent(page, 'setup-map-shell')
       await setupPage.selectArea()
       await expect(page.getByTestId('setup-coordinates-pill')).toBeVisible()
-      const firstCoordinates = await page.getByTestId('setup-coordinates-pill').textContent()
 
       await panGoogleMap(page, 'setup-map-shell')
       await setupPage.selectArea()
@@ -246,22 +246,14 @@ test.describe('ui component interaction coverage', () => {
     }
     if (mapMode === 'interactive') {
       await expectGoogleMapHasContent(page, 'explorer-map-panel')
-      let centerBefore: { lat: number; lng: number } | null = null
-      try {
-        centerBefore = await getGoogleMapCenter(page, 'explorer-map-panel')
-      }
-      catch {
-        centerBefore = null
-      }
+      const centerBefore = await getGoogleMapCenter(page, 'explorer-map-panel')
 
       await panGoogleMap(page, 'explorer-map-panel')
-
-      if (centerBefore) {
+      await panExplorerMapBy(page, 180, 120)
+      await expect.poll(async () => {
         const centerAfter = await getGoogleMapCenter(page, 'explorer-map-panel')
-        expect(
-          Math.abs(centerAfter.lat - centerBefore.lat) + Math.abs(centerAfter.lng - centerBefore.lng),
-        ).toBeGreaterThan(0.0001)
-      }
+        return Math.abs(centerAfter.lat - centerBefore.lat) + Math.abs(centerAfter.lng - centerBefore.lng)
+      }).toBeGreaterThan(0.0001)
     }
 
     await page.getByTestId('explorer-filters-button').click()
@@ -321,3 +313,26 @@ test.describe('ui component interaction coverage', () => {
     await expect(page.getByTestId('settings-page')).toBeVisible()
   })
 })
+
+async function panExplorerMapBy(page: Page, x: number, y: number): Promise<void> {
+  const didPan = await page.evaluate(
+    ({ deltaX, deltaY }: { deltaX: number; deltaY: number }) => {
+      const debugController = (
+        window as typeof window & {
+          __gomapsExplorerDebug?: {
+            panBy?: (xPixels: number, yPixels: number) => boolean
+          }
+        }
+      ).__gomapsExplorerDebug
+
+      if (typeof debugController?.panBy !== 'function') {
+        throw new Error('window.__gomapsExplorerDebug.panBy is not available.')
+      }
+
+      return debugController.panBy(deltaX, deltaY)
+    },
+    { deltaX: x, deltaY: y },
+  )
+
+  expect(didPan).toBe(true)
+}

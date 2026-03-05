@@ -24,6 +24,7 @@ interface SeedFixturesPayload {
   places?: Array<{
     id: string
     googleMapsUri: string
+    googleMapsPhotosUri?: string
     name: string
     lat: number
     lng: number

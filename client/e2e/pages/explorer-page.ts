@@ -1,5 +1,5 @@
 import { resolveLocator } from '../utils/locators'
-import { waitForNetworkIdle, waitForVisible } from '../utils/waiters'
+import { waitForExplorerPageReady, waitForVisible } from '../utils/waiters'
 import type { Locator, Page } from '@playwright/test'
 
 class ExplorerPageObject {
@@ -7,7 +7,7 @@ class ExplorerPageObject {
 
   async goto(projectId: string): Promise<void> {
     await this.page.goto(`/projects/${projectId}/explorer`)
-    await waitForNetworkIdle(this.page)
+    await waitForExplorerPageReady(this.page)
   }
 
   async root(): Promise<Locator> {
@@ -39,7 +39,7 @@ class ExplorerPageObject {
       defectLabel: 'Explorer project selector',
     })
     await selector.selectOption(projectId)
-    await waitForNetworkIdle(this.page)
+    await waitForExplorerPageReady(this.page)
   }
 
   async clickRow(placeId: string): Promise<void> {

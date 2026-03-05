@@ -1,6 +1,6 @@
 import { resolveLocator } from '../utils/locators'
 import { expect } from '../fixtures/base'
-import { waitForNetworkIdle, waitForVisible } from '../utils/waiters'
+import { waitForProjectsPageReady, waitForSetupPageReady, waitForVisible } from '../utils/waiters'
 import type { Locator, Page } from '@playwright/test'
 
 class ProjectsPageObject {
@@ -8,7 +8,7 @@ class ProjectsPageObject {
 
   async goto(): Promise<void> {
     await this.page.goto('/')
-    await waitForNetworkIdle(this.page)
+    await waitForProjectsPageReady(this.page)
   }
 
   async root(): Promise<Locator> {
@@ -75,7 +75,7 @@ class ProjectsPageObject {
     await submitButton.click()
     const createResponse = await createResponsePromise
     expect(createResponse.status(), 'project creation API should return 201').toBe(201)
-    await waitForNetworkIdle(this.page)
+    await waitForProjectsPageReady(this.page)
 
     const projectsError = this.page.getByTestId('projects-error')
     await expect(projectsError).toHaveCount(0)
@@ -98,7 +98,7 @@ class ProjectsPageObject {
       defectLabel: `Project card heading for ${name}`,
     })
     await heading.click()
-    await waitForNetworkIdle(this.page)
+    await waitForSetupPageReady(this.page)
   }
 
   async deleteProject(projectId: string): Promise<void> {
@@ -106,7 +106,7 @@ class ProjectsPageObject {
     const deleteButton = this.page.getByTestId(`project-delete-${projectId}`)
     await waitForVisible(deleteButton)
     await deleteButton.click()
-    await waitForNetworkIdle(this.page)
+    await expect(this.page.getByTestId(`project-card-${projectId}`)).toHaveCount(0)
   }
 }
 

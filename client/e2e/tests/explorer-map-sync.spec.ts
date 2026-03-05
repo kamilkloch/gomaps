@@ -36,6 +36,11 @@ interface ExplorerMapDebugController {
   setZoom?: (zoom: number) => boolean
 }
 
+interface MapDebugActionResult {
+  ok: boolean
+  reason: string | null
+}
+
 declare global {
   interface Window {
     __gomapsExplorerDebug?: ExplorerMapDebugController
@@ -91,9 +96,11 @@ test.describe('explorer map interaction and table-sync story-boards', () => {
     test.skip(mapMode !== 'interactive', 'Interactive map unavailable; skipping map interaction assertions.')
 
     await expectGoogleMapHasContent(page, 'explorer-map-panel')
+    await expect(page.getByTestId('explorer-marker-debug')).toHaveCount(1)
+    await expect(page.getByTestId('explorer-selection-circle-debug')).toHaveCount(1)
     await expect.poll(async () => (await readMarkerDebug(page)).length).toBe(3)
 
-    expect(await runMapDebugAction(page, 'clickMarker', 'map-sync-beta')).toBe(true)
+    await runMapDebugAction(page, 'clickMarker', 'map-sync-beta')
     await expect(page.getByTestId('explorer-row-map-sync-beta')).toHaveAttribute('data-selected', 'true')
     await expect(page.getByTestId('explorer-detail-name')).toHaveText('Map Sync Beta')
 
@@ -102,7 +109,7 @@ test.describe('explorer map interaction and table-sync story-boards', () => {
     await expect.poll(async () => (await readSelectionCircleDebug(page)).radius ?? 0).toBeGreaterThan(0)
     await captureStepScreenshot(page, testInfo, 'explorer-map-sync-after-marker-selection')
 
-    expect(await runMapDebugAction(page, 'clickMap')).toBe(true)
+    await runMapDebugAction(page, 'clickMap')
     await expect(page.locator('[data-testid^="explorer-row-"][data-selected="true"]')).toHaveCount(0)
     await expect(page.getByTestId('explorer-detail-panel')).toContainText('Select a marker to inspect place details.')
     await expect.poll(async () => (await readSelectionCircleDebug(page)).visible).toBe(false)
@@ -142,9 +149,11 @@ test.describe('explorer map interaction and table-sync story-boards', () => {
     test.skip(mapMode !== 'interactive', 'Interactive map unavailable; skipping clustering assertions.')
 
     await expectGoogleMapHasContent(page, 'explorer-map-panel')
+    await expect(page.getByTestId('explorer-marker-debug')).toHaveCount(1)
+    await expect(page.getByTestId('explorer-cluster-debug')).toHaveCount(1)
     await expect.poll(async () => (await readMarkerDebug(page)).length).toBe(240)
 
-    expect(await runMapDebugAction(page, 'setZoom', 5)).toBe(true)
+    await runMapDebugAction(page, 'setZoom', 5)
 
     await expect.poll(async () => (await readClusterDebug(page)).groupedClusterCount).toBeGreaterThan(0)
     await expect.poll(async () => (await readClusterDebug(page)).maxClusterSize).toBeGreaterThan(1)
@@ -199,6 +208,7 @@ test.describe('explorer map interaction and table-sync story-boards', () => {
     test.skip(mapMode !== 'interactive', 'Interactive map unavailable; skipping map/table filter assertions.')
 
     await expectGoogleMapHasContent(page, 'explorer-map-panel')
+    await expect(page.getByTestId('explorer-marker-debug')).toHaveCount(1)
     await expect.poll(async () => (await readMarkerDebug(page)).length).toBe(25)
 
     await explorerPage.search('Harbor')
@@ -218,56 +228,72 @@ test.describe('explorer map interaction and table-sync story-boards', () => {
 })
 
 async function readMarkerDebug(page: Page): Promise<MarkerDebugEntry[]> {
-  return readDebugSnapshot(page, 'explorer-marker-debug', [])
+  return readDebugSnapshot(page, 'explorer-marker-debug')
 }
 
 async function readClusterDebug(page: Page): Promise<ClusterDebugSnapshot> {
-  return readDebugSnapshot(page, 'explorer-cluster-debug', {
-    totalClusters: 0,
-    groupedClusterCount: 0,
-    clusterLabels: [],
-    maxClusterSize: 0,
-  })
+  return readDebugSnapshot(page, 'explorer-cluster-debug')
 }
 
 async function readSelectionCircleDebug(page: Page): Promise<SelectionCircleDebugSnapshot> {
-  return readDebugSnapshot(page, 'explorer-selection-circle-debug', {
-    visible: false,
-    placeId: null,
-    center: null,
-    radius: null,
-  })
+  return readDebugSnapshot(page, 'explorer-selection-circle-debug')
 }
 
-async function readDebugSnapshot<T>(page: Page, testId: string, fallback: T): Promise<T> {
-  const raw = await page.getByTestId(testId).textContent()
-  if (!raw) {
-    return fallback
+async function readDebugSnapshot<T>(page: Page, testId: string): Promise<T> {
+  const snapshot = page.getByTestId(testId)
+  await expect(snapshot, `Missing required Explorer debug snapshot "${testId}".`).toHaveCount(1)
+
+  const raw = await snapshot.textContent()
+  if (!raw?.trim()) {
+    throw new Error(`Explorer debug snapshot "${testId}" is empty.`)
   }
 
   try {
     return JSON.parse(raw) as T
   }
-  catch {
-    return fallback
+  catch (error) {
+    throw new Error(
+      `Explorer debug snapshot "${testId}" contained invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }
 
-async function runMapDebugAction(page: Page, action: 'clickMarker' | 'clickMap' | 'setZoom', ...args: unknown[]): Promise<boolean> {
-  return page.evaluate(
+async function runMapDebugAction(page: Page, action: 'clickMarker' | 'clickMap' | 'setZoom', ...args: unknown[]): Promise<void> {
+  const result = await page.evaluate<MapDebugActionResult, { actionName: 'clickMarker' | 'clickMap' | 'setZoom'; actionArgs: unknown[] }>(
     ({ actionName, actionArgs }) => {
       const debugController = window.__gomapsExplorerDebug
       if (!debugController) {
-        return false
+        return {
+          ok: false,
+          reason: 'window.__gomapsExplorerDebug is not available.',
+        }
       }
 
       const actionFn = debugController[actionName]
       if (typeof actionFn !== 'function') {
-        return false
+        return {
+          ok: false,
+          reason: `window.__gomapsExplorerDebug.${actionName} is not a function.`,
+        }
       }
 
-      return Boolean(actionFn(...actionArgs))
+      const actionResult = (actionFn as (...debugArgs: unknown[]) => boolean)(...actionArgs)
+      if (!actionResult) {
+        return {
+          ok: false,
+          reason: `window.__gomapsExplorerDebug.${actionName} returned a falsy result.`,
+        }
+      }
+
+      return {
+        ok: true,
+        reason: null,
+      }
     },
     { actionName: action, actionArgs: args },
   )
+
+  if (!result.ok) {
+    throw new Error(result.reason ?? `window.__gomapsExplorerDebug.${action} failed.`)
+  }
 }

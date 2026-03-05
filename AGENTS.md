@@ -184,4 +184,4 @@ Always execute interactions from a clean state. Ensure you are resetting the bro
 - For Explorer map marker assertions in Playwright, prefer the hidden `explorer-marker-debug` JSON snapshot (enabled only in `VITE_E2E_TEST_MODE=1`) instead of brittle Google Maps internal DOM hooks.
 - For Explorer map interaction + clustering assertions in Playwright, use the E2E-only hooks exposed in test mode: `explorer-cluster-debug`, `explorer-selection-circle-debug`, and `window.__gomapsExplorerDebug` (marker-click/map-click/zoom actions).
 - If a test relies on Playwright-only debug hooks or snapshots, missing hooks are failures; do not swallow the only assertion proving movement, selection, or clustering.
-- Live Playwright tests must remain opt-in and should not depend on host-only CLI tools or random port guessing when repo-managed Node helpers can provide the same setup.
+- Live Playwright tests must remain opt-in and should not depend on host-only CLI tools or random port guessing when repo-managed Node helpers or OS-assigned ephemeral ports can provide the same setup.

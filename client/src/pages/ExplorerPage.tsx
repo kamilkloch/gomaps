@@ -106,6 +106,8 @@ interface ExplorerE2EMapDebugController {
   clickMarker: (placeId: string) => boolean
   clickMap: () => boolean
   setZoom: (zoom: number) => boolean
+  panBy: (x: number, y: number) => boolean
+  getCenter: () => { lat: number; lng: number } | null
 }
 
 type ExplorerCategoryFilter = (typeof EXPLORER_CATEGORY_OPTIONS)[number]['id']
@@ -1918,6 +1920,29 @@ function PlaceMarkerController({
 
         map.setZoom(zoom)
         return true
+      },
+      panBy: (x: number, y: number) => {
+        if (!map || !Number.isFinite(x) || !Number.isFinite(y)) {
+          return false
+        }
+
+        map.panBy(x, y)
+        return true
+      },
+      getCenter: () => {
+        if (!map) {
+          return null
+        }
+
+        const center = map.getCenter()
+        if (!center) {
+          return null
+        }
+
+        return {
+          lat: center.lat(),
+          lng: center.lng(),
+        }
       },
     }
 

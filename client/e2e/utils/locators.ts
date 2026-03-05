@@ -9,23 +9,41 @@ interface LocatorOptions {
 }
 
 export async function resolveLocator(page: Page, options: LocatorOptions): Promise<Locator> {
-  const candidates: Locator[] = []
+  const candidates: Array<{ description: string; locator: Locator }> = []
 
   if (options.testId) {
-    candidates.push(page.getByTestId(options.testId))
+    candidates.push({
+      description: `data-testid="${options.testId}"`,
+      locator: page.getByTestId(options.testId),
+    })
   }
 
   if (options.role) {
-    candidates.push(page.getByRole(options.role, options.name ? { name: options.name } : undefined))
+    candidates.push({
+      description: options.name
+        ? `role="${options.role}" name=${String(options.name)}`
+        : `role="${options.role}"`,
+      locator: page.getByRole(options.role, options.name ? { name: options.name } : undefined),
+    })
   }
 
   if (options.text) {
-    candidates.push(page.getByText(options.text))
+    candidates.push({
+      description: `text=${String(options.text)}`,
+      locator: page.getByText(options.text),
+    })
   }
 
   for (const candidate of candidates) {
-    if (await candidate.count()) {
-      return candidate.first()
+    const count = await candidate.locator.count()
+    if (count === 1) {
+      return candidate.locator
+    }
+
+    if (count > 1) {
+      throw new Error(
+        `Accessibility / Testability Defect: locator for "${options.defectLabel}" matched ${count} elements via ${candidate.description}.`,
+      )
     }
   }
 

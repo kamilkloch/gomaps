@@ -38,10 +38,13 @@
 - **Playwright route matching:** For nested endpoint mocks (e.g., `/api/scrape/:runId/...`), use glob patterns like `**/api/scrape**` (not `**/api/scrape*`) and read methods via `route.request().method()` to avoid silently missing subpath requests.
 - **Playwright fixture seeding:** `POST /api/test/seed-fixtures` accepts optional `existingProjectId` to append runs/tiles/places onto an existing seeded project; use this to create mixed run histories for cross-view regressions.
 - **Playwright env loading:** Parse root `.env` in `client/playwright.config.ts` before web server startup so both `VITE_GOOGLE_MAPS_API_KEY` and `GOOGLE_MAPS_API_KEY` flow into client/server e2e processes consistently.
+- **Playwright E2E type coverage:** Keep `npm run typecheck --workspace=client` wired to a dedicated `client/tsconfig.e2e.json` (or equivalent) so Playwright specs, page objects, utilities, and `client/playwright.config.ts` compile under the normal client gate.
 - **Playwright waits on SSE pages:** Avoid `networkidle` waits on Setup-like pages with long-lived SSE requests; wait for deterministic UI locators/state transitions instead.
 - **Playwright pending-request UI assertions:** For loading-state copy tied to slow API responses (e.g., "Saving bounds…"), block the matching `page.route` fulfillment with a deferred promise, assert the temporary UI state, then resolve the request.
 - **Playwright map debug snapshots:** For map overlays/markers, expose Playwright-only hidden JSON snapshots (gated by `VITE_E2E_TEST_MODE`) and assert those snapshots instead of brittle `.gm-style` internals.
 - **Explorer map interaction E2E hooks:** For marker-click/map-click/zoom tests, expose a Playwright-only map controller (`window.__gomapsExplorerDebug`) plus hidden snapshots (`explorer-marker-debug`, `explorer-cluster-debug`, `explorer-selection-circle-debug`) instead of probing Google Maps DOM internals.
+- **Playwright helper strictness:** Shared locator/debug helpers should fail loudly on duplicate matches, missing controllers, or invalid debug JSON instead of returning `.first()` fallbacks or silent empty snapshots.
+- **Live Playwright migration setup:** For opt-in migration/live smoke tests, build legacy SQLite fixtures with repo-managed Node dependencies and reserve ports via OS-assigned ephemeral binds (`listen(0)`) instead of relying on host `sqlite3` or `Math.random()` guessing.
 - **SQLite timestamp ordering:** When listing rows by timestamp fields (`created_at`, etc.), add a deterministic tie-breaker (`rowid DESC`) so rapid same-second inserts keep stable ordering in UI tests and cards.
 - **Setup deep-link not-found handling:** For `/projects/:projectId/setup`, treat API `404` as a deterministic "Project not found." page state instead of generic load-error copy.
 - **Explorer keyboard row selection:** Make table rows focusable (`tabIndex={0}`) with Enter/Space selection handlers, and keep key map/table containers discoverable via named region labels for accessibility-first E2E locators.
@@ -590,4 +593,25 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - `npm test --workspace=client`
   - `npm run test:coverage`
   - `npm run test:e2e --workspace=client -- client/e2e/tests/explorer-detail.spec.ts --grep "stale indicators"`
+---
+
+## 2026-03-06 00:52:58 CET - US-E2E-08
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Wired `npm run typecheck --workspace=client` through a dedicated `client/tsconfig.e2e.json` so Playwright specs, helpers, page objects, and `client/playwright.config.ts` are typechecked with the app.
+- Hardened shared Playwright helpers: locator resolution now fails on ambiguity, page objects wait on stable Projects/Setup/Explorer UI state instead of `networkidle`, and debug snapshot/controller access fails loudly when required E2E hooks are missing.
+- Extended the Explorer E2E map controller with deterministic center/pan helpers and updated assertions to use explicit debug hooks instead of brittle Google Maps internals or silent catch/fallback paths.
+- Replaced the opt-in live scrape migration test's host `sqlite3` dependency and `Math.random()` port guessing with repo-managed `better-sqlite3` setup plus OS-assigned ephemeral port reservation.
+- Updated Playwright hard-requirement guidance in `AGENTS.md` and `prompt.md`.
+- Files changed: `AGENTS.md`, `prompt.md`, `client/package.json`, `client/tsconfig.e2e.json`, `client/e2e/pages/{projects-page,setup-page,explorer-page}.ts`, `client/e2e/utils/{locators,waiters,test-backdoor}.ts`, `client/e2e/tests/{explorer-map-sync,live-scrape,ui-components}.spec.ts`, `client/src/pages/ExplorerPage.tsx`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - Keep reusable Playwright helpers strict by default: ambiguous locator matches and missing debug hooks should fail fast instead of silently selecting the first match or fabricating fallback JSON.
+  - Page-object navigation helpers on map-heavy pages should wait on explicit UI readiness (`Loading …` copy cleared, stable counters visible) rather than `networkidle`, which is too noisy with Maps and SSE.
+  - When a live migration test needs SQLite setup or a free port, prefer repo-managed Node dependencies and OS-assigned ephemeral ports over host CLIs and guessed port ranges.
+  - Quality gates run:
+    - `npm run typecheck --workspace=server`
+    - `npm run typecheck --workspace=client`
+    - `npm test --workspace=server`
+    - `npm test --workspace=client`
+    - `npm run test:e2e --workspace=client`
+    - `npm run test:coverage`
 ---

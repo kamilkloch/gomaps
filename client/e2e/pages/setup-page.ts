@@ -1,5 +1,5 @@
 import { resolveLocator } from '../utils/locators'
-import { drawAreaOnGoogleMap, waitForVisible } from '../utils/waiters'
+import { drawAreaOnGoogleMap, waitForSetupPageReady, waitForVisible } from '../utils/waiters'
 import { expect } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
@@ -8,7 +8,7 @@ class SetupPageObject {
 
   async goto(projectId: string): Promise<void> {
     await this.page.goto(`/projects/${projectId}/setup`)
-    await waitForVisible(this.page.getByTestId('setup-page'))
+    await waitForSetupPageReady(this.page)
   }
 
   async root(): Promise<Locator> {

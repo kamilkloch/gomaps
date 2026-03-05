@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": ["playwright.config.ts", "e2e/**/*.ts"],
+  "exclude": ["e2e/test-results", "e2e/screenshots", "e2e/coverage"]
+}

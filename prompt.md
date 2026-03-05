@@ -58,7 +58,8 @@ If you discover a **reusable pattern**, add it to the `## Codebase Patterns` sec
 - Do not use `waitForLoadState('networkidle')` as the default synchronization strategy on pages with Google Maps, SSE, or other background traffic; wait for explicit UI state, targeted responses, or deterministic debug hooks instead
 - Shared locator helpers must preserve Playwright strictness; never use `.first()` or similar fallbacks to hide ambiguous matches in reusable helpers
 - If a test relies on Playwright-only debug hooks or snapshots, missing hooks are test failures; do not catch and ignore the only assertion proving a map interaction happened
-- Live or opt-in Playwright tests must not depend on host-only CLI tools or random port guessing when a repo-managed Node alternative can provide the same setup
+- Keep `npm run typecheck --workspace=client` wired to a dedicated Playwright tsconfig (or equivalent) so `client/e2e/**/*.ts` and `client/playwright.config.ts` stay inside the normal typecheck gate
+- Live or opt-in Playwright tests must not depend on host-only CLI tools or random port guessing when repo-managed Node helpers or OS-assigned ephemeral ports can provide the same setup
 
 ## Stop Condition
 

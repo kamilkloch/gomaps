@@ -3,8 +3,41 @@ import type { Locator, Page } from '@playwright/test'
 
 export type GoogleMapRenderMode = 'interactive' | 'fallback'
 
-export async function waitForNetworkIdle(page: Page): Promise<void> {
-  await page.waitForLoadState('networkidle')
+async function requireSingleLocator(locator: Locator, description: string): Promise<Locator> {
+  const count = await locator.count()
+  if (count !== 1) {
+    throw new Error(`Expected exactly 1 ${description}, found ${count}.`)
+  }
+
+  return locator
+}
+
+async function requireSingleMapLocator(
+  page: Page,
+  mapShellTestId: string,
+  selector: string,
+  description: string,
+): Promise<Locator> {
+  const mapShell = await requireSingleLocator(page.getByTestId(mapShellTestId), `map shell "${mapShellTestId}"`)
+  return requireSingleLocator(mapShell.locator(selector), `${description} inside "${mapShellTestId}"`)
+}
+
+export async function waitForProjectsPageReady(page: Page): Promise<void> {
+  const pageRoot = page.getByTestId('projects-page')
+  await expect(pageRoot).toBeVisible()
+  await expect(pageRoot.getByText('Loading projects…')).toHaveCount(0)
+}
+
+export async function waitForSetupPageReady(page: Page): Promise<void> {
+  const pageRoot = page.getByTestId('setup-page')
+  await expect(pageRoot).toBeVisible()
+  await expect(pageRoot.getByText('Loading setup…')).toHaveCount(0)
+}
+
+export async function waitForExplorerPageReady(page: Page): Promise<void> {
+  const pageRoot = page.getByTestId('explorer-page')
+  await expect(pageRoot).toBeVisible()
+  await expect(pageRoot.getByTestId('explorer-table-count')).not.toContainText('Loading places…')
 }
 
 export async function waitForVisible(locator: Locator): Promise<void> {
@@ -17,32 +50,49 @@ export async function expectGoogleMapRendered(
   fallbackTestId: string,
 ): Promise<GoogleMapRenderMode> {
   const fallback = page.getByTestId(fallbackTestId)
-  if (await fallback.count() && await fallback.first().isVisible()) {
-    await expect(fallback).toBeVisible()
-    return 'fallback'
-  }
+  const mapShell = await requireSingleLocator(page.getByTestId(mapShellTestId), `map shell "${mapShellTestId}"`)
+  let resolvedMode: GoogleMapRenderMode | null = null
 
-  const mapRoot = page.locator(`[data-testid="${mapShellTestId}"] .gm-style`).first()
-  try {
-    await expect(mapRoot).toBeVisible({ timeout: 20_000 })
-    return 'interactive'
-  }
-  catch {
-    return 'fallback'
-  }
+  await expect.poll(async () => {
+    const fallbackCount = await fallback.count()
+    if (fallbackCount > 1) {
+      throw new Error(`Expected at most one fallback map container "${fallbackTestId}", found ${fallbackCount}.`)
+    }
+
+    if (fallbackCount === 1 && await fallback.isVisible()) {
+      resolvedMode = 'fallback'
+      return 'resolved'
+    }
+
+    const mapRoot = mapShell.locator('.gm-style')
+    const mapRootCount = await mapRoot.count()
+    if (mapRootCount > 1) {
+      throw new Error(`Expected exactly 1 Google Maps root inside "${mapShellTestId}", found ${mapRootCount}.`)
+    }
+
+    if (mapRootCount === 1 && await mapRoot.isVisible()) {
+      resolvedMode = 'interactive'
+      return 'resolved'
+    }
+
+    return 'pending'
+  }, { timeout: 20_000 }).toBe('resolved')
+
+  return resolvedMode ?? 'fallback'
 }
 
 export async function expectGoogleMapHasContent(page: Page, mapShellTestId: string): Promise<void> {
   const mapShell = page.getByTestId(mapShellTestId)
-  const interactiveMap = mapShell.locator('.gm-style').first()
+  const interactiveMap = await requireSingleMapLocator(page, mapShellTestId, '.gm-style', 'Google Maps root')
   await expect(interactiveMap).toBeVisible({ timeout: 20_000 })
 
-  const renderedTileMedia = mapShell.locator('.gm-style img, .gm-style canvas').first()
-  await expect(renderedTileMedia).toBeVisible({ timeout: 20_000 })
+  const renderedTileMedia = mapShell.locator('.gm-style img, .gm-style canvas')
+  await expect.poll(async () => renderedTileMedia.count()).toBeGreaterThan(0)
+  await expect(renderedTileMedia.nth(0)).toBeVisible({ timeout: 20_000 })
 }
 
 export async function panGoogleMap(page: Page, mapShellTestId: string): Promise<void> {
-  const mapRoot = page.locator(`[data-testid="${mapShellTestId}"] .gm-style`).first()
+  const mapRoot = await requireSingleMapLocator(page, mapShellTestId, '.gm-style', 'Google Maps root')
   await expect(mapRoot).toBeVisible({ timeout: 20_000 })
 
   const bounds = await mapRoot.boundingBox()
@@ -73,7 +123,7 @@ export async function drawAreaOnGoogleMap(
   mapShellTestId: string,
   options: DrawAreaOnGoogleMapOptions = {},
 ): Promise<void> {
-  const mapRoot = page.locator(`[data-testid="${mapShellTestId}"] .gm-style`).first()
+  const mapRoot = await requireSingleMapLocator(page, mapShellTestId, '.gm-style', 'Google Maps root')
   await expect(mapRoot).toBeVisible({ timeout: 20_000 })
 
   const bounds = await mapRoot.boundingBox()
@@ -104,7 +154,7 @@ export async function moveSelectionRectangleOnGoogleMap(
   mapShellTestId: string,
   options: MoveSelectionRectangleOnGoogleMapOptions = {},
 ): Promise<void> {
-  const mapRoot = page.locator(`[data-testid="${mapShellTestId}"] .gm-style`).first()
+  const mapRoot = await requireSingleMapLocator(page, mapShellTestId, '.gm-style', 'Google Maps root')
   await expect(mapRoot).toBeVisible({ timeout: 20_000 })
 
   const bounds = await mapRoot.boundingBox()
@@ -128,6 +178,22 @@ export async function getGoogleMapCenter(
   mapShellTestId: string,
 ): Promise<{ lat: number; lng: number }> {
   return page.evaluate((testId) => {
+    const explorerDebugController = (
+      window as typeof window & {
+        __gomapsExplorerDebug?: {
+          getCenter?: () => { lat: number; lng: number } | null
+        }
+      }
+    ).__gomapsExplorerDebug
+    if (typeof explorerDebugController?.getCenter === 'function') {
+      const center = explorerDebugController.getCenter()
+      if (!center) {
+        throw new Error('Explorer debug controller did not return a map center.')
+      }
+
+      return center
+    }
+
     const shell = document.querySelector(`[data-testid="${testId}"]`)
     if (!shell) {
       throw new Error(`Map shell [data-testid="${testId}"] not found`)
@@ -138,7 +204,11 @@ export async function getGoogleMapCenter(
     }
     // The __gm property on the .gm-style div holds the internal map reference
     const internal = (gmStyle as unknown as Record<string, unknown>).__gm as
-      | { get: (key: string) => google.maps.Map | undefined }
+      | {
+        get: (key: string) => {
+          getCenter: () => { lat: () => number; lng: () => number } | null | undefined
+        } | undefined
+      }
       | undefined
     const mapInstance = internal?.get?.('map')
     if (!mapInstance) {

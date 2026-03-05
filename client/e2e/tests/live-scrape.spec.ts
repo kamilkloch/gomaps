@@ -1,7 +1,9 @@
 import { expect, test } from '../fixtures/base'
 import type { APIRequestContext } from '@playwright/test'
-import { execFileSync, spawn } from 'node:child_process'
+import Database from 'better-sqlite3'
+import { spawn } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
+import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { captureStepScreenshot } from '../utils/screenshots'
@@ -157,9 +159,9 @@ test.describe('live scrape smoke (Google Places API)', () => {
     const dbPath = join(tempDir, 'gomaps-legacy.db')
 
     try {
-      execFileSync('sqlite3', [dbPath, LEGACY_SCHEMA_SQL])
+      createLegacyDatabase(dbPath)
 
-      const port = 3300 + Math.floor(Math.random() * 200)
+      const port = await reserveServerPort()
       const serverBaseUrl = `http://127.0.0.1:${port}`
       const server = spawn('npm', ['run', 'dev', '--workspace=server'], {
         cwd: '..',
@@ -315,6 +317,40 @@ const requestJson = async <T>(url: string, init?: RequestInit, expectedStatus = 
 
 const delay = async (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms))
+
+const createLegacyDatabase = (dbPath: string): void => {
+  const db = new Database(dbPath)
+  try {
+    db.pragma('foreign_keys = ON')
+    db.exec(LEGACY_SCHEMA_SQL)
+  }
+  finally {
+    db.close()
+  }
+}
+
+const reserveServerPort = async (): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const server = createServer()
+    server.unref()
+    server.on('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      if (!address || typeof address === 'string') {
+        server.close(() => reject(new Error('Failed to resolve an ephemeral port for the live scrape test server.')))
+        return
+      }
+
+      server.close((error) => {
+        if (error) {
+          reject(error)
+          return
+        }
+
+        resolve(address.port)
+      })
+    })
+  })
 
 const LEGACY_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS projects (
