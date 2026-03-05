@@ -1,7 +1,12 @@
 import { expect, test } from '../fixtures/base'
 import { captureStepScreenshot } from '../utils/screenshots'
 import { seedFixtures } from '../utils/test-backdoor'
-import { expectGoogleMapHasContent, expectGoogleMapRendered } from '../utils/waiters'
+import {
+  drawAreaOnGoogleMap,
+  expectGoogleMapHasContent,
+  expectGoogleMapRendered,
+  moveSelectionRectangleOnGoogleMap,
+} from '../utils/waiters'
 
 test.describe('setup page validation, estimates, and chrome story boards', () => {
   test('estimate badge updates for selected area and resets after clear', async ({ page, request }, testInfo) => {
@@ -153,6 +158,7 @@ test.describe('setup page validation, estimates, and chrome story boards', () =>
       && response.request().method() === 'PUT'
     )
     await page.getByTestId('setup-select-area-button').click()
+    await drawAreaOnGoogleMap(page, 'setup-map-shell')
     await boundsSaveResponse
     await expect(page.getByTestId('setup-coordinates-pill')).toBeVisible()
     await expect(page.getByTestId('setup-status-copy')).toContainText('Selection saved to project.')
@@ -165,5 +171,167 @@ test.describe('setup page validation, estimates, and chrome story boards', () =>
     await expect(page).toHaveURL(new RegExp(`/projects/${seeded.projectId}/setup$`))
     await expect(page.getByTestId('setup-coordinates-pill')).toHaveText(coordinatesBeforeNavigation)
     await captureStepScreenshot(page, testInfo, 'setup-bounds-roundtrip-restored')
+  })
+
+  test('redrawing selection avoids redundant bounds saves and keeps status stable', async ({ page, request }, testInfo) => {
+    const projectName = 'Setup Redraw Stability Story'
+    const seeded = await seedFixtures(request, {
+      project: {
+        name: projectName,
+        bounds: '',
+      },
+    })
+
+    let saveRequestCount = 0
+    const pendingSaveResolvers: Array<() => void> = []
+    let activePendingSaveCount = 0
+    let didDetectOverlappingSaves = false
+
+    await page.route(`**/api/projects/${seeded.projectId}`, async (route) => {
+      if (route.request().method() !== 'PUT') {
+        await route.fallback()
+        return
+      }
+
+      saveRequestCount += 1
+      if (activePendingSaveCount > 0) {
+        didDetectOverlappingSaves = true
+      }
+      activePendingSaveCount += 1
+
+      const body = route.request().postDataJSON() as { bounds?: string }
+      await new Promise<void>((resolve) => {
+        pendingSaveResolvers.push(resolve)
+      })
+      activePendingSaveCount -= 1
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: seeded.projectId,
+          name: projectName,
+          bounds: body.bounds && body.bounds.length > 0 ? body.bounds : null,
+          createdAt: new Date().toISOString(),
+        }),
+      })
+    })
+
+    await page.goto(`/projects/${seeded.projectId}/setup`)
+    await expect(page.getByTestId('setup-page')).toBeVisible()
+
+    const mapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
+    test.skip(mapMode === 'fallback', 'Redraw stability assertions require interactive Google Maps rendering')
+
+    await expectGoogleMapHasContent(page, 'setup-map-shell')
+    await page.getByTestId('setup-select-area-button').click()
+
+    await drawAreaOnGoogleMap(page, 'setup-map-shell', {
+      startXRatio: 0.22,
+      startYRatio: 0.24,
+      endXRatio: 0.66,
+      endYRatio: 0.61,
+    })
+    await expect.poll(() => saveRequestCount).toBe(1)
+    await expect(page.getByTestId('setup-status-copy')).toHaveText('Saving bounds…')
+    expect(didDetectOverlappingSaves).toBe(false)
+    const releaseFirstSave = pendingSaveResolvers.shift()
+    if (!releaseFirstSave) {
+      throw new Error('Expected first pending save resolver')
+    }
+    releaseFirstSave()
+    expect(saveRequestCount).toBe(1)
+    await expect(page.getByTestId('setup-status-copy')).toContainText('Selection saved to project.')
+
+    await drawAreaOnGoogleMap(page, 'setup-map-shell', {
+      startXRatio: 0.30,
+      startYRatio: 0.30,
+      endXRatio: 0.80,
+      endYRatio: 0.75,
+    })
+    await expect.poll(() => saveRequestCount).toBe(2)
+    await expect(page.getByTestId('setup-status-copy')).toHaveText('Saving bounds…')
+    expect(didDetectOverlappingSaves).toBe(false)
+    const releaseSecondSave = pendingSaveResolvers.shift()
+    if (!releaseSecondSave) {
+      throw new Error('Expected second pending save resolver')
+    }
+    releaseSecondSave()
+    expect(saveRequestCount).toBe(2)
+    await expect(page.getByTestId('setup-status-copy')).toContainText('Selection saved to project.')
+
+    await captureStepScreenshot(page, testInfo, 'setup-redraw-stability')
+  })
+
+  test('moving existing rectangle sends a single save request per move', async ({ page, request }, testInfo) => {
+    const projectName = 'Setup Move Stability Story'
+    const seeded = await seedFixtures(request, {
+      project: {
+        name: projectName,
+        bounds: JSON.stringify({
+          sw: { lat: 40.08, lng: 9.08 },
+          ne: { lat: 40.42, lng: 9.42 },
+        }),
+      },
+    })
+
+    let saveRequestCount = 0
+    const pendingSaveResolvers: Array<() => void> = []
+    let activePendingSaveCount = 0
+    let didDetectOverlappingSaves = false
+
+    await page.route(`**/api/projects/${seeded.projectId}`, async (route) => {
+      if (route.request().method() !== 'PUT') {
+        await route.fallback()
+        return
+      }
+
+      saveRequestCount += 1
+      if (activePendingSaveCount > 0) {
+        didDetectOverlappingSaves = true
+      }
+      activePendingSaveCount += 1
+
+      const body = route.request().postDataJSON() as { bounds?: string }
+      await new Promise<void>((resolve) => {
+        pendingSaveResolvers.push(resolve)
+      })
+      activePendingSaveCount -= 1
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: seeded.projectId,
+          name: projectName,
+          bounds: body.bounds && body.bounds.length > 0 ? body.bounds : null,
+          createdAt: new Date().toISOString(),
+        }),
+      })
+    })
+
+    await page.goto(`/projects/${seeded.projectId}/setup`)
+    await expect(page.getByTestId('setup-page')).toBeVisible()
+
+    const mapMode = await expectGoogleMapRendered(page, 'setup-map-shell', 'setup-map-fallback')
+    test.skip(mapMode === 'fallback', 'Move stability assertions require interactive Google Maps rendering')
+
+    await expectGoogleMapHasContent(page, 'setup-map-shell')
+    await expect(page.getByTestId('setup-status-copy')).toContainText('Selection saved to project.')
+    await page.getByTestId('setup-select-area-button').click()
+
+    await moveSelectionRectangleOnGoogleMap(page, 'setup-map-shell')
+    await expect.poll(() => saveRequestCount).toBe(1)
+    await expect(page.getByTestId('setup-status-copy')).toHaveText('Saving bounds…')
+    expect(didDetectOverlappingSaves).toBe(false)
+    const releaseMoveSave = pendingSaveResolvers.shift()
+    if (!releaseMoveSave) {
+      throw new Error('Expected pending save resolver for rectangle move')
+    }
+    releaseMoveSave()
+    await expect(page.getByTestId('setup-status-copy')).toContainText('Selection saved to project.')
+    expect(saveRequestCount).toBe(1)
+
+    await captureStepScreenshot(page, testInfo, 'setup-move-stability')
   })
 })

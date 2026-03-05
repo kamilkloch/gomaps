@@ -1,5 +1,6 @@
 import { resolveLocator } from '../utils/locators'
-import { waitForVisible } from '../utils/waiters'
+import { drawAreaOnGoogleMap, waitForVisible } from '../utils/waiters'
+import { expect } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
 class SetupPageObject {
@@ -25,8 +26,8 @@ class SetupPageObject {
     const clearButton = await resolveLocator(this.page, {
       testId: 'setup-clear-area-button',
       role: 'button',
-      name: /clear/i,
-      text: 'Clear',
+      name: /reset area/i,
+      text: 'Reset area',
       defectLabel: 'Setup clear area button',
     })
     await clearButton.click()
@@ -36,11 +37,33 @@ class SetupPageObject {
     const selectButton = await resolveLocator(this.page, {
       testId: 'setup-select-area-button',
       role: 'button',
-      name: /select area/i,
-      text: 'Select Area',
+      name: /select/i,
+      text: 'Select',
       defectLabel: 'Setup select area button',
     })
     await selectButton.click()
+
+    const drawAttempts = [
+      { startXRatio: 0.12, startYRatio: 0.14, endXRatio: 0.42, endYRatio: 0.46 },
+      { startXRatio: 0.68, startYRatio: 0.18, endXRatio: 0.92, endYRatio: 0.44 },
+    ]
+
+    const startScrapeButton = this.page.getByTestId('setup-start-scrape-button')
+    const statusCopy = this.page.getByTestId('setup-status-copy')
+
+    for (const drawAttempt of drawAttempts) {
+      await drawAreaOnGoogleMap(this.page, 'setup-map-shell', drawAttempt)
+      try {
+        await expect(statusCopy).toContainText('Selection saved to project.', { timeout: 1_500 })
+        await expect(startScrapeButton).toBeEnabled({ timeout: 1_500 })
+        return
+      }
+      catch {
+        // Try an alternative draw region before failing.
+      }
+    }
+
+    throw new Error('Could not create a selectable scrape area in SetupPage.selectArea()')
   }
 
   async startScrape(query: string): Promise<void> {

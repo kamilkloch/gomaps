@@ -37,11 +37,15 @@ const MAP_INIT_TIMEOUT_COPY =
   'Map did not initialize. Verify `VITE_GOOGLE_MAPS_API_KEY`, ensure Maps JavaScript API is enabled, and allow `http://localhost:5173/*` in key referrer restrictions.'
 const MAP_TILES_TIMEOUT_COPY =
   'Google Maps initialized but tiles did not render. Check network/ad-blockers and key referrer restrictions for map tile requests.'
+const BOUNDS_COMPARISON_EPSILON = 1e-6
+
+type SetupMapInteractionMode = 'pan' | 'select'
 
 export function SetupPage() {
   const { projectId } = useParams()
   const [project, setProject] = useState<Project | null>(null)
   const [selectionBounds, setSelectionBounds] = useState<Bounds | null>(null)
+  const [mapInteractionMode, setMapInteractionMode] = useState<SetupMapInteractionMode>('pan')
   const [query, setQuery] = useState('vacation rentals')
   const [runs, setRuns] = useState<ScrapeRun[]>([])
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
@@ -60,6 +64,8 @@ export function SetupPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const hasAppliedInitialBounds = useRef(false)
   const refreshRunsRef = useRef<() => void>(() => {})
+  const selectionBoundsRef = useRef<Bounds | null>(null)
+  const latestPersistRequestIdRef = useRef(0)
 
   const selectRun = useCallback((runId: string | null) => {
     setActiveRunId(runId)
@@ -87,7 +93,12 @@ export function SetupPage() {
   useEffect(() => {
     hasAppliedInitialBounds.current = false
     setIsProjectMissing(false)
+    setMapInteractionMode('pan')
   }, [projectId])
+
+  useEffect(() => {
+    selectionBoundsRef.current = selectionBounds
+  }, [selectionBounds])
 
   useEffect(() => {
     if (!forcedMapDiagnostic) {
@@ -118,12 +129,15 @@ export function SetupPage() {
         }
 
         setProject(loadedProject)
-        setSelectionBounds(parseBounds(loadedProject.bounds))
+        const parsedBounds = parseBounds(loadedProject.bounds)
+        selectionBoundsRef.current = parsedBounds
+        setSelectionBounds(parsedBounds)
       }
       catch (error) {
         if (!isCancelled) {
           if (error instanceof ApiRequestError && error.status === 404) {
             setProject(null)
+            selectionBoundsRef.current = null
             setSelectionBounds(null)
             setRuns([])
             selectRun(null)
@@ -360,6 +374,9 @@ export function SetupPage() {
         return
       }
 
+      const requestId = latestPersistRequestIdRef.current + 1
+      latestPersistRequestIdRef.current = requestId
+
       try {
         setIsSaving(true)
         setErrorMessage(null)
@@ -372,56 +389,33 @@ export function SetupPage() {
         setErrorMessage('Unable to save bounds. Please try again.')
       }
       finally {
-        setIsSaving(false)
+        if (latestPersistRequestIdRef.current === requestId) {
+          setIsSaving(false)
+        }
       }
     },
     [projectId],
   )
 
-  const handleBoundsPreview = useCallback((nextBounds: Bounds | null) => {
-    setSelectionBounds((currentBounds) => {
-      if (areBoundsEqual(currentBounds, nextBounds)) {
-        return currentBounds
-      }
-
-      return nextBounds
-    })
-  }, [])
+  const handleBoundsPreview = useCallback((_nextBounds: Bounds | null) => {}, [])
 
   const handleBoundsCommit = useCallback(
     (nextBounds: Bounds | null) => {
+      if (areBoundsEqual(selectionBoundsRef.current, nextBounds)) {
+        return
+      }
+      selectionBoundsRef.current = nextBounds
       setSelectionBounds(nextBounds)
       void persistBounds(nextBounds)
     },
     [persistBounds],
   )
 
-  const handleSelectArea = useCallback(() => {
-    if (!map) {
-      return
-    }
-
-    const viewportBounds = map.getBounds()
-    if (!viewportBounds) {
-      return
-    }
-
-    const nextBounds: Bounds = {
-      sw: {
-        lat: viewportBounds.getSouthWest().lat(),
-        lng: viewportBounds.getSouthWest().lng(),
-      },
-      ne: {
-        lat: viewportBounds.getNorthEast().lat(),
-        lng: viewportBounds.getNorthEast().lng(),
-      },
-    }
-
-    setSelectionBounds(nextBounds)
-    void persistBounds(nextBounds)
-  }, [map, persistBounds])
-
   const handleClearArea = useCallback(() => {
+    if (!selectionBoundsRef.current) {
+      return
+    }
+    selectionBoundsRef.current = null
     setSelectionBounds(null)
     void persistBounds(null)
   }, [persistBounds])
@@ -547,6 +541,15 @@ export function SetupPage() {
     ? estimateRemaining(progress)
     : null
   const displayElapsedMs = clientElapsedMs ?? progress?.elapsedMs ?? 0
+  const statusCopy = isSaving
+    ? 'Saving bounds…'
+    : selectionBounds
+      ? mapInteractionMode === 'select'
+        ? 'Selection saved to project. Select mode: drag on map to redraw, or drag handles to fine-tune.'
+        : 'Selection saved to project. Pan mode: move/zoom map. Switch to Select mode to adjust area.'
+      : mapInteractionMode === 'select'
+        ? 'No area selected yet. Select mode: drag on map to draw your scrape area.'
+        : 'No area selected yet. Pan mode: move/zoom map, then switch to Select mode to draw an area.'
 
   return (
     <main className="setup-page" data-testid="setup-page">
@@ -569,7 +572,7 @@ export function SetupPage() {
           aria-label="Setup map panel"
         >
           <div
-            className="setup-map-shell"
+            className={`setup-map-shell ${mapInteractionMode === 'select' ? 'is-select-mode' : 'is-pan-mode'}`}
             data-testid="setup-map-shell"
             data-map-tiles-loaded={hasMapTilesLoaded ? 'true' : 'false'}
           >
@@ -583,13 +586,17 @@ export function SetupPage() {
                 <Map
                   defaultCenter={mapCenter}
                   defaultZoom={selectionBounds ? estimateZoom(selectionBounds) : 6}
-                  gestureHandling="greedy"
+                  gestureHandling={mapInteractionMode === 'select' ? 'none' : 'greedy'}
+                  draggable={mapInteractionMode !== 'select'}
+                  draggableCursor={mapInteractionMode === 'select' ? 'crosshair' : undefined}
+                  draggingCursor={mapInteractionMode === 'select' ? 'crosshair' : undefined}
                   style={{ width: '100%', height: '100%' }}
                 >
                   <MapBridge onReady={setMap} onTilesLoaded={() => setHasMapTilesLoaded(true)} />
                   <TileOverlayController tiles={runTiles} />
                   <BoundsRectangleController
                     selectedBounds={selectionBounds}
+                    mapInteractionMode={mapInteractionMode}
                     onBoundsPreview={handleBoundsPreview}
                     onBoundsCommit={handleBoundsCommit}
                   />
@@ -617,6 +624,38 @@ export function SetupPage() {
                 {JSON.stringify(tileOverlayDebugSnapshot)}
               </pre>
             ) : null}
+
+            <div className="setup-map-overlay-controls" data-testid="setup-map-overlay-controls">
+              <div className="setup-map-mode-toggle" role="group" aria-label="Map interaction mode">
+                <button
+                  data-testid="setup-map-pan-mode-button"
+                  type="button"
+                  className={`setup-map-mode-button ${mapInteractionMode === 'pan' ? 'is-active' : ''}`}
+                  onClick={() => setMapInteractionMode('pan')}
+                  disabled={!hasMapsKey}
+                >
+                  Pan
+                </button>
+                <button
+                  data-testid="setup-select-area-button"
+                  type="button"
+                  className={`setup-map-mode-button ${mapInteractionMode === 'select' ? 'is-active' : ''}`}
+                  onClick={() => setMapInteractionMode('select')}
+                  disabled={!hasMapsKey}
+                >
+                  Select
+                </button>
+              </div>
+              <button
+                data-testid="setup-clear-area-button"
+                type="button"
+                className="setup-map-reset-button"
+                onClick={handleClearArea}
+                disabled={!selectionBounds}
+              >
+                Reset area
+              </button>
+            </div>
           </div>
 
           {selectionBounds ? (
@@ -633,23 +672,10 @@ export function SetupPage() {
           aria-label="Setup controls panel"
         >
           <h2>Scrape Area</h2>
-          <p>Capture the visible map viewport, then fine-tune the rectangle by dragging or resizing corners.</p>
-
-          <div className="setup-actions">
-            <button data-testid="setup-select-area-button" type="button" className="setup-select-button" onClick={handleSelectArea}>
-              Select Area
-            </button>
-            <button data-testid="setup-clear-area-button" type="button" className="setup-clear-button" onClick={handleClearArea}>
-              Clear
-            </button>
-          </div>
+          <p>Use map controls to switch between Pan and Select mode. In Select mode, drag to draw a new rectangle or adjust the existing one.</p>
 
           <p className="setup-status" data-testid="setup-status-copy">
-            {isSaving
-              ? 'Saving bounds…'
-              : selectionBounds
-                ? 'Selection saved to project.'
-                : 'No area selected yet.'}
+            {statusCopy}
           </p>
 
           <div className="setup-query-block">
@@ -862,17 +888,25 @@ function TileOverlayController({ tiles }: { tiles: ScrapeTile[] }) {
 
 interface BoundsRectangleControllerProps {
   selectedBounds: Bounds | null
+  mapInteractionMode: SetupMapInteractionMode
   onBoundsPreview: (bounds: Bounds | null) => void
   onBoundsCommit: (bounds: Bounds | null) => void
 }
 
 function BoundsRectangleController({
   selectedBounds,
+  mapInteractionMode,
   onBoundsPreview,
   onBoundsCommit,
 }: BoundsRectangleControllerProps) {
   const map = useMap()
   const rectangleRef = useRef<google.maps.Rectangle | null>(null)
+  const mapInteractionModeRef = useRef(mapInteractionMode)
+  const drawStartRef = useRef<google.maps.LatLng | null>(null)
+  const hasDrawMovedRef = useRef(false)
+  const suppressNextRectangleMouseUpCommitRef = useRef(false)
+  const suppressNextRectangleDragEndCommitRef = useRef(false)
+  const lastCommittedBoundsRef = useRef<Bounds | null>(null)
   const previewCallbackRef = useRef(onBoundsPreview)
   const commitCallbackRef = useRef(onBoundsCommit)
 
@@ -880,6 +914,10 @@ function BoundsRectangleController({
     previewCallbackRef.current = onBoundsPreview
     commitCallbackRef.current = onBoundsCommit
   }, [onBoundsPreview, onBoundsCommit])
+
+  useEffect(() => {
+    mapInteractionModeRef.current = mapInteractionMode
+  }, [mapInteractionMode])
 
   useEffect(() => {
     if (!map || rectangleRef.current) {
@@ -898,24 +936,169 @@ function BoundsRectangleController({
       visible: false,
     })
 
-    const publishBounds = () => {
-      previewCallbackRef.current(extractBounds(rectangle))
+    const syncRectangleEditability = () => {
+      const isSelectMode = mapInteractionModeRef.current === 'select'
+      rectangle.setEditable(isSelectMode)
+      rectangle.setDraggable(isSelectMode)
     }
 
-    const commitBounds = () => {
-      commitCallbackRef.current(extractBounds(rectangle))
+    const resetDrawState = () => {
+      drawStartRef.current = null
+      hasDrawMovedRef.current = false
+      syncRectangleEditability()
+    }
+
+    const updateRectangleFromDrag = (start: google.maps.LatLng, end: google.maps.LatLng): Bounds | null => {
+      const nextBounds = boundsFromPoints(
+        { lat: start.lat(), lng: start.lng() },
+        { lat: end.lat(), lng: end.lng() },
+      )
+      if (!nextBounds) {
+        return null
+      }
+
+      rectangle.setBounds(toLatLngBounds(nextBounds))
+      rectangle.setVisible(true)
+      previewCallbackRef.current(nextBounds)
+      return nextBounds
+    }
+
+    const commitBoundsIfChanged = (nextBounds: Bounds | null): boolean => {
+      if (!nextBounds) {
+        return false
+      }
+
+      if (areBoundsEqual(lastCommittedBoundsRef.current, nextBounds)) {
+        return false
+      }
+
+      lastCommittedBoundsRef.current = nextBounds
+      commitCallbackRef.current(nextBounds)
+      return true
+    }
+
+    const beginDraw = (event: google.maps.MapMouseEvent) => {
+      if (mapInteractionModeRef.current !== 'select' || !event.latLng) {
+        return
+      }
+
+      const rectangleBounds = rectangle.getBounds()
+      if (
+        rectangle.getVisible()
+        && rectangleBounds
+        && rectangleBounds.contains(event.latLng)
+      ) {
+        return
+      }
+
+      drawStartRef.current = event.latLng
+      hasDrawMovedRef.current = false
+      rectangle.setEditable(false)
+      rectangle.setDraggable(false)
+    }
+
+    const continueDraw = (event: google.maps.MapMouseEvent) => {
+      const start = drawStartRef.current
+      if (mapInteractionModeRef.current !== 'select' || !start || !event.latLng) {
+        return
+      }
+
+      const nextBounds = updateRectangleFromDrag(start, event.latLng)
+      if (nextBounds) {
+        hasDrawMovedRef.current = true
+      }
+    }
+
+    const finishDraw = (event: google.maps.MapMouseEvent) => {
+      const start = drawStartRef.current
+      if (mapInteractionModeRef.current !== 'select' || !start) {
+        resetDrawState()
+        return
+      }
+
+      let committedFromMouseUp = false
+      let nextBoundsFromMouseUp: Bounds | null = null
+      if (event.latLng) {
+        nextBoundsFromMouseUp = updateRectangleFromDrag(start, event.latLng)
+        if (nextBoundsFromMouseUp && commitBoundsIfChanged(nextBoundsFromMouseUp)) {
+          committedFromMouseUp = true
+        }
+      }
+
+      if (!committedFromMouseUp && hasDrawMovedRef.current) {
+        const currentBounds = extractBounds(rectangle)
+        if (commitBoundsIfChanged(currentBounds)) {
+          committedFromMouseUp = true
+        }
+      }
+
+      if (committedFromMouseUp) {
+        suppressNextRectangleMouseUpCommitRef.current = true
+      }
+
+      resetDrawState()
+    }
+
+    const finalizeDrawFromGlobalMouseUp = () => {
+      if (!drawStartRef.current) {
+        return
+      }
+
+      if (hasDrawMovedRef.current) {
+        const currentBounds = extractBounds(rectangle)
+        if (commitBoundsIfChanged(currentBounds)) {
+          suppressNextRectangleMouseUpCommitRef.current = true
+        }
+      }
+
+      resetDrawState()
+    }
+
+    const handleRectangleMouseUp = (event: google.maps.MapMouseEvent) => {
+      if (suppressNextRectangleMouseUpCommitRef.current) {
+        suppressNextRectangleMouseUpCommitRef.current = false
+        return
+      }
+
+      if (drawStartRef.current) {
+        finishDraw(event)
+        return
+      }
+
+      const currentBounds = extractBounds(rectangle)
+      if (commitBoundsIfChanged(currentBounds)) {
+        suppressNextRectangleDragEndCommitRef.current = true
+      }
+    }
+
+    const handleRectangleDragEnd = () => {
+      if (suppressNextRectangleDragEndCommitRef.current) {
+        suppressNextRectangleDragEndCommitRef.current = false
+        resetDrawState()
+        return
+      }
+
+      const currentBounds = extractBounds(rectangle)
+      if (commitBoundsIfChanged(currentBounds)) {
+        suppressNextRectangleMouseUpCommitRef.current = true
+      }
+      resetDrawState()
     }
 
     const listeners = [
-      rectangle.addListener('bounds_changed', publishBounds),
-      rectangle.addListener('dragend', commitBounds),
-      rectangle.addListener('mouseup', commitBounds),
+      map.addListener('mousedown', beginDraw),
+      map.addListener('mousemove', continueDraw),
+      map.addListener('mouseup', finishDraw),
+      rectangle.addListener('dragend', handleRectangleDragEnd),
+      rectangle.addListener('mouseup', handleRectangleMouseUp),
     ]
+    window.addEventListener('mouseup', finalizeDrawFromGlobalMouseUp)
 
     rectangleRef.current = rectangle
 
     return () => {
       listeners.forEach((listener) => listener.remove())
+      window.removeEventListener('mouseup', finalizeDrawFromGlobalMouseUp)
       rectangle.setMap(null)
       rectangleRef.current = null
     }
@@ -927,6 +1110,10 @@ function BoundsRectangleController({
       return
     }
 
+    const isSelectMode = mapInteractionMode === 'select'
+    rectangle.setEditable(isSelectMode)
+    rectangle.setDraggable(isSelectMode)
+
     if (!selectedBounds) {
       rectangle.setVisible(false)
       return
@@ -934,7 +1121,7 @@ function BoundsRectangleController({
 
     rectangle.setBounds(toLatLngBounds(selectedBounds))
     rectangle.setVisible(true)
-  }, [selectedBounds])
+  }, [mapInteractionMode, selectedBounds])
 
   return null
 }
@@ -995,11 +1182,33 @@ const areBoundsEqual = (first: Bounds | null, second: Bounds | null): boolean =>
   }
 
   return (
-    first.sw.lat === second.sw.lat
-    && first.sw.lng === second.sw.lng
-    && first.ne.lat === second.ne.lat
-    && first.ne.lng === second.ne.lng
+    areNumbersClose(first.sw.lat, second.sw.lat)
+    && areNumbersClose(first.sw.lng, second.sw.lng)
+    && areNumbersClose(first.ne.lat, second.ne.lat)
+    && areNumbersClose(first.ne.lng, second.ne.lng)
   )
+}
+
+const areNumbersClose = (first: number, second: number): boolean =>
+  Math.abs(first - second) <= BOUNDS_COMPARISON_EPSILON
+
+const boundsFromPoints = (
+  first: { lat: number; lng: number },
+  second: { lat: number; lng: number },
+): Bounds | null => {
+  const south = Math.min(first.lat, second.lat)
+  const north = Math.max(first.lat, second.lat)
+  const west = Math.min(first.lng, second.lng)
+  const east = Math.max(first.lng, second.lng)
+
+  if (south === north || west === east) {
+    return null
+  }
+
+  return {
+    sw: { lat: south, lng: west },
+    ne: { lat: north, lng: east },
+  }
 }
 
 const getBoundsCenter = (bounds: Bounds): { lat: number; lng: number } => ({

@@ -296,6 +296,20 @@ a {
   background: radial-gradient(circle at top, #163458, #0e1d31);
 }
 
+.setup-map-shell.is-select-mode::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(48, 91, 151, 0.08);
+  box-shadow: inset 0 0 0 2px rgba(84, 150, 237, 0.35);
+  z-index: 1;
+}
+
+.setup-map-shell.is-select-mode .gm-style {
+  cursor: crosshair;
+}
+
 .setup-map-fallback {
   height: 100%;
   display: grid;
@@ -303,6 +317,70 @@ a {
   color: #b4c8e8;
   padding: 1rem;
   text-align: center;
+}
+
+.setup-map-overlay-controls {
+  position: absolute;
+  top: 0.8rem;
+  left: 0.8rem;
+  right: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  z-index: 3;
+}
+
+.setup-map-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid #3a5c8a;
+  background: rgba(8, 18, 33, 0.9);
+  padding: 0.18rem;
+}
+
+.setup-map-mode-button,
+.setup-map-reset-button {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  color: #e5f0ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.setup-map-mode-button {
+  padding: 0.42rem 0.75rem;
+  background: transparent;
+}
+
+.setup-map-mode-button.is-active {
+  background: linear-gradient(165deg, #2c7ce6, #1d5bb0);
+  border-color: #4e9dff;
+}
+
+.setup-map-mode-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.setup-map-reset-button {
+  padding: 0.45rem 0.82rem;
+  background: linear-gradient(165deg, #2d3d54, #232f43);
+  border-color: #526581;
+}
+
+.setup-map-reset-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.setup-map-mode-button:hover,
+.setup-map-reset-button:hover:not(:disabled) {
+  filter: brightness(1.06);
 }
 
 .setup-map-diagnostic {
@@ -357,14 +435,6 @@ a {
   line-height: 1.45;
 }
 
-.setup-actions {
-  margin-top: 0.9rem;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.65rem;
-}
-
-.setup-select-button,
 .setup-clear-button {
   border-radius: 0.7rem;
   border: 1px solid transparent;
@@ -372,19 +442,10 @@ a {
   color: #eff6ff;
   font-weight: 700;
   cursor: pointer;
-}
-
-.setup-select-button {
-  background: linear-gradient(165deg, #2c7ce6, #1d5bb0);
-  border-color: #4e9dff;
-}
-
-.setup-clear-button {
   background: linear-gradient(165deg, #2d3d54, #232f43);
   border-color: #485a76;
 }
 
-.setup-select-button:hover,
 .setup-clear-button:hover {
   filter: brightness(1.06);
 }

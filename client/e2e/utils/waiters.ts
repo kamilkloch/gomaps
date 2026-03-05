@@ -61,6 +61,68 @@ export async function panGoogleMap(page: Page, mapShellTestId: string): Promise<
   await page.mouse.up()
 }
 
+interface DrawAreaOnGoogleMapOptions {
+  startXRatio?: number
+  startYRatio?: number
+  endXRatio?: number
+  endYRatio?: number
+}
+
+export async function drawAreaOnGoogleMap(
+  page: Page,
+  mapShellTestId: string,
+  options: DrawAreaOnGoogleMapOptions = {},
+): Promise<void> {
+  const mapRoot = page.locator(`[data-testid="${mapShellTestId}"] .gm-style`).first()
+  await expect(mapRoot).toBeVisible({ timeout: 20_000 })
+
+  const bounds = await mapRoot.boundingBox()
+  if (!bounds) {
+    throw new Error(`Unable to draw area in ${mapShellTestId}; missing bounding box`)
+  }
+
+  const startX = bounds.x + bounds.width * (options.startXRatio ?? 0.28)
+  const startY = bounds.y + bounds.height * (options.startYRatio ?? 0.34)
+  const endX = bounds.x + bounds.width * (options.endXRatio ?? 0.72)
+  const endY = bounds.y + bounds.height * (options.endYRatio ?? 0.68)
+
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  await page.mouse.move(endX, endY, { steps: 14 })
+  await page.mouse.up()
+}
+
+interface MoveSelectionRectangleOnGoogleMapOptions {
+  startXRatio?: number
+  startYRatio?: number
+  endXRatio?: number
+  endYRatio?: number
+}
+
+export async function moveSelectionRectangleOnGoogleMap(
+  page: Page,
+  mapShellTestId: string,
+  options: MoveSelectionRectangleOnGoogleMapOptions = {},
+): Promise<void> {
+  const mapRoot = page.locator(`[data-testid="${mapShellTestId}"] .gm-style`).first()
+  await expect(mapRoot).toBeVisible({ timeout: 20_000 })
+
+  const bounds = await mapRoot.boundingBox()
+  if (!bounds) {
+    throw new Error(`Unable to move selection in ${mapShellTestId}; missing bounding box`)
+  }
+
+  const startX = bounds.x + bounds.width * (options.startXRatio ?? 0.5)
+  const startY = bounds.y + bounds.height * (options.startYRatio ?? 0.5)
+  const endX = bounds.x + bounds.width * (options.endXRatio ?? 0.6)
+  const endY = bounds.y + bounds.height * (options.endYRatio ?? 0.58)
+
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  await page.mouse.move(endX, endY, { steps: 18 })
+  await page.mouse.up()
+}
+
 export async function getGoogleMapCenter(
   page: Page,
   mapShellTestId: string,

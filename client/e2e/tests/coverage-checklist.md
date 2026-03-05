@@ -21,7 +21,7 @@ This artifact maps currently implemented interactive UI controls to Playwright c
 | Projects + Accessibility | Landmark semantics: main region + projects list named region + project cards expose `role="button"` | `navigation-a11y.spec.ts` → `landmarks and keyboard-only explorer row selection are accessible` |
 | Projects + Setup | Cross-view consistency: project status badge + summary metrics match Setup runs/progress for mixed completed/running history | `app-flows.spec.ts` → `projects and setup stay consistent for mixed run history and explicit run switching` |
 | Setup | Map render + tile/canvas content assertion + drag pan (interactive mode) | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls`; `app-flows.spec.ts` setup scenarios |
-| Setup | `Select Area` + coordinate pill updates | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
+| Setup | `Pan/Select` map modes + coordinate pill updates | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | `Clear` selection + status copy | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | Query input keyboard editing | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
 | Setup | `Start Scrape` action | `ui-components.spec.ts` → `setup page covers area, query, launch, runs, and pause controls` |
