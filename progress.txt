@@ -27,6 +27,7 @@
 - **Scrape engine + counters:** when orchestrating runs in `server/src/scraper/engine.ts`, create/subdivide/complete tiles via tiling helpers instead of raw tile CRUD so `scrape_runs.tiles_*` counters stay in sync
 - **Scrape route orchestration:** keep background scrape state (`pauseRequested`, in-flight task handles, SSE subscribers) module-scoped in `server/src/routes/scrape.ts`, and expose lightweight test hooks (`set...ForTests`, `reset...ForTests`) to make async integration tests deterministic
 - **Scrape run kinds:** persist `scrape_runs.kind` (`discovery` | `refresh`) so setup/history UI and route orchestration can distinguish area discovery runs from re-scrape refresh jobs
+- **Run-scoped scrape bounds:** persist the exact bounds snapshot used to start a discovery run on `scrape_runs.bounds`, send the current UI selection with `POST /api/scrape/start`, and resume paused runs from that stored snapshot instead of mutable `projects.bounds`
 - **Place refresh timestamping:** for Place Details refresh flows, update `places.scraped_at` on each `updatePlace()` write so stale-data indicators and last-scraped metadata stay accurate
 - **Places API requests:** Use `X-Goog-Api-Key` + `X-Goog-FieldMask` headers and wrap network calls in `Effect.tryPromise` with typed `ScrapeError`
 - **Website classification:** Normalize website hostnames with URL parsing (add `https://` fallback for protocol-less inputs), then classify via suffix matching so `www.booking.com` and other subdomains map to the base domain allowlist
@@ -614,4 +615,19 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
     - `npm test --workspace=client`
     - `npm run test:e2e --workspace=client`
     - `npm run test:coverage`
+---
+## 2026-03-19 00:50:45 CET - US-030
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Hardened Setup scrape launch so the run starts from the current blue selection bounds instead of an older persisted project rectangle.
+- Persisted discovery-run bounds snapshots on `scrape_runs`, updated resume to reuse run-scoped bounds, and added regression coverage for start/resume drift plus the client API branch used by coverage gates.
+- Files changed: `client/src/lib/api.ts`, `client/src/lib/api.test.ts`, `client/src/pages/SetupPage.tsx`, `server/src/db/{schema,scrape-runs,types}.ts`, `server/src/routes/scrape.ts`, `server/tests/{db,projects}.test.ts`, `prd.json`, `progress.txt`
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
+- **Learnings for future iterations:**
+  - Starting a scrape must snapshot the live UI bounds into the run record; relying on asynchronously persisted project bounds can shrink coverage if the user clicks Start before the save finishes.
+  - Resume logic should reload immutable run inputs from the run itself so later project edits do not mutate an in-flight or paused scrape.
 ---

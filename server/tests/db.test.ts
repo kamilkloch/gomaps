@@ -42,6 +42,14 @@ describe('schema', () => {
     expect(tableNames).toContain('shortlist_entries')
   })
 
+  it('adds bounds column to scrape_runs', () => {
+    const columns = db
+      .prepare('PRAGMA table_info(scrape_runs)')
+      .all() as Array<{ name: string }>
+    const columnNames = columns.map((column) => column.name)
+    expect(columnNames).toContain('bounds')
+  })
+
   it('has WAL journal mode', () => {
     const result = db.pragma('journal_mode') as { journal_mode: string }[]
     expect(result[0].journal_mode).toBe('wal')
@@ -116,6 +124,45 @@ describe('schema', () => {
 
     const insertedRow = db.prepare('SELECT * FROM places WHERE id = ?').get('new-place') as Record<string, unknown>
     expect(insertedRow.google_maps_uri).toBe('https://maps.google.com/?cid=new')
+  })
+
+  it('migrates legacy scrape_runs schema to add bounds', () => {
+    db.close()
+    try { unlinkSync(dbPath) } catch { /* ignore */ }
+
+    const legacyDb = new Database(dbPath)
+    legacyDb.exec(`
+      CREATE TABLE projects (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        bounds TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE TABLE scrape_runs (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        query TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'discovery',
+        status TEXT NOT NULL DEFAULT 'pending',
+        tiles_total INTEGER NOT NULL DEFAULT 0,
+        tiles_completed INTEGER NOT NULL DEFAULT 0,
+        tiles_subdivided INTEGER NOT NULL DEFAULT 0,
+        places_found INTEGER NOT NULL DEFAULT 0,
+        places_unique INTEGER NOT NULL DEFAULT 0,
+        started_at TEXT,
+        completed_at TEXT
+      );
+    `)
+    legacyDb.close()
+
+    db = createDatabase(dbPath)
+
+    const columns = db
+      .prepare('PRAGMA table_info(scrape_runs)')
+      .all() as Array<{ name: string }>
+    const columnNames = columns.map((column) => column.name)
+    expect(columnNames).toContain('bounds')
   })
 })
 

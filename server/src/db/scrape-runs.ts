@@ -8,14 +8,15 @@ import { DbError, NotFoundError } from '../errors.js'
 export const createScrapeRun = (
   projectId: string,
   query: string,
-  kind: ScrapeRun['kind'] = 'discovery'
+  kind: ScrapeRun['kind'] = 'discovery',
+  bounds: string | null = null,
 ): Effect.Effect<ScrapeRun, DbError, Db> =>
   Effect.flatMap(Db, ({ db }) =>
     tryDb('create scrape run', () => {
         const id = randomUUID()
         db.prepare(
-          'INSERT INTO scrape_runs (id, project_id, query, kind) VALUES (?, ?, ?, ?)'
-        ).run(id, projectId, query, kind)
+          'INSERT INTO scrape_runs (id, project_id, query, kind, bounds) VALUES (?, ?, ?, ?, ?)'
+        ).run(id, projectId, query, kind, bounds)
         const row = db.prepare('SELECT * FROM scrape_runs WHERE id = ?').get(id) as Record<string, unknown>
         return mapScrapeRun(row)
     })
@@ -93,6 +94,7 @@ function mapScrapeRun(row: Record<string, unknown>): ScrapeRun {
     projectId: row.project_id as string,
     query: row.query as string,
     kind: (row.kind as ScrapeRun['kind'] | undefined) ?? 'discovery',
+    bounds: (row.bounds as string | null | undefined) ?? null,
     status: row.status as ScrapeRun['status'],
     tilesTotal: row.tiles_total as number,
     tilesCompleted: row.tiles_completed as number,

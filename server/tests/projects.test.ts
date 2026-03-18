@@ -334,6 +334,52 @@ describe('scrape API', () => {
     expect(status.body.elapsedMs).toBeGreaterThanOrEqual(0)
   })
 
+  it('starts a scrape run using the submitted bounds snapshot', async () => {
+    const capturedBounds: StartScrapeConfig['bounds'][] = []
+    setScrapeExecutorForTests(
+      createMockScrapeExecutor({
+        onStart: (config) => {
+          capturedBounds.push(config.bounds)
+        },
+      })
+    )
+
+    const project = await request(app)
+      .post('/api/projects')
+      .send({
+        name: 'Updated Bounds Project',
+        bounds: JSON.stringify({
+          sw: { lat: 39.0, lng: 8.0 },
+          ne: { lat: 39.1, lng: 8.1 },
+        }),
+      })
+
+    const requestedBounds = JSON.stringify({
+      sw: { lat: 39.0, lng: 8.0 },
+      ne: { lat: 39.4, lng: 8.6 },
+    })
+
+    const start = await request(app)
+      .post('/api/scrape/start')
+      .send({
+        projectId: project.body.id,
+        query: 'accommodation',
+        bounds: requestedBounds,
+      })
+
+    expect(start.status).toBe(202)
+    await waitForRunStatus(start.body.scrapeRunId as string, 'completed')
+
+    expect(capturedBounds).toEqual([JSON.parse(requestedBounds)])
+
+    const storedRun = await appRuntime.runPromise(getScrapeRun(start.body.scrapeRunId as string))
+    expect(storedRun.bounds).toBe(requestedBounds)
+
+    const storedProject = await request(app).get(`/api/projects/${project.body.id as string}`)
+    expect(storedProject.status).toBe(200)
+    expect(storedProject.body.bounds).toBe(requestedBounds)
+  })
+
   it('starts a refresh run and updates existing place details', async () => {
     setRescrapeExecutorForTests(createMockRescrapeExecutor())
 
@@ -396,7 +442,15 @@ describe('scrape API', () => {
   })
 
   it('pauses and resumes a run', async () => {
-    setScrapeExecutorForTests(createMockScrapeExecutor({ delayMs: 40 }))
+    const capturedBounds: StartScrapeConfig['bounds'][] = []
+    setScrapeExecutorForTests(
+      createMockScrapeExecutor({
+        delayMs: 40,
+        onStart: (config) => {
+          capturedBounds.push(config.bounds)
+        },
+      })
+    )
 
     const project = await request(app)
       .post('/api/projects')
@@ -408,9 +462,18 @@ describe('scrape API', () => {
         }),
       })
 
+    const requestedBounds = JSON.stringify({
+      sw: { lat: 40.0, lng: 9.0 },
+      ne: { lat: 40.4, lng: 9.4 },
+    })
+
     const start = await request(app)
       .post('/api/scrape/start')
-      .send({ projectId: project.body.id, query: 'family hotels' })
+      .send({
+        projectId: project.body.id,
+        query: 'family hotels',
+        bounds: requestedBounds,
+      })
     const runId = start.body.scrapeRunId as string
 
     const pause = await request(app).post(`/api/scrape/${runId}/pause`)
@@ -419,6 +482,16 @@ describe('scrape API', () => {
 
     await waitForRunStatus(runId, 'paused')
 
+    const updatedProject = await request(app)
+      .put(`/api/projects/${project.body.id as string}`)
+      .send({
+        bounds: JSON.stringify({
+          sw: { lat: 40.0, lng: 9.0 },
+          ne: { lat: 40.2, lng: 9.2 },
+        }),
+      })
+    expect(updatedProject.status).toBe(200)
+
     const resume = await request(app).post(`/api/scrape/${runId}/resume`)
     expect(resume.status).toBe(200)
     expect(resume.body.status).toBe('running')
@@ -426,6 +499,10 @@ describe('scrape API', () => {
     await waitForRunStatus(runId, 'completed')
     const status = await request(app).get(`/api/scrape/${runId}`)
     expect(status.body.status).toBe('completed')
+    expect(capturedBounds).toEqual([
+      JSON.parse(requestedBounds),
+      JSON.parse(requestedBounds),
+    ])
   })
 
   it('streams progress payload over SSE', async () => {
@@ -823,11 +900,13 @@ describe('db modules', () => {
 const createMockScrapeExecutor = (
   options?: {
     delayMs?: number
+    onStart?: (config: StartScrapeConfig) => void
   }
 ): ((config: StartScrapeConfig) => Effect.Effect<void, never, import('../src/db/Db.js').Db>) => {
   const delayMs = options?.delayMs ?? 0
   return (config) =>
     Effect.gen(function* () {
+      options?.onStart?.(config)
       const runningRun = yield* updateScrapeRun(config.scrapeRunId, {
         status: 'running',
         startedAt: new Date().toISOString(),

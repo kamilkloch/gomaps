@@ -8,6 +8,7 @@ import {
   listPlaces,
   listScrapeRuns,
   listTiles,
+  updateProject,
   updateScrapeRun,
 } from '../db/index.js'
 import { NotFoundError, ValidationError } from '../errors.js'
@@ -26,6 +27,7 @@ export const scrapeRouter = Router()
 const StartScrapeBody = Schema.Struct({
   projectId: Schema.String,
   query: Schema.String,
+  bounds: Schema.optional(Schema.String),
   delayMs: Schema.optional(Schema.Number),
 })
 
@@ -75,8 +77,12 @@ scrapeRouter.post('/start', async (req, res) => {
       )
 
       const project = yield* getProject(body.projectId)
-      const bounds = yield* parseProjectBounds(project.bounds)
-      const run = yield* createScrapeRun(project.id, body.query)
+      const bounds = yield* parseProjectBounds(body.bounds ?? project.bounds)
+      const normalizedBounds = JSON.stringify(bounds)
+      if (project.bounds !== normalizedBounds) {
+        yield* updateProject(project.id, { bounds: normalizedBounds })
+      }
+      const run = yield* createScrapeRun(project.id, body.query, 'discovery', normalizedBounds)
 
       startBackgroundScrape({
         scrapeRunId: run.id,
@@ -199,8 +205,8 @@ scrapeRouter.post('/:runId/resume', async (req, res) => {
         )
       }
 
-      const project = yield* getProject(run.projectId)
-      const bounds = yield* parseProjectBounds(project.bounds)
+      const project = run.bounds ? null : yield* getProject(run.projectId)
+      const bounds = yield* parseProjectBounds(run.bounds ?? project?.bounds ?? null)
       const runState = getRunState(run.id)
       runState.pauseRequested = false
 

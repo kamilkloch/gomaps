@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS scrape_runs (
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   query TEXT NOT NULL,
   kind TEXT NOT NULL DEFAULT 'discovery',
+  bounds TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   tiles_total INTEGER NOT NULL DEFAULT 0,
   tiles_completed INTEGER NOT NULL DEFAULT 0,
@@ -109,6 +110,7 @@ export function createDatabase(dbPath: string): Database.Database {
   migrateLegacyPlacesTable(db)
   migratePlacesPhotosUriColumn(db)
   migrateScrapeRunKindColumn(db)
+  migrateScrapeRunBoundsColumn(db)
   return db
 }
 
@@ -241,6 +243,18 @@ const migrateScrapeRunKindColumn = (db: Database.Database): void => {
   }
 
   db.exec("ALTER TABLE scrape_runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'discovery'")
+}
+
+const migrateScrapeRunBoundsColumn = (db: Database.Database): void => {
+  const tableInfo = db
+    .prepare('PRAGMA table_info(scrape_runs)')
+    .all() as Array<{ name: string }>
+  const columnNames = new Set(tableInfo.map((column) => column.name))
+  if (columnNames.has('bounds')) {
+    return
+  }
+
+  db.exec('ALTER TABLE scrape_runs ADD COLUMN bounds TEXT')
 }
 
 const DEFAULT_DB_PATH = process.env.DB_PATH ?? 'data/gomaps.db'

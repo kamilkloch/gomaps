@@ -28,6 +28,7 @@ export interface ScrapeRun {
   projectId: string
   query: string
   kind: 'discovery' | 'refresh'
+  bounds: string | null
   status: 'pending' | 'running' | 'paused' | 'completed' | 'failed'
   tilesTotal: number
   tilesCompleted: number
@@ -249,10 +250,15 @@ export const removeShortlistEntry = async (shortlistId: string, placeId: string)
 export const startScrape = async (
   projectId: string,
   query: string,
+  bounds?: string,
 ): Promise<{ scrapeRunId: string }> =>
   requestJson<{ scrapeRunId: string }>('/scrape/start', {
     method: 'POST',
-    body: JSON.stringify({ projectId, query }),
+    body: JSON.stringify(
+      bounds === undefined
+        ? { projectId, query }
+        : { projectId, query, bounds }
+    ),
   })
 
 export const startRescrape = async (

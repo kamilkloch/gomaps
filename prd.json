@@ -716,6 +716,22 @@
       "priority": -9,
       "passes": true,
       "notes": "Implemented in Explorer detail panel: fullscreen photo browser overlay with Google Maps-style split layout (left thumbnail rail, right active image), keyboard navigation (ArrowLeft/ArrowRight/Escape), focus trap + focus return, modal test ids, and Playwright coverage in explorer-detail.spec.ts."
+    },
+    {
+      "id": "US-030",
+      "title": "Setup scrape bounds fidelity and run-scoped snapshots",
+      "description": "Harden Setup scrape launch so discovery runs always use the exact bounds visible in the UI at the moment the user clicks Start. Persist that bounds snapshot on the scrape run itself, keep project bounds synchronized for future sessions, and ensure paused runs resume against their original snapshot instead of any newer project rectangle.",
+      "acceptanceCriteria": [
+        "Client `POST /api/scrape/start` sends the current Setup selection bounds with the query",
+        "Server start route prefers submitted bounds over stale persisted project bounds and persists the normalized snapshot on the discovery run",
+        "Paused discovery runs resume using `scrape_runs.bounds` rather than mutable `projects.bounds`",
+        "SQLite schema includes a `scrape_runs.bounds` column with migration coverage for existing databases",
+        "Regression tests cover start-with-new-bounds, resume-after-project-bounds-change, and the client API payload branch",
+        "Run and pass: npm run typecheck --workspace=server, npm run typecheck --workspace=client, npm test --workspace=server, npm test --workspace=client, npm run test:coverage"
+      ],
+      "priority": 40,
+      "passes": true,
+      "notes": "Completed by snapshotting Setup bounds into `scrape_runs.bounds`, syncing Start Scrape and Resume to that immutable run input, and adding schema/API regression coverage so the selected blue area is not silently shrunk by stale project state."
     }
   ]
 }

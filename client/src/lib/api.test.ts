@@ -250,16 +250,45 @@ describe('api helpers', () => {
     )
   })
 
-  it('starts scrape with project and query payload', async () => {
+  it('starts scrape with project, query, and bounds payload', async () => {
     mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ scrapeRunId: 'run-7' }), { status: 200 }))
 
-    const result = await startScrape('project-7', 'hotel')
+    const result = await startScrape(
+      'project-7',
+      'hotel',
+      JSON.stringify({
+        sw: { lat: 40.0, lng: 9.0 },
+        ne: { lat: 40.2, lng: 9.3 },
+      }),
+    )
     expect(result).toEqual({ scrapeRunId: 'run-7' })
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/scrape/start',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ projectId: 'project-7', query: 'hotel' }),
+        body: JSON.stringify({
+          projectId: 'project-7',
+          query: 'hotel',
+          bounds: JSON.stringify({
+            sw: { lat: 40.0, lng: 9.0 },
+            ne: { lat: 40.2, lng: 9.3 },
+          }),
+        }),
+      }),
+    )
+  })
+
+  it('starts scrape without bounds when none are provided', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify({ scrapeRunId: 'run-8' }), { status: 200 }))
+
+    const result = await startScrape('project-8', 'villa')
+
+    expect(result).toEqual({ scrapeRunId: 'run-8' })
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/scrape/start',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ projectId: 'project-8', query: 'villa' }),
       }),
     )
   })

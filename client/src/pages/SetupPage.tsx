@@ -459,7 +459,11 @@ export function SetupPage() {
     try {
       setIsStartingScrape(true)
       setErrorMessage(null)
-      const started = await startScrape(projectId, trimmedQuery)
+      const started = await startScrape(
+        projectId,
+        trimmedQuery,
+        JSON.stringify(selectionBounds),
+      )
       await refreshRuns(started.scrapeRunId)
     }
     catch {
