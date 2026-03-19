@@ -40,6 +40,7 @@ const MAP_TILES_TIMEOUT_COPY =
 const BOUNDS_COMPARISON_EPSILON = 1e-6
 
 type SetupMapInteractionMode = 'pan' | 'select'
+type SetupSelectionCoverageState = 'default' | 'covered'
 
 export function SetupPage() {
   const { projectId } = useParams()
@@ -536,6 +537,10 @@ export function SetupPage() {
     : null
   const activeRunBounds = parseBounds(activeRun?.bounds ?? null)
   const activeRunMatchesSelection = areBoundsEqual(activeRunBounds, selectionBounds)
+  const selectionCoverageState: SetupSelectionCoverageState =
+    activeRun?.status === 'completed' && activeRunMatchesSelection
+      ? 'covered'
+      : 'default'
   const isRunActive = progress?.status === 'running' || progress?.status === 'paused'
   const effectiveCompletedTiles = progress
     ? Math.min(progress.tilesTotal, progress.tilesCompleted + progress.tilesSubdivided)
@@ -601,9 +606,12 @@ export function SetupPage() {
                 >
                   <MapBridge onReady={setMap} onTilesLoaded={() => setHasMapTilesLoaded(true)} />
                   <TileOverlayController tiles={runTiles} />
-                  <RunBoundsOverlayController bounds={activeRunBounds} />
+                  <RunBoundsOverlayController
+                    bounds={activeRunMatchesSelection ? null : activeRunBounds}
+                  />
                   <BoundsRectangleController
                     selectedBounds={selectionBounds}
+                    coverageState={selectionCoverageState}
                     mapInteractionMode={mapInteractionMode}
                     onBoundsPreview={handleBoundsPreview}
                     onBoundsCommit={handleBoundsCommit}
@@ -697,7 +705,7 @@ export function SetupPage() {
             <p className="setup-run-footprint" data-testid="setup-run-footprint">
               {activeRunBounds
                 ? activeRunMatchesSelection
-                  ? 'Selected run footprint matches the current blue selection. The green outline marks the run bounds; nested grid lines show subdivisions inside it.'
+                  ? 'Selected run footprint matches the current selection. The selection border turns green to show the area has been scraped; nested grid lines show subdivisions inside it.'
                   : 'Selected run footprint is marked with the green outline. It differs from the current blue selection.'
                 : 'Selected run does not have recorded bounds, so only the tile grid can be shown.'}
             </p>
@@ -955,6 +963,7 @@ function RunBoundsOverlayController({ bounds }: { bounds: Bounds | null }) {
 
 interface BoundsRectangleControllerProps {
   selectedBounds: Bounds | null
+  coverageState: SetupSelectionCoverageState
   mapInteractionMode: SetupMapInteractionMode
   onBoundsPreview: (bounds: Bounds | null) => void
   onBoundsCommit: (bounds: Bounds | null) => void
@@ -962,6 +971,7 @@ interface BoundsRectangleControllerProps {
 
 function BoundsRectangleController({
   selectedBounds,
+  coverageState,
   mapInteractionMode,
   onBoundsPreview,
   onBoundsCommit,
@@ -995,11 +1005,7 @@ function BoundsRectangleController({
       map,
       editable: true,
       draggable: true,
-      strokeColor: '#52a0ff',
-      strokeOpacity: 1,
-      strokeWeight: 2,
-      fillColor: '#1d5eb9',
-      fillOpacity: 0.18,
+      ...selectionRectangleStyle(coverageState),
       visible: false,
     })
 
@@ -1186,9 +1192,12 @@ function BoundsRectangleController({
       return
     }
 
-    rectangle.setBounds(toLatLngBounds(selectedBounds))
+    rectangle.setOptions({
+      ...selectionRectangleStyle(coverageState),
+      bounds: toLatLngBounds(selectedBounds),
+    })
     rectangle.setVisible(true)
-  }, [mapInteractionMode, selectedBounds])
+  }, [coverageState, mapInteractionMode, selectedBounds])
 
   return null
 }
@@ -1364,6 +1373,30 @@ const tileStyle = (status: ScrapeTile['status']): Omit<google.maps.RectangleOpti
     fillColor: '#304158',
     fillOpacity: 0.16,
     zIndex: 1,
+  }
+}
+
+const selectionRectangleStyle = (
+  coverageState: SetupSelectionCoverageState,
+): Omit<google.maps.RectangleOptions, 'bounds'> => {
+  if (coverageState === 'covered') {
+    return {
+      strokeColor: '#53e3a6',
+      strokeOpacity: 1,
+      strokeWeight: 3,
+      fillColor: '#158f62',
+      fillOpacity: 0.12,
+      zIndex: 6,
+    }
+  }
+
+  return {
+    strokeColor: '#52a0ff',
+    strokeOpacity: 1,
+    strokeWeight: 2,
+    fillColor: '#1d5eb9',
+    fillOpacity: 0.18,
+    zIndex: 6,
   }
 }
 

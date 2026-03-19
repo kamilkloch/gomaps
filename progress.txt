@@ -29,6 +29,7 @@
 - **Scrape run kinds:** persist `scrape_runs.kind` (`discovery` | `refresh`) so setup/history UI and route orchestration can distinguish area discovery runs from re-scrape refresh jobs
 - **Run-scoped scrape bounds:** persist the exact bounds snapshot used to start a discovery run on `scrape_runs.bounds`, send the current UI selection with `POST /api/scrape/start`, and resume paused runs from that stored snapshot instead of mutable `projects.bounds`
 - **Setup run-footprint clarity:** when showing a selected Setup run, render its stored bounds separately from the editable blue selection and explain whether they match; subdivided tile grids alone can look inset even when the run covered the full area
+- **Setup covered-selection state:** when the selected completed run matches the current editable bounds, restyle the selection border itself as the coverage indicator instead of stacking a second outline underneath it
 - **Place refresh timestamping:** for Place Details refresh flows, update `places.scraped_at` on each `updatePlace()` write so stale-data indicators and last-scraped metadata stay accurate
 - **Places API requests:** Use `X-Goog-Api-Key` + `X-Goog-FieldMask` headers and wrap network calls in `Effect.tryPromise` with typed `ScrapeError`
 - **Website classification:** Normalize website hostnames with URL parsing (add `https://` fallback for protocol-less inputs), then classify via suffix matching so `www.booking.com` and other subdomains map to the base domain allowlist
@@ -646,4 +647,19 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
 - **Learnings for future iterations:**
   - When a run footprint and the editable selection share the same outer bounds, the tile grid alone may not visually prove full coverage; a separate run-bounds overlay removes that ambiguity.
   - Setup status copy should explain whether the selected run matches the current selection so users can distinguish “coverage is complete” from “selection has changed since the run.”
+---
+## 2026-03-19 01:24:02 CET - US-032
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Updated Setup selection rendering so a completed run that matches the current selection turns the outer selection border green instead of leaving the green footprint hidden underneath the editable blue rectangle.
+- Kept the separate green run-bounds overlay only for mismatched run/selection cases, and adjusted the sidebar explanation to reflect the new “selection border turns green” behavior.
+- Files changed: `client/src/pages/SetupPage.tsx`, `prd.json`, `progress.txt`
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
+- **Learnings for future iterations:**
+  - If two overlays share the same geometry, prefer styling the user-facing primary overlay rather than drawing a second identical outline below it.
+  - Coverage state should be communicated by both color and copy; otherwise users can still misread the map when tile subdivisions dominate the visible surface.
 ---

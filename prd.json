@@ -746,6 +746,20 @@
       "priority": 41,
       "passes": true,
       "notes": "Completed by drawing a dedicated green selected-run outline on the Setup map and adding explanatory sidebar copy so users can tell that the selected run covered the full blue selection even when tile subdivision makes the grid look inset."
+    },
+    {
+      "id": "US-032",
+      "title": "Setup completed selection coverage state",
+      "description": "When the selected completed run used the same bounds as the current editable selection, make the Setup map show that coverage directly on the selection itself. This avoids the full-run green outline being hidden underneath the blue selection border and makes completed coverage obvious at a glance.",
+      "acceptanceCriteria": [
+        "If the active completed run bounds match the current selection, the outer selection border visibly changes to the completed coverage styling",
+        "If the active run bounds differ from the current selection, Setup continues to render a separate run-bounds overlay",
+        "Sidebar copy reflects the new behavior and no longer describes the matching selection as a blue border",
+        "Run and pass: npm run typecheck --workspace=server, npm run typecheck --workspace=client, npm test --workspace=server, npm test --workspace=client, npm run test:coverage"
+      ],
+      "priority": 42,
+      "passes": true,
+      "notes": "Completed by teaching the Setup selection rectangle to switch to the completed green styling when the selected run matches the current bounds, while preserving the separate green run outline for mismatch cases."
     }
   ]
 }
