@@ -60,6 +60,23 @@ export interface ScrapeTile {
   parentTileId: string | null
 }
 
+export interface ProjectAggregateCoverageRectangle {
+  bounds: string
+}
+
+export interface ProjectAggregateCoverageSourceTile {
+  scrapeRunId: string
+  query: string
+  completedAt: string | null
+  bounds: string
+}
+
+export interface ProjectAggregateCoverage {
+  completedDiscoveryRunsCount: number
+  coverageRectangles: ProjectAggregateCoverageRectangle[]
+  sourceTiles: ProjectAggregateCoverageSourceTile[]
+}
+
 export interface Place {
   id: string
   googleMapsUri: string
@@ -188,6 +205,11 @@ export const getScrapeStatus = async (runId: string): Promise<ScrapeProgress> =>
 
 export const listRunTiles = async (runId: string): Promise<ScrapeTile[]> =>
   requestJson<ScrapeTile[]>(`/scrape/${runId}/tiles`)
+
+export const getProjectAggregateCoverage = async (
+  projectId: string,
+): Promise<ProjectAggregateCoverage> =>
+  requestJson<ProjectAggregateCoverage>(`/scrape/coverage?projectId=${encodeURIComponent(projectId)}`)
 
 export const listPlaces = async (projectId?: string): Promise<Place[]> =>
   requestJson<Place[]>(

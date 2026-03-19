@@ -774,6 +774,28 @@
       "priority": 43,
       "passes": true,
       "notes": "Completed by strengthening the matching covered-selection border, muting completed tile fills/strokes when they sit inside that same selection, and updating Setup copy so the rectangles read as footprint plus subdivisions instead of outer and inner footprints."
+    },
+    {
+      "id": "US-034",
+      "title": "Setup aggregate scrape coverage overview",
+      "description": "Add an aggregate coverage view to the Setup page so users can immediately understand what has already been scraped across all completed discovery runs for the current project. Today the page is run-centric: it can show the selected run footprint and tile grid, but it does not answer the broader planning question of 'which parts of this project area have already been covered at least once?'. The new UX should keep the current editable selection distinct, show merged historical scraped coverage by default, and make remaining gaps inside the current selection obvious without forcing the user to manually inspect previous runs one by one. Aggregate coverage must be derived from completed leaf tiles rather than raw run bounds so the map reflects actual scraped area, not merely intended area.",
+      "acceptanceCriteria": [
+        "Setup renders an aggregate historical coverage overlay for the current project using completed discovery-run leaf tiles across all relevant runs, not only the currently selected run",
+        "Aggregate coverage is derived from actual completed tile geometry; do not use raw run bounds as the default aggregate source because run bounds can overstate real coverage",
+        "The current editable selection remains visually distinct from historical coverage at all times",
+        "When the current selection overlaps historical coverage, the user can visually distinguish covered versus uncovered portions of the current selection at a glance",
+        "The default map presentation remains readable when a project has many past runs; individual historical run outlines must not all be shown at once by default",
+        "The sidebar shows a compact summary for the current selection including at minimum: covered percentage within the current selection and the number of completed discovery runs contributing coverage in or intersecting that selection",
+        "The UI provides an explicit, optional affordance to inspect individual run footprints or run-specific coverage without making the default map state noisy",
+        "If there is no current selection, Setup still shows aggregate project coverage in a sensible way and the sidebar copy explains what is being summarized",
+        "If there are no completed discovery runs, the page does not show misleading coverage and the sidebar copy makes the empty state clear",
+        "Refresh/re-scrape jobs that are not area-discovery runs do not pollute the aggregate coverage overlay",
+        "The implementation handles overlapping coverage from multiple runs without double-counting visual area or inflating the sidebar coverage percentage beyond 100%",
+        "Run and pass: npm run typecheck --workspace=server, npm run typecheck --workspace=client, npm test --workspace=server, npm test --workspace=client, npm run test:coverage"
+      ],
+      "priority": 44,
+      "passes": true,
+      "notes": "Completed with a new `/api/scrape/coverage` project-coverage API sourced from completed discovery-run leaf tiles only (excluding refresh runs and subdivided parents), merged historical coverage rectangles for the default Setup map layer, amber gap overlays plus covered-percentage/run-count summary for the current selection, and an explicit selected-run inspection toggle so aggregate history stays primary until the user drills in."
     }
   ]
 }

@@ -87,6 +87,7 @@ npm run dev --workspace=client
 - When ordering SQLite rows by timestamp fields like `created_at`, add a deterministic tie-breaker (`rowid DESC` or equivalent) so rapid same-second inserts keep stable UI ordering
 - In Setup, treat run selection as run-scoped state: when `activeRunId` changes, clear prior progress/tile snapshots before loading the new run so stale counters cannot leak across run switches
 - In Setup, when a completed run matches the current selection, emphasize the outer selection border and de-emphasize inner completed tile fills so subdivision grids do not read like a smaller scrape footprint
+- For Setup aggregate coverage, source project history from completed discovery-run leaf tiles only (exclude refresh runs and any tile with children), merge that coverage into disjoint rectangles for the default map layer, and compute current-selection gap highlighting from that merged coverage instead of raw run bounds
 - For deep links like `/projects/:projectId/setup`, map API `404` responses to a deterministic "Project not found." UI state instead of showing generic transient load errors
 - For Projects, Setup, and Explorer accessibility/E2E stability, expose named regions (`role="region"` + `aria-label`) for key panels and keep table row selection keyboard-accessible via `tabIndex` + Enter/Space handlers
 - The Google Maps JavaScript API (embedded maps in the React UI) is a separate concern from scraping

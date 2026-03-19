@@ -480,11 +480,19 @@ a {
 }
 
 .setup-query-block,
+.setup-coverage-section,
 .setup-runs-section,
 .setup-progress-section {
   margin-top: 1rem;
   border-top: 1px solid #263a58;
   padding-top: 0.95rem;
+}
+
+.setup-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .setup-query-block label {
@@ -554,9 +562,78 @@ a {
 }
 
 .setup-runs-section h3,
-.setup-progress-section h3 {
+.setup-progress-section h3,
+.setup-coverage-section h3 {
   margin: 0;
   font-size: 0.92rem;
+}
+
+.setup-coverage-legend {
+  margin-top: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.setup-coverage-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  border: 1px solid #28415f;
+  border-radius: 999px;
+  background: #0d1728;
+  color: #cfe0f8;
+  padding: 0.26rem 0.6rem;
+  font-size: 0.72rem;
+}
+
+.setup-coverage-swatch {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.setup-coverage-swatch.is-blue {
+  border-color: #52a0ff;
+  background: rgba(29, 94, 185, 0.45);
+}
+
+.setup-coverage-swatch.is-green {
+  border-color: #58d59a;
+  background: rgba(44, 154, 104, 0.55);
+}
+
+.setup-coverage-swatch.is-amber {
+  border-color: #e4a63a;
+  background: rgba(184, 116, 24, 0.6);
+}
+
+.setup-coverage-metrics {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.setup-coverage-metric {
+  border: 1px solid #28415f;
+  border-radius: 0.8rem;
+  background: #0d1728;
+  padding: 0.7rem 0.75rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.setup-coverage-metric-label {
+  color: #95aed1;
+  font-size: 0.72rem;
+}
+
+.setup-coverage-metric-value {
+  color: #eff6ff;
+  font-size: 1.2rem;
+  line-height: 1;
 }
 
 .setup-runs-empty {
@@ -635,6 +712,28 @@ a {
 .setup-run-metrics {
   font-size: 0.73rem;
   color: #9cb4d6;
+}
+
+.setup-run-inspection-button {
+  border: 1px solid #4a6488;
+  border-radius: 999px;
+  background: #172336;
+  color: #dbe7fb;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.32rem 0.65rem;
+  cursor: pointer;
+}
+
+.setup-run-inspection-button.is-active {
+  border-color: #53e3a6;
+  color: #cbf5df;
+}
+
+.setup-run-inspection-copy {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: #9db3d5;
 }
 
 .setup-progress-heading {

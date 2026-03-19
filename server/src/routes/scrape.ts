@@ -4,6 +4,7 @@ import type { Db } from '../db/Db.js'
 import {
   createScrapeRun,
   getProject,
+  getProjectAggregateCoverage,
   getScrapeRun,
   listPlaces,
   listScrapeRuns,
@@ -60,6 +61,29 @@ scrapeRouter.get('/', async (req, res) => {
   await appRuntime.runPromise(
     listScrapeRuns(projectId).pipe(
       Effect.andThen((runs) => Effect.sync(() => res.json(runs))),
+      Effect.catchTag('DbError', (error) =>
+        Effect.sync(() => res.status(500).json({ error: error.message }))
+      )
+    )
+  )
+})
+
+scrapeRouter.get('/coverage', async (req, res) => {
+  const projectId = req.query.projectId
+  if (typeof projectId !== 'string' || projectId.length === 0) {
+    res.status(400).json({ error: 'projectId is required' })
+    return
+  }
+
+  await appRuntime.runPromise(
+    Effect.gen(function* () {
+      yield* getProject(projectId)
+      const coverage = yield* getProjectAggregateCoverage(projectId)
+      res.json(coverage)
+    }).pipe(
+      Effect.catchTag('NotFoundError', () =>
+        Effect.sync(() => res.status(404).json({ error: 'Project not found' }))
+      ),
       Effect.catchTag('DbError', (error) =>
         Effect.sync(() => res.status(500).json({ error: error.message }))
       )

@@ -39,6 +39,23 @@ export interface Tile {
   parentTileId: string | null
 }
 
+export interface ProjectAggregateCoverageRectangle {
+  bounds: string
+}
+
+export interface ProjectAggregateCoverageSourceTile {
+  scrapeRunId: string
+  query: string
+  completedAt: string | null
+  bounds: string
+}
+
+export interface ProjectAggregateCoverage {
+  completedDiscoveryRunsCount: number
+  coverageRectangles: ProjectAggregateCoverageRectangle[]
+  sourceTiles: ProjectAggregateCoverageSourceTile[]
+}
+
 export interface Place {
   id: string
   googleMapsUri: string

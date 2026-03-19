@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import {
   ApiRequestError,
   getProject,
+  getProjectAggregateCoverage,
   getScrapeStatus,
   listRunTiles,
   listScrapeRuns,
@@ -13,16 +14,17 @@ import {
   startScrape,
   subscribeScrapeProgress,
   updateProject,
+  type ProjectAggregateCoverage,
   type Project,
   type ScrapeProgress,
   type ScrapeRun,
   type ScrapeTile,
 } from '../lib/api'
-
-interface Bounds {
-  sw: { lat: number; lng: number }
-  ne: { lat: number; lng: number }
-}
+import {
+  computeSelectionCoverageSummary,
+  parseSetupBounds,
+  type SetupBounds as Bounds,
+} from '../lib/setup-coverage'
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 const IS_E2E_TEST_MODE = import.meta.env.VITE_E2E_TEST_MODE === '1'
@@ -40,7 +42,6 @@ const MAP_TILES_TIMEOUT_COPY =
 const BOUNDS_COMPARISON_EPSILON = 1e-6
 
 type SetupMapInteractionMode = 'pan' | 'select'
-type SetupSelectionCoverageState = 'default' | 'covered'
 
 export function SetupPage() {
   const { projectId } = useParams()
@@ -52,6 +53,9 @@ export function SetupPage() {
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
   const [progress, setProgress] = useState<ScrapeProgress | null>(null)
   const [runTiles, setRunTiles] = useState<ScrapeTile[]>([])
+  const [aggregateCoverage, setAggregateCoverage] = useState<ProjectAggregateCoverage | null>(null)
+  const [isLoadingAggregateCoverage, setIsLoadingAggregateCoverage] = useState(true)
+  const [isInspectingSelectedRun, setIsInspectingSelectedRun] = useState(false)
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [mapLoadErrorMessage, setMapLoadErrorMessage] = useState<string | null>(null)
   const [didMapInitTimeout, setDidMapInitTimeout] = useState(false)
@@ -83,11 +87,39 @@ export function SetupPage() {
   const activeRun = activeRunId
     ? runs.find((run) => run.id === activeRunId) ?? null
     : null
-  const activeRunBounds = parseBounds(activeRun?.bounds ?? null)
+  const activeRunBounds = parseSetupBounds(activeRun?.bounds ?? null)
   const activeRunMatchesSelection = areBoundsEqual(activeRunBounds, selectionBounds)
-  const hasCoveredSelection = activeRun?.status === 'completed' && activeRunMatchesSelection
+  const showSelectedRunDetails = Boolean(
+    activeRun
+      && (
+        activeRun.status === 'running'
+        || activeRun.status === 'paused'
+        || isInspectingSelectedRun
+      ),
+  )
+  const aggregateCoverageBounds = (aggregateCoverage?.coverageRectangles ?? [])
+    .map((rectangle) => parseSetupBounds(rectangle.bounds))
+    .filter(isDefined)
+  const aggregateCoverageSourceTiles = (aggregateCoverage?.sourceTiles ?? [])
+    .map((tile) => {
+      const bounds = parseSetupBounds(tile.bounds)
+      if (!bounds) {
+        return null
+      }
+
+      return {
+        scrapeRunId: tile.scrapeRunId,
+        bounds,
+      }
+    })
+    .filter(isDefined)
+  const selectionCoverageSummary = computeSelectionCoverageSummary(
+    selectionBounds,
+    aggregateCoverageBounds,
+    aggregateCoverageSourceTiles,
+  )
   const tileOverlayDebugSnapshot = runTiles.map((tile) => {
-    const style = tileStyle(tile.status, hasCoveredSelection)
+    const style = tileStyle(tile.status, false)
     return {
       id: tile.id,
       status: tile.status,
@@ -101,6 +133,9 @@ export function SetupPage() {
     hasAppliedInitialBounds.current = false
     setIsProjectMissing(false)
     setMapInteractionMode('pan')
+    setAggregateCoverage(null)
+    setIsLoadingAggregateCoverage(true)
+    setIsInspectingSelectedRun(false)
   }, [projectId])
 
   useEffect(() => {
@@ -136,7 +171,7 @@ export function SetupPage() {
         }
 
         setProject(loadedProject)
-        const parsedBounds = parseBounds(loadedProject.bounds)
+        const parsedBounds = parseSetupBounds(loadedProject.bounds)
         selectionBoundsRef.current = parsedBounds
         setSelectionBounds(parsedBounds)
       }
@@ -147,6 +182,8 @@ export function SetupPage() {
             selectionBoundsRef.current = null
             setSelectionBounds(null)
             setRuns([])
+            setAggregateCoverage(null)
+            setIsLoadingAggregateCoverage(false)
             selectRun(null)
             setIsProjectMissing(true)
             return
@@ -269,6 +306,42 @@ export function SetupPage() {
       isCancelled = true
     }
   }, [isProjectMissing, project?.id, projectId, selectRun])
+
+  useEffect(() => {
+    if (!projectId || !project?.id || isProjectMissing) {
+      return
+    }
+
+    let isCancelled = false
+
+    const loadAggregateCoverage = async () => {
+      try {
+        setIsLoadingAggregateCoverage(true)
+        const projectCoverage = await getProjectAggregateCoverage(projectId)
+        if (isCancelled) {
+          return
+        }
+
+        setAggregateCoverage(projectCoverage)
+      }
+      catch {
+        if (!isCancelled) {
+          setErrorMessage('Unable to load historical coverage right now.')
+        }
+      }
+      finally {
+        if (!isCancelled) {
+          setIsLoadingAggregateCoverage(false)
+        }
+      }
+    }
+
+    void loadAggregateCoverage()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [isProjectMissing, project?.id, projectId])
 
   useEffect(() => {
     if (!activeRunId) {
@@ -432,7 +505,12 @@ export function SetupPage() {
       return
     }
 
-    const scrapeRuns = await listScrapeRuns(projectId)
+    const [scrapeRuns, projectCoverage] = await Promise.all([
+      listScrapeRuns(projectId),
+      getProjectAggregateCoverage(projectId),
+    ])
+    setAggregateCoverage(projectCoverage)
+    setIsLoadingAggregateCoverage(false)
     setRuns(scrapeRuns)
     const selectedRunId = preferredRunId ?? activeRunId
     if (selectedRunId && scrapeRuns.some((run) => run.id === selectedRunId)) {
@@ -538,10 +616,6 @@ export function SetupPage() {
 
   const mapCenter = selectionBounds ? getBoundsCenter(selectionBounds) : FALLBACK_CENTER
   const estimate = selectionBounds ? estimateScrape(selectionBounds) : null
-  const selectionCoverageState: SetupSelectionCoverageState =
-    hasCoveredSelection
-      ? 'covered'
-      : 'default'
   const isRunActive = progress?.status === 'running' || progress?.status === 'paused'
   const effectiveCompletedTiles = progress
     ? Math.min(progress.tilesTotal, progress.tilesCompleted + progress.tilesSubdivided)
@@ -563,6 +637,25 @@ export function SetupPage() {
     : mapInteractionMode === 'select'
       ? 'No area selected yet. Select mode: drag on map to draw your scrape area.'
       : 'No area selected yet. Pan mode: move/zoom map, then switch to Select mode to draw an area.'
+  const completedDiscoveryRunsCount = aggregateCoverage?.completedDiscoveryRunsCount ?? 0
+  const coverageSummaryCopy = completedDiscoveryRunsCount === 0
+    ? isLoadingAggregateCoverage
+      ? 'Loading historical coverage…'
+      : 'No completed discovery coverage yet. Start a discovery scrape to build the historical coverage layer.'
+    : selectionCoverageSummary
+      ? selectionCoverageSummary.coveredPercentage === 100
+        ? 'This selection is already fully covered by previous discovery runs.'
+        : selectionCoverageSummary.coveredPercentage === 0
+          ? 'This selection does not overlap any completed discovery coverage yet.'
+          : 'Green marks prior discovery coverage. Amber highlights the gap still outside that history.'
+      : `Historical coverage from ${completedDiscoveryRunsCount} completed discovery run${completedDiscoveryRunsCount === 1 ? '' : 's'} is shown in green. Select an area to measure overlap and gaps.`
+  const runInspectionCopy = !activeRun
+    ? 'Select a run to inspect its exact footprint and tile grid on the map.'
+    : isRunActive
+      ? 'The active run stays visible on the map so live progress remains readable.'
+      : showSelectedRunDetails
+        ? 'Selected run details are layered on top of aggregate coverage for closer inspection.'
+        : 'Historical aggregate coverage stays primary by default. Turn on selected-run inspection only when you need exact run detail.'
 
   return (
     <main className="setup-page" data-testid="setup-page">
@@ -606,16 +699,29 @@ export function SetupPage() {
                   style={{ width: '100%', height: '100%' }}
                 >
                   <MapBridge onReady={setMap} onTilesLoaded={() => setHasMapTilesLoaded(true)} />
-                  <TileOverlayController
-                    tiles={runTiles}
-                    deemphasizeCompletedTiles={hasCoveredSelection}
+                  <CoverageOverlayController
+                    rectangles={aggregateCoverageBounds}
+                    color="green"
                   />
+                  <CoverageOverlayController
+                    rectangles={selectionCoverageSummary?.uncoveredBounds ?? []}
+                    color="amber"
+                  />
+                  {showSelectedRunDetails ? (
+                    <TileOverlayController
+                      tiles={runTiles}
+                      deemphasizeCompletedTiles={false}
+                    />
+                  ) : null}
                   <RunBoundsOverlayController
-                    bounds={activeRunMatchesSelection ? null : activeRunBounds}
+                    bounds={
+                      showSelectedRunDetails && !activeRunMatchesSelection
+                        ? activeRunBounds
+                        : null
+                    }
                   />
                   <BoundsRectangleController
                     selectedBounds={selectionBounds}
-                    coverageState={selectionCoverageState}
                     mapInteractionMode={mapInteractionMode}
                     onBoundsPreview={handleBoundsPreview}
                     onBoundsCommit={handleBoundsCommit}
@@ -640,9 +746,22 @@ export function SetupPage() {
             ) : null}
 
             {IS_E2E_TEST_MODE ? (
-              <pre hidden data-testid="setup-tile-overlay-debug">
-                {JSON.stringify(tileOverlayDebugSnapshot)}
-              </pre>
+              <>
+                <pre hidden data-testid="setup-tile-overlay-debug">
+                  {JSON.stringify(tileOverlayDebugSnapshot)}
+                </pre>
+                <pre hidden data-testid="setup-aggregate-coverage-debug">
+                  {JSON.stringify({
+                    completedDiscoveryRunsCount,
+                    coverageRectangleCount: aggregateCoverageBounds.length,
+                    sourceTileCount: aggregateCoverageSourceTiles.length,
+                    selectionCoveredPercentage: selectionCoverageSummary?.coveredPercentage ?? null,
+                    selectionContributingRunCount: selectionCoverageSummary?.contributingRunCount ?? null,
+                    uncoveredGapCount: selectionCoverageSummary?.uncoveredBounds.length ?? 0,
+                    showingSelectedRunDetails: showSelectedRunDetails,
+                  })}
+                </pre>
+              </>
             ) : null}
 
             <div className="setup-map-overlay-controls" data-testid="setup-map-overlay-controls">
@@ -705,15 +824,50 @@ export function SetupPage() {
               {isSaving ? 'Saving bounds…' : ''}
             </span>
           </p>
-          {activeRun ? (
+          <section className="setup-coverage-section" data-testid="setup-coverage-section">
+            <div className="setup-section-heading">
+              <h3>Coverage Overview</h3>
+            </div>
+            <div className="setup-coverage-legend" data-testid="setup-coverage-legend">
+              <span className="setup-coverage-legend-item">
+                <span className="setup-coverage-swatch is-blue" aria-hidden="true" />
+                Current selection
+              </span>
+              <span className="setup-coverage-legend-item">
+                <span className="setup-coverage-swatch is-green" aria-hidden="true" />
+                Covered before
+              </span>
+              <span className="setup-coverage-legend-item">
+                <span className="setup-coverage-swatch is-amber" aria-hidden="true" />
+                Gap in selection
+              </span>
+            </div>
+            <div className="setup-coverage-metrics" data-testid="setup-coverage-metrics">
+              <article className="setup-coverage-metric">
+                <span className="setup-coverage-metric-label">
+                  {selectionCoverageSummary ? 'Coverage in current selection' : 'Completed discovery runs'}
+                </span>
+                <strong className="setup-coverage-metric-value">
+                  {selectionCoverageSummary
+                    ? `${selectionCoverageSummary.coveredPercentage}%`
+                    : completedDiscoveryRunsCount}
+                </strong>
+              </article>
+              <article className="setup-coverage-metric">
+                <span className="setup-coverage-metric-label">
+                  {selectionCoverageSummary ? 'Runs affecting this area' : 'Leaf tiles represented'}
+                </span>
+                <strong className="setup-coverage-metric-value">
+                  {selectionCoverageSummary
+                    ? selectionCoverageSummary.contributingRunCount
+                    : aggregateCoverageSourceTiles.length}
+                </strong>
+              </article>
+            </div>
             <p className="setup-run-footprint" data-testid="setup-run-footprint">
-              {activeRunBounds
-                ? activeRunMatchesSelection
-                  ? 'Selected run footprint matches the current selection. The thick green border marks the scraped area; the lighter inner grid only shows tile subdivisions.'
-                  : 'Selected run footprint is marked with the green outline. It differs from the current blue selection.'
-                : 'Selected run does not have recorded bounds, so only the tile grid can be shown.'}
+              {coverageSummaryCopy}
             </p>
-          ) : null}
+          </section>
 
           <div className="setup-query-block">
             <label htmlFor="scrape-query">Query</label>
@@ -758,7 +912,22 @@ export function SetupPage() {
           </div>
 
           <section className="setup-runs-section" data-testid="setup-runs-section">
-            <h3>Previous Runs</h3>
+            <div className="setup-section-heading">
+              <h3>Previous Runs</h3>
+              {activeRun && !isRunActive ? (
+                <button
+                  data-testid="setup-toggle-run-inspection-button"
+                  type="button"
+                  className={`setup-run-inspection-button ${showSelectedRunDetails ? 'is-active' : ''}`}
+                  onClick={() => setIsInspectingSelectedRun((currentValue) => !currentValue)}
+                >
+                  {showSelectedRunDetails ? 'Hide map detail' : 'Inspect on map'}
+                </button>
+              ) : null}
+            </div>
+            <p className="setup-run-inspection-copy" data-testid="setup-run-inspection-copy">
+              {runInspectionCopy}
+            </p>
             {runs.length === 0 ? (
               <p className="setup-runs-empty">No runs yet for this project.</p>
             ) : (
@@ -892,7 +1061,7 @@ function TileOverlayController({
     }
 
     for (const tile of tiles) {
-      const bounds = parseBounds(tile.bounds)
+      const bounds = parseSetupBounds(tile.bounds)
       if (!bounds) {
         continue
       }
@@ -924,6 +1093,45 @@ function TileOverlayController({
       rectangle.setMap(null)
     }
     rectanglesRef.current.clear()
+  }, [])
+
+  return null
+}
+
+function CoverageOverlayController({
+  rectangles,
+  color,
+}: {
+  rectangles: Bounds[]
+  color: 'green' | 'amber'
+}) {
+  const map = useMap()
+  const rectanglesRef = useRef<google.maps.Rectangle[]>([])
+
+  useEffect(() => {
+    for (const rectangle of rectanglesRef.current) {
+      rectangle.setMap(null)
+    }
+    rectanglesRef.current = []
+
+    if (!map) {
+      return
+    }
+
+    const style = aggregateCoverageStyle(color)
+    rectanglesRef.current = rectangles.map((bounds) => new google.maps.Rectangle({
+      map,
+      clickable: false,
+      ...style,
+      bounds: toLatLngBounds(bounds),
+    }))
+  }, [color, map, rectangles])
+
+  useEffect(() => () => {
+    for (const rectangle of rectanglesRef.current) {
+      rectangle.setMap(null)
+    }
+    rectanglesRef.current = []
   }, [])
 
   return null
@@ -973,7 +1181,6 @@ function RunBoundsOverlayController({ bounds }: { bounds: Bounds | null }) {
 
 interface BoundsRectangleControllerProps {
   selectedBounds: Bounds | null
-  coverageState: SetupSelectionCoverageState
   mapInteractionMode: SetupMapInteractionMode
   onBoundsPreview: (bounds: Bounds | null) => void
   onBoundsCommit: (bounds: Bounds | null) => void
@@ -981,7 +1188,6 @@ interface BoundsRectangleControllerProps {
 
 function BoundsRectangleController({
   selectedBounds,
-  coverageState,
   mapInteractionMode,
   onBoundsPreview,
   onBoundsCommit,
@@ -1015,7 +1221,7 @@ function BoundsRectangleController({
       map,
       editable: true,
       draggable: true,
-      ...selectionRectangleStyle(coverageState),
+      ...selectionRectangleStyle(),
       visible: false,
     })
 
@@ -1203,36 +1409,11 @@ function BoundsRectangleController({
     }
 
     rectangle.setOptions({
-      ...selectionRectangleStyle(coverageState),
+      ...selectionRectangleStyle(),
       bounds: toLatLngBounds(selectedBounds),
     })
     rectangle.setVisible(true)
-  }, [coverageState, mapInteractionMode, selectedBounds])
-
-  return null
-}
-
-const parseBounds = (rawBounds: string | null): Bounds | null => {
-  if (!rawBounds) {
-    return null
-  }
-
-  try {
-    const parsed = JSON.parse(rawBounds) as Bounds
-    if (
-      Number.isFinite(parsed.sw.lat)
-      && Number.isFinite(parsed.sw.lng)
-      && Number.isFinite(parsed.ne.lat)
-      && Number.isFinite(parsed.ne.lng)
-      && parsed.sw.lat < parsed.ne.lat
-      && parsed.sw.lng < parsed.ne.lng
-    ) {
-      return parsed
-    }
-  }
-  catch {
-    return null
-  }
+  }, [mapInteractionMode, selectedBounds])
 
   return null
 }
@@ -1400,28 +1581,38 @@ const tileStyle = (
   }
 }
 
-const selectionRectangleStyle = (
-  coverageState: SetupSelectionCoverageState,
-): Omit<google.maps.RectangleOptions, 'bounds'> => {
-  if (coverageState === 'covered') {
-    return {
-      strokeColor: '#7dffbf',
-      strokeOpacity: 1,
-      strokeWeight: 5,
-      fillColor: '#158f62',
-      fillOpacity: 0.14,
-      zIndex: 7,
-    }
-  }
+const aggregateCoverageStyle = (
+  color: 'green' | 'amber',
+): Omit<google.maps.RectangleOptions, 'bounds'> =>
+  color === 'green'
+    ? {
+        strokeColor: '#58d59a',
+        strokeOpacity: 0.72,
+        strokeWeight: 1,
+        fillColor: '#2c9a68',
+        fillOpacity: 0.16,
+        zIndex: 2,
+      }
+    : {
+        strokeColor: '#e4a63a',
+        strokeOpacity: 0.7,
+        strokeWeight: 1,
+        fillColor: '#b87418',
+        fillOpacity: 0.18,
+        zIndex: 3,
+      }
 
-  return {
-    strokeColor: '#52a0ff',
-    strokeOpacity: 1,
-    strokeWeight: 2,
-    fillColor: '#1d5eb9',
-    fillOpacity: 0.18,
-    zIndex: 6,
-  }
+const selectionRectangleStyle = (): Omit<google.maps.RectangleOptions, 'bounds'> => ({
+  strokeColor: '#52a0ff',
+  strokeOpacity: 1,
+  strokeWeight: 2,
+  fillColor: '#1d5eb9',
+  fillOpacity: 0.06,
+  zIndex: 6,
+})
+
+function isDefined<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined
 }
 
 const getForcedMapDiagnostic = (): 'api-key-error' | 'init-timeout' | 'tiles-timeout' | null => {

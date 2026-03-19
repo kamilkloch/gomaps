@@ -21,6 +21,7 @@ const {
   createProject,
   createReview,
   createScrapeRun,
+  createTile,
   createShortlist,
   deleteReview,
   deleteReviewsByPlace,
@@ -41,6 +42,7 @@ const {
   updateScrapeRun,
   updateShortlist,
   updateShortlistEntryNotes,
+  updateTile,
 } = await import('../src/db/index.js')
 const { appRuntime } = await import('../src/runtime.js')
 const {
@@ -580,6 +582,120 @@ describe('scrape API', () => {
     const tiles = await request(app).get(`/api/scrape/${start.body.scrapeRunId}/tiles`)
     expect(tiles.status).toBe(200)
     expect(Array.isArray(tiles.body)).toBe(true)
+  })
+
+  it('returns aggregate historical coverage from completed discovery leaf tiles only', async () => {
+    const project = await request(app)
+      .post('/api/projects')
+      .send({
+        name: 'Aggregate Coverage Project',
+        bounds: JSON.stringify({
+          sw: { lat: 39.5, lng: 8.5 },
+          ne: { lat: 40.5, lng: 9.5 },
+        }),
+      })
+
+    expect(project.status).toBe(201)
+
+    await appRuntime.runPromise(
+      Effect.gen(function* () {
+        const firstRun = yield* createScrapeRun(project.body.id as string, 'hotels', 'discovery')
+        yield* updateScrapeRun(firstRun.id, {
+          status: 'completed',
+          completedAt: '2026-01-03T10:00:00.000Z',
+        })
+
+        const firstLeaf = yield* createTile(
+          firstRun.id,
+          JSON.stringify({
+            sw: { lat: 39.5, lng: 8.5 },
+            ne: { lat: 40.0, lng: 9.0 },
+          }),
+          0,
+        )
+        yield* updateTile(firstLeaf.id, { status: 'completed' })
+
+        const secondRun = yield* createScrapeRun(project.body.id as string, 'villas', 'discovery')
+        yield* updateScrapeRun(secondRun.id, {
+          status: 'completed',
+          completedAt: '2026-01-04T10:00:00.000Z',
+        })
+
+        const parentTile = yield* createTile(
+          secondRun.id,
+          JSON.stringify({
+            sw: { lat: 40.0, lng: 8.5 },
+            ne: { lat: 40.5, lng: 9.5 },
+          }),
+          0,
+        )
+        yield* updateTile(parentTile.id, { status: 'subdivided' })
+
+        const childTileA = yield* createTile(
+          secondRun.id,
+          JSON.stringify({
+            sw: { lat: 40.0, lng: 8.5 },
+            ne: { lat: 40.5, lng: 9.0 },
+          }),
+          1,
+          parentTile.id,
+        )
+        yield* updateTile(childTileA.id, { status: 'completed' })
+
+        const childTileB = yield* createTile(
+          secondRun.id,
+          JSON.stringify({
+            sw: { lat: 40.0, lng: 9.0 },
+            ne: { lat: 40.5, lng: 9.5 },
+          }),
+          1,
+          parentTile.id,
+        )
+        yield* updateTile(childTileB.id, { status: 'completed' })
+
+        const refreshRun = yield* createScrapeRun(project.body.id as string, 'Refresh Data', 'refresh')
+        yield* updateScrapeRun(refreshRun.id, {
+          status: 'completed',
+          completedAt: '2026-01-05T10:00:00.000Z',
+        })
+
+        const refreshTile = yield* createTile(
+          refreshRun.id,
+          JSON.stringify({
+            sw: { lat: 39.5, lng: 9.0 },
+            ne: { lat: 40.0, lng: 9.5 },
+          }),
+          0,
+        )
+        yield* updateTile(refreshTile.id, { status: 'completed' })
+      })
+    )
+
+    const response = await request(app)
+      .get(`/api/scrape/coverage?projectId=${project.body.id as string}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body.completedDiscoveryRunsCount).toBe(2)
+    expect(response.body.sourceTiles).toHaveLength(3)
+    expect(response.body.sourceTiles.map((tile: { query: string }) => tile.query)).toEqual([
+      'villas',
+      'villas',
+      'hotels',
+    ])
+    expect(response.body.coverageRectangles).toEqual([
+      {
+        bounds: JSON.stringify({
+          sw: { lat: 39.5, lng: 8.5 },
+          ne: { lat: 40.0, lng: 9.0 },
+        }),
+      },
+      {
+        bounds: JSON.stringify({
+          sw: { lat: 40.0, lng: 8.5 },
+          ne: { lat: 40.5, lng: 9.5 },
+        }),
+      },
+    ])
   })
 })
 

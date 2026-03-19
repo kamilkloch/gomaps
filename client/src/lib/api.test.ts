@@ -5,6 +5,7 @@ import {
   createShortlist,
   deleteShortlist,
   getProject,
+  getProjectAggregateCoverage,
   getScrapeStatus,
   listShortlistEntries,
   listShortlists,
@@ -151,6 +152,19 @@ describe('api helpers', () => {
     const result = await listRunTiles('run-2')
     expect(result).toEqual([{ id: 'tile-1' }])
     expect(mockFetch).toHaveBeenCalledWith('/api/scrape/run-2/tiles', expect.any(Object))
+  })
+
+  it('gets aggregate project coverage', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ completedDiscoveryRunsCount: 2, coverageRectangles: [], sourceTiles: [] }), { status: 200 }),
+    )
+
+    const result = await getProjectAggregateCoverage('project/id with spaces')
+    expect(result).toEqual({ completedDiscoveryRunsCount: 2, coverageRectangles: [], sourceTiles: [] })
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/scrape/coverage?projectId=project%2Fid%20with%20spaces',
+      expect.any(Object),
+    )
   })
 
   it('lists places with and without a project filter', async () => {

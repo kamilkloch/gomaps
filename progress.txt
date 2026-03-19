@@ -6,6 +6,7 @@
 - **Server build:** `tsc` (standard compilation)
 - **Monorepo:** npm workspaces with `server` and `client` packages
 - **Setup covered-area hierarchy:** when a completed Setup run matches the current selection, make the outer selection border the primary coverage signal and mute inner completed tile styling so subdivision grids do not look like a smaller scraped area
+- **Setup aggregate coverage:** derive the default historical coverage layer from completed discovery-run leaf tiles only, merge overlapping tile rectangles server-side into disjoint coverage rectangles, and compute selection gap emphasis client-side from that merged coverage instead of from raw run bounds
 - **Express version:** Express v5 (no need for @types/express body parsing)
 - **DB layer:** `server/src/db/` — one file per entity, `schema.ts` for init, `types.ts` for interfaces, `index.ts` re-exports all
 - **DB tests:** Use `createDatabase(tempPath)` for isolated test DBs; snake_case columns mapped to camelCase interfaces
@@ -679,4 +680,21 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
   - `npm test --workspace=server`
   - `npm test --workspace=client`
   - `npm run test:coverage`
+---
+## 2026-03-19 02:09:46 CET - US-034
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Added a project-level Setup coverage API that sources completed discovery-run leaf tiles only, excludes refresh runs and subdivided parents, and returns merged historical coverage rectangles plus source-tile metadata.
+- Extended Setup to load aggregate historical coverage, render soft-green historical coverage with amber gap overlays inside the current selection, and keep selected-run map detail behind an explicit inspection toggle unless a run is actively running or paused.
+- Added client-side coverage summary helpers and regression tests for covered percentage math, contributing-run counts, empty/full coverage states, and uncovered-gap rectangle merging, plus API tests for the new coverage request.
+- Files changed: `AGENTS.md`, `client/src/lib/api.ts`, `client/src/lib/api.test.ts`, `client/src/lib/setup-coverage.ts`, `client/src/lib/setup-coverage.test.ts`, `client/src/pages/SetupPage.tsx`, `client/src/styles.css`, `server/src/db/types.ts`, `server/src/db/tiles.ts`, `server/src/routes/scrape.ts`, `server/tests/projects.test.ts`, `prd.json`, `progress.txt`
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
+- **Learnings for future iterations:**
+  - For Setup planning UX, use tile evidence for aggregate history and treat raw run bounds as optional inspection detail rather than default truth.
+  - Returning disjoint aggregate coverage rectangles from the server keeps the map readable and makes client-side gap/percentage calculations deterministic.
+  - New helpers under `client/src/lib/` need exhaustive branch tests because that workspace enforces 100% coverage for lib files.
 ---
