@@ -28,6 +28,7 @@
 - **Scrape route orchestration:** keep background scrape state (`pauseRequested`, in-flight task handles, SSE subscribers) module-scoped in `server/src/routes/scrape.ts`, and expose lightweight test hooks (`set...ForTests`, `reset...ForTests`) to make async integration tests deterministic
 - **Scrape run kinds:** persist `scrape_runs.kind` (`discovery` | `refresh`) so setup/history UI and route orchestration can distinguish area discovery runs from re-scrape refresh jobs
 - **Run-scoped scrape bounds:** persist the exact bounds snapshot used to start a discovery run on `scrape_runs.bounds`, send the current UI selection with `POST /api/scrape/start`, and resume paused runs from that stored snapshot instead of mutable `projects.bounds`
+- **Setup run-footprint clarity:** when showing a selected Setup run, render its stored bounds separately from the editable blue selection and explain whether they match; subdivided tile grids alone can look inset even when the run covered the full area
 - **Place refresh timestamping:** for Place Details refresh flows, update `places.scraped_at` on each `updatePlace()` write so stale-data indicators and last-scraped metadata stay accurate
 - **Places API requests:** Use `X-Goog-Api-Key` + `X-Goog-FieldMask` headers and wrap network calls in `Effect.tryPromise` with typed `ScrapeError`
 - **Website classification:** Normalize website hostnames with URL parsing (add `https://` fallback for protocol-less inputs), then classify via suffix matching so `www.booking.com` and other subdomains map to the base domain allowlist
@@ -630,4 +631,19 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
 - **Learnings for future iterations:**
   - Starting a scrape must snapshot the live UI bounds into the run record; relying on asynchronously persisted project bounds can shrink coverage if the user clicks Start before the save finishes.
   - Resume logic should reload immutable run inputs from the run itself so later project edits do not mutate an in-flight or paused scrape.
+---
+## 2026-03-19 01:05:19 CET - US-031
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Investigated the reported “inner smaller rectangle” screenshot and confirmed the live scrape run already covered the full selected bounds; the confusion came from the Setup visualization rather than the backend scrape footprint.
+- Added a dedicated selected-run bounds overlay and sidebar explanation so Setup explicitly shows when the chosen run matches the current blue selection, even when subdivided tiles make the grid look inset.
+- Files changed: `client/src/pages/SetupPage.tsx`, `client/src/styles.css`, `prd.json`, `progress.txt`
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
+- **Learnings for future iterations:**
+  - When a run footprint and the editable selection share the same outer bounds, the tile grid alone may not visually prove full coverage; a separate run-bounds overlay removes that ambiguity.
+  - Setup status copy should explain whether the selected run matches the current selection so users can distinguish “coverage is complete” from “selection has changed since the run.”
 ---

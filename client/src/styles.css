@@ -468,6 +468,17 @@ a {
   opacity: 1;
 }
 
+.setup-run-footprint {
+  margin-top: 0.55rem;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(83, 227, 166, 0.28);
+  background: rgba(12, 40, 31, 0.58);
+  color: #bdeed5;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .setup-query-block,
 .setup-runs-section,
 .setup-progress-section {

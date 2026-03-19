@@ -732,6 +732,20 @@
       "priority": 40,
       "passes": true,
       "notes": "Completed by snapshotting Setup bounds into `scrape_runs.bounds`, syncing Start Scrape and Resume to that immutable run input, and adding schema/API regression coverage so the selected blue area is not silently shrunk by stale project state."
+    },
+    {
+      "id": "US-031",
+      "title": "Setup selected-run footprint clarity",
+      "description": "Make Setup clearly communicate the footprint of the currently selected scrape run. When a run used the same bounds as the current blue selection, the UI should make that obvious; when it differs, the UI should say so directly. This prevents subdivided tile grids from being misread as a smaller scraped area.",
+      "acceptanceCriteria": [
+        "Setup renders a dedicated selected-run bounds overlay distinct from the editable blue selection when the active run has recorded bounds",
+        "Sidebar copy explicitly tells the user whether the selected run footprint matches the current selection or differs from it",
+        "Older runs without stored bounds continue to render without crashing and show a fallback explanation",
+        "Run and pass: npm run typecheck --workspace=server, npm run typecheck --workspace=client, npm test --workspace=server, npm test --workspace=client, npm run test:coverage"
+      ],
+      "priority": 41,
+      "passes": true,
+      "notes": "Completed by drawing a dedicated green selected-run outline on the Setup map and adding explanatory sidebar copy so users can tell that the selected run covered the full blue selection even when tile subdivision makes the grid look inset."
     }
   ]
 }

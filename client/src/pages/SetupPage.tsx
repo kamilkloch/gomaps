@@ -531,6 +531,11 @@ export function SetupPage() {
 
   const mapCenter = selectionBounds ? getBoundsCenter(selectionBounds) : FALLBACK_CENTER
   const estimate = selectionBounds ? estimateScrape(selectionBounds) : null
+  const activeRun = activeRunId
+    ? runs.find((run) => run.id === activeRunId) ?? null
+    : null
+  const activeRunBounds = parseBounds(activeRun?.bounds ?? null)
+  const activeRunMatchesSelection = areBoundsEqual(activeRunBounds, selectionBounds)
   const isRunActive = progress?.status === 'running' || progress?.status === 'paused'
   const effectiveCompletedTiles = progress
     ? Math.min(progress.tilesTotal, progress.tilesCompleted + progress.tilesSubdivided)
@@ -596,6 +601,7 @@ export function SetupPage() {
                 >
                   <MapBridge onReady={setMap} onTilesLoaded={() => setHasMapTilesLoaded(true)} />
                   <TileOverlayController tiles={runTiles} />
+                  <RunBoundsOverlayController bounds={activeRunBounds} />
                   <BoundsRectangleController
                     selectedBounds={selectionBounds}
                     mapInteractionMode={mapInteractionMode}
@@ -687,6 +693,15 @@ export function SetupPage() {
               {isSaving ? 'Saving bounds…' : ''}
             </span>
           </p>
+          {activeRun ? (
+            <p className="setup-run-footprint" data-testid="setup-run-footprint">
+              {activeRunBounds
+                ? activeRunMatchesSelection
+                  ? 'Selected run footprint matches the current blue selection. The green outline marks the run bounds; nested grid lines show subdivisions inside it.'
+                  : 'Selected run footprint is marked with the green outline. It differs from the current blue selection.'
+                : 'Selected run does not have recorded bounds, so only the tile grid can be shown.'}
+            </p>
+          ) : null}
 
           <div className="setup-query-block">
             <label htmlFor="scrape-query">Query</label>
@@ -891,6 +906,48 @@ function TileOverlayController({ tiles }: { tiles: ScrapeTile[] }) {
       rectangle.setMap(null)
     }
     rectanglesRef.current.clear()
+  }, [])
+
+  return null
+}
+
+function RunBoundsOverlayController({ bounds }: { bounds: Bounds | null }) {
+  const map = useMap()
+  const rectangleRef = useRef<google.maps.Rectangle | null>(null)
+
+  useEffect(() => {
+    if (!map) {
+      return
+    }
+
+    if (!rectangleRef.current) {
+      rectangleRef.current = new google.maps.Rectangle({
+        map,
+        clickable: false,
+        strokeColor: '#53e3a6',
+        strokeOpacity: 0.96,
+        strokeWeight: 3,
+        fillOpacity: 0,
+        zIndex: 5,
+        visible: false,
+      })
+    }
+
+    const rectangle = rectangleRef.current
+    if (!bounds) {
+      rectangle.setVisible(false)
+      return
+    }
+
+    rectangle.setOptions({
+      bounds: toLatLngBounds(bounds),
+      visible: true,
+    })
+  }, [bounds, map])
+
+  useEffect(() => () => {
+    rectangleRef.current?.setMap(null)
+    rectangleRef.current = null
   }, [])
 
   return null
