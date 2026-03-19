@@ -5,6 +5,7 @@
 - **Client build:** `tsc -b && vite build` (project references)
 - **Server build:** `tsc` (standard compilation)
 - **Monorepo:** npm workspaces with `server` and `client` packages
+- **Setup covered-area hierarchy:** when a completed Setup run matches the current selection, make the outer selection border the primary coverage signal and mute inner completed tile styling so subdivision grids do not look like a smaller scraped area
 - **Express version:** Express v5 (no need for @types/express body parsing)
 - **DB layer:** `server/src/db/` — one file per entity, `schema.ts` for init, `types.ts` for interfaces, `index.ts` re-exports all
 - **DB tests:** Use `createDatabase(tempPath)` for isolated test DBs; snake_case columns mapped to camelCase interfaces
@@ -662,4 +663,20 @@ Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
 - **Learnings for future iterations:**
   - If two overlays share the same geometry, prefer styling the user-facing primary overlay rather than drawing a second identical outline below it.
   - Coverage state should be communicated by both color and copy; otherwise users can still misread the map when tile subdivisions dominate the visible surface.
+---
+## 2026-03-19 01:42:05 CET - US-033
+Thread: https://ampcode.com/threads/$AMP_CURRENT_THREAD_ID
+- Reproduced the Setup map issue in a live Playwright session by starting a fresh `accomodation` scrape for the current selected rectangle and confirming the inner completed tile grid still visually competed with the outer covered-selection border.
+- Updated `client/src/pages/SetupPage.tsx` so matching completed selections use a thicker brighter outer border while completed tile rectangles inside that same selection are muted, making the outer rectangle read as the scraped footprint and the inner grid as subdivisions.
+- Added a reusable Setup guidance note to `AGENTS.md` and `## Codebase Patterns`, and clarified the sidebar copy to explain the thick border versus lighter grid.
+- Files changed: `AGENTS.md`, `client/src/pages/SetupPage.tsx`, `prd.json`, `progress.txt`
+- **Learnings for future iterations:**
+  - When one map overlay communicates area state and another communicates processing detail inside the same geometry, the state overlay needs stronger contrast and the detail overlay needs to step back.
+  - Live map verification is worth doing for Setup rendering changes because matching status text can still mask a misleading overlay hierarchy.
+- Quality-gate commands run:
+  - `npm run typecheck --workspace=server`
+  - `npm run typecheck --workspace=client`
+  - `npm test --workspace=server`
+  - `npm test --workspace=client`
+  - `npm run test:coverage`
 ---

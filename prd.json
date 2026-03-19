@@ -760,6 +760,20 @@
       "priority": 42,
       "passes": true,
       "notes": "Completed by teaching the Setup selection rectangle to switch to the completed green styling when the selected run matches the current bounds, while preserving the separate green run outline for mismatch cases."
+    },
+    {
+      "id": "US-033",
+      "title": "Setup covered-area visual hierarchy",
+      "description": "When the current selection has already been fully scraped, keep the completed outer bounds visually dominant over the inner tile grid. Users should immediately read the thick outer green rectangle as the scraped area and the lighter inner rectangles as subdivisions inside it.",
+      "acceptanceCriteria": [
+        "When the active completed run matches the current selection, the outer selection border is visibly stronger than the inner completed tile grid",
+        "Completed tile overlays inside a matching covered selection are visually de-emphasized so they do not imply a smaller scraped rectangle",
+        "Setup sidebar copy explains the thick green border versus the lighter inner grid",
+        "Run and pass: npm run typecheck --workspace=server, npm run typecheck --workspace=client, npm test --workspace=server, npm test --workspace=client, npm run test:coverage"
+      ],
+      "priority": 43,
+      "passes": true,
+      "notes": "Completed by strengthening the matching covered-selection border, muting completed tile fills/strokes when they sit inside that same selection, and updating Setup copy so the rectangles read as footprint plus subdivisions instead of outer and inner footprints."
     }
   ]
 }

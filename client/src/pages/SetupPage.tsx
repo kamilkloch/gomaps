@@ -80,8 +80,14 @@ export function SetupPage() {
   const forceMapTilesTimeout = forcedMapDiagnostic === 'tiles-timeout'
   const trimmedMapsKey = API_KEY?.trim() ?? ''
   const hasMapsKey = trimmedMapsKey.length > 0 && !MAPS_KEY_PLACEHOLDERS.has(trimmedMapsKey)
+  const activeRun = activeRunId
+    ? runs.find((run) => run.id === activeRunId) ?? null
+    : null
+  const activeRunBounds = parseBounds(activeRun?.bounds ?? null)
+  const activeRunMatchesSelection = areBoundsEqual(activeRunBounds, selectionBounds)
+  const hasCoveredSelection = activeRun?.status === 'completed' && activeRunMatchesSelection
   const tileOverlayDebugSnapshot = runTiles.map((tile) => {
-    const style = tileStyle(tile.status)
+    const style = tileStyle(tile.status, hasCoveredSelection)
     return {
       id: tile.id,
       status: tile.status,
@@ -532,13 +538,8 @@ export function SetupPage() {
 
   const mapCenter = selectionBounds ? getBoundsCenter(selectionBounds) : FALLBACK_CENTER
   const estimate = selectionBounds ? estimateScrape(selectionBounds) : null
-  const activeRun = activeRunId
-    ? runs.find((run) => run.id === activeRunId) ?? null
-    : null
-  const activeRunBounds = parseBounds(activeRun?.bounds ?? null)
-  const activeRunMatchesSelection = areBoundsEqual(activeRunBounds, selectionBounds)
   const selectionCoverageState: SetupSelectionCoverageState =
-    activeRun?.status === 'completed' && activeRunMatchesSelection
+    hasCoveredSelection
       ? 'covered'
       : 'default'
   const isRunActive = progress?.status === 'running' || progress?.status === 'paused'
@@ -605,7 +606,10 @@ export function SetupPage() {
                   style={{ width: '100%', height: '100%' }}
                 >
                   <MapBridge onReady={setMap} onTilesLoaded={() => setHasMapTilesLoaded(true)} />
-                  <TileOverlayController tiles={runTiles} />
+                  <TileOverlayController
+                    tiles={runTiles}
+                    deemphasizeCompletedTiles={hasCoveredSelection}
+                  />
                   <RunBoundsOverlayController
                     bounds={activeRunMatchesSelection ? null : activeRunBounds}
                   />
@@ -705,7 +709,7 @@ export function SetupPage() {
             <p className="setup-run-footprint" data-testid="setup-run-footprint">
               {activeRunBounds
                 ? activeRunMatchesSelection
-                  ? 'Selected run footprint matches the current selection. The selection border turns green to show the area has been scraped; nested grid lines show subdivisions inside it.'
+                  ? 'Selected run footprint matches the current selection. The thick green border marks the scraped area; the lighter inner grid only shows tile subdivisions.'
                   : 'Selected run footprint is marked with the green outline. It differs from the current blue selection.'
                 : 'Selected run does not have recorded bounds, so only the tile grid can be shown.'}
             </p>
@@ -861,7 +865,13 @@ function MapBridge({
   return null
 }
 
-function TileOverlayController({ tiles }: { tiles: ScrapeTile[] }) {
+function TileOverlayController({
+  tiles,
+  deemphasizeCompletedTiles,
+}: {
+  tiles: ScrapeTile[]
+  deemphasizeCompletedTiles: boolean
+}) {
   const map = useMap()
   const rectanglesRef = useRef(new globalThis.Map<string, google.maps.Rectangle>())
 
@@ -887,7 +897,7 @@ function TileOverlayController({ tiles }: { tiles: ScrapeTile[] }) {
         continue
       }
 
-      const style = tileStyle(tile.status)
+      const style = tileStyle(tile.status, deemphasizeCompletedTiles)
       const existing = rectanglesRef.current.get(tile.id)
       if (existing) {
         existing.setOptions({
@@ -907,7 +917,7 @@ function TileOverlayController({ tiles }: { tiles: ScrapeTile[] }) {
       })
       rectanglesRef.current.set(tile.id, rectangle)
     }
-  }, [map, tiles])
+  }, [deemphasizeCompletedTiles, map, tiles])
 
   useEffect(() => () => {
     for (const rectangle of rectanglesRef.current.values()) {
@@ -1343,8 +1353,22 @@ const formatDuration = (ms: number): string => {
   return `${minutes}m ${seconds.toString().padStart(2, '0')}s`
 }
 
-const tileStyle = (status: ScrapeTile['status']): Omit<google.maps.RectangleOptions, 'bounds'> => {
+const tileStyle = (
+  status: ScrapeTile['status'],
+  deemphasizeCompletedTiles = false,
+): Omit<google.maps.RectangleOptions, 'bounds'> => {
   if (status === 'completed') {
+    if (deemphasizeCompletedTiles) {
+      return {
+        strokeColor: '#2f8e61',
+        strokeOpacity: 0.55,
+        strokeWeight: 1,
+        fillColor: '#2f8e61',
+        fillOpacity: 0.04,
+        zIndex: 2,
+      }
+    }
+
     return {
       strokeColor: '#4ad18a',
       strokeOpacity: 0.9,
@@ -1381,12 +1405,12 @@ const selectionRectangleStyle = (
 ): Omit<google.maps.RectangleOptions, 'bounds'> => {
   if (coverageState === 'covered') {
     return {
-      strokeColor: '#53e3a6',
+      strokeColor: '#7dffbf',
       strokeOpacity: 1,
-      strokeWeight: 3,
+      strokeWeight: 5,
       fillColor: '#158f62',
-      fillOpacity: 0.12,
-      zIndex: 6,
+      fillOpacity: 0.14,
+      zIndex: 7,
     }
   }
 
